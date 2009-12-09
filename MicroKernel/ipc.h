@@ -45,4 +45,7 @@ long RecvMsg(MESSAGE_DESC **msg);
 /*阻塞并等待消息*/
 void WaitMsg(MESSAGE_DESC **msg);
 
+/*清除线程的消息队列*/
+void FreeAllMsg();
+
 #endif

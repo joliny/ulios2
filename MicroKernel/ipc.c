@@ -101,14 +101,11 @@ long RecvMsg(MESSAGE_DESC **msg)
 	{
 		*msg = CurThed->msg;
 		CurThed->msg = (*msg)->nxt;
-		if (CurThed->msg == NULL)
-			CurThed->lst = NULL;
 		CurThed->MsgCou--;
 	}
 	else	/*没有消息*/
 	{
 		sti();
-		*msg = NULL;
 		return ERROR_HAVENO_MSGDESC;
 	}
 	sti();
@@ -127,4 +124,23 @@ void WaitMsg(MESSAGE_DESC **msg)
 			DeleteThed();
 		RecvMsg(msg);
 	}
+}
+
+/*清除线程的消息队列*/
+void FreeAllMsg()
+{
+	THREAD_DESC *CurThed;
+	MESSAGE_DESC *msg;
+
+	CurThed = CurPmd->CurTmd;
+	cli();
+	for (msg = CurThed->msg; msg; msg = msg->nxt)
+	{
+		msg->data[0] = 0;
+		if (FstMsg > msg)
+			FstMsg = msg;
+	}
+	CurThed->msg = NULL;
+	CurThed->MsgCou = 0;
+	sti();
 }

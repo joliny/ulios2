@@ -58,7 +58,7 @@ void ThedStart()
 	CurThed = CurProc->CurTmd;
 	UstkSiz = CurThed->kstk[1];
 	UstkSiz = (UstkSiz != 0) ? (UstkSiz + 0x00000FFF) & 0xFFFFF000 : THEDSTK_SIZ;
-	if ((CurThed->ustk = LockAllocUFData(CurProc, UstkSiz)) != NULL)
+	if ((CurThed->ustk = LockAllocUFData(CurProc, UstkSiz)))
 		DeleteThed();
 	CurThed->UstkSiz = UstkSiz;
 	CurThed->attr |= THED_ATTR_APPS;
