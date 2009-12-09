@@ -319,6 +319,7 @@ void DeleteThed()
 	CurThed->attr |= THED_ATTR_DEL;	/*标记为正在被删除*/
 	UnregAllIrq();
 	UnregAllKnlPort();
+	FreeAllMsg();
 	LockFreeUFData(CurProc, CurThed->ustk, CurThed->UstkSiz);
 	clilock(CurProc->Page_l || CurExec->Page_l || Kmalloc_l || AllocPage_l);
 	CurTid = CurThed->id.ThedID;
