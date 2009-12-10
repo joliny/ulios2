@@ -3,7 +3,7 @@
 	ProjectType="Visual C++"
 	Version="8.00"
 	Name="ulios"
-	ProjectGUID="{C4B90A21-BDB5-4DD2-BDB5-5092FDA5ED69}"
+	ProjectGUID="{DC75E48B-50F2-49FB-8F57-74F2E016E74E}"
 	RootNamespace="ulios"
 	>
 	<Platforms>
@@ -202,25 +202,13 @@
 			Name="boot"
 			>
 			<File
-				RelativePath=".\boot\c0.asm"
+				RelativePath="boot\c0.asm"
 				>
 			</File>
 			<File
-				RelativePath=".\boot\setup.asm"
+				RelativePath="boot\setup.asm"
 				>
 			</File>
-			<Filter
-				Name="fat32"
-				>
-				<File
-					RelativePath=".\boot\fat32\f32boot.asm"
-					>
-				</File>
-				<File
-					RelativePath=".\boot\fat32\f32ldr.c"
-					>
-				</File>
-			</Filter>
 			<Filter
 				Name="ulifs"
 				>
@@ -230,6 +218,34 @@
 				</File>
 				<File
 					RelativePath="boot\ulifs\ulildr.c"
+					>
+					<FileConfiguration
+						Name="Debug|Win32"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+							PreprocessorDefinitions=""
+						/>
+					</FileConfiguration>
+					<FileConfiguration
+						Name="Release|Win32"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+							PreprocessorDefinitions=""
+						/>
+					</FileConfiguration>
+				</File>
+			</Filter>
+			<Filter
+				Name="fat32"
+				>
+				<File
+					RelativePath="boot\fat32\f32boot.asm"
+					>
+				</File>
+				<File
+					RelativePath="boot\fat32\f32ldr.c"
 					>
 					<FileConfiguration
 						Name="Debug|Win32"
@@ -635,8 +651,24 @@
 			>
 		</File>
 		<File
-			RelativePath=".\test.c"
+			RelativePath="test.c"
 			>
+			<FileConfiguration
+				Name="Debug|Win32"
+				>
+				<Tool
+					Name="VCCLCompilerTool"
+					PreprocessorDefinitions=""
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release|Win32"
+				>
+				<Tool
+					Name="VCCLCompilerTool"
+					PreprocessorDefinitions=""
+				/>
+			</FileConfiguration>
 		</File>
 	</Files>
 	<Globals>
