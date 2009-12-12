@@ -91,7 +91,7 @@ WORD atol(BYTE *str)
 
 	for (i = 0; (c = *str) >= '0' && c <= '9'; str++)
 		i = i * 10 + c - '0';
-	return i;   
+	return i;
 }
 
 void PutChar(BYTE c)

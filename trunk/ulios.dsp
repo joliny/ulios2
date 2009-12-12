@@ -272,6 +272,14 @@ SOURCE=.\MicroKernel\ulios.c
 SOURCE=.\MicroKernel\ulios.ld
 # End Source File
 # End Group
+# Begin Group "tools"
+
+# PROP Default_Filter ""
+# Begin Source File
+
+SOURCE=.\tools\fmtboot.c
+# End Source File
+# End Group
 # Begin Source File
 
 SOURCE=.\Makefile
