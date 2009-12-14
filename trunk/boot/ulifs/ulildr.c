@@ -312,7 +312,7 @@ void main(BPB *bpb)
 	if (ReadPath(bpb, idx, buf, &SrcDir, &DstDir, bpb->BootPath, FAR2LINE((DWORD)((void far *)BootList))) == 0)
 		goto BootError;
 	cmd = BootList;
-	BootList[DstDir.len] = 0;
+	BootList[DstDir.len[0]] = 0;
 	*VesaMode = 0;
 	for (;;)
 	{

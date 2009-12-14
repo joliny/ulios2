@@ -106,6 +106,9 @@ typedef struct _BOOTSEC_ULIFS
 	BYTE	code[384];	/*引导代码*/
 }BOOTSEC_ULIFS;	/*ULIFS引导扇区数据24*/
 
+#define FALSE		0
+#define TRUE		1
+
 #define NO_ERROR	0
 #define ERROR_DISK	1
 #define ERROR_FILE	2
@@ -146,7 +149,7 @@ void ReadPart(PART_INF *part)
 	for (i = 0; i < 0x7F; i++)	/*每个硬盘*/
 	{
 		BOOT_SEC mbr;
-		if (RwSector(i + 0x80, 0, 0, 1, FAR2LINE((DWORD)((void far *)&mbr))) != NO_ERROR)
+		if (RwSector(i + 0x80, FALSE, 0, 1, FAR2LINE((DWORD)((void far *)&mbr))) != NO_ERROR)
 			continue;
 		if (mbr.aa55 != 0xAA55)	/*bad MBR*/
 			continue;
@@ -161,7 +164,7 @@ void ReadPart(PART_INF *part)
 				for (;;)	/*扩展分区的每个逻辑驱动器*/
 				{
 					BOOT_SEC ebr;
-					if (RwSector(i + 0x80, 0, fst, 1, FAR2LINE((DWORD)((void far *)&ebr))) != NO_ERROR)
+					if (RwSector(i + 0x80, FALSE, fst, 1, FAR2LINE((DWORD)((void far *)&ebr))) != NO_ERROR)
 						break;
 					if (ebr.aa55 != 0xAA55)	/*bad EBR*/
 						break;
@@ -202,7 +205,7 @@ int Fat32Setup(BYTE drv, DWORD fst)
 	FILE *f;
 
 	printf("Reading... boot sector\n");
-	if (RwSector(drv, 0, fst, 1, FAR2LINE((DWORD)((void far *)&dbr))) != NO_ERROR)
+	if (RwSector(drv, FALSE, fst, 1, FAR2LINE((DWORD)((void far *)&dbr))) != NO_ERROR)
 		return ERROR_DISK;
 
 	printf("Reading... f32boot\n");
@@ -211,7 +214,8 @@ int Fat32Setup(BYTE drv, DWORD fst)
 	fread(&boot, sizeof(BOOTSEC_FAT32), 1, f);
 	fclose(f);
 
-	memcpy(&boot.bps, dbr.bps, 79);
+	memcpy(&boot.bps, &dbr.bps, 79);
+	boot.ldroff = dbr.backup + 2;
 	boot.secoff = fst;
 
 	memset(buf, 0, sizeof(buf));
@@ -227,17 +231,63 @@ int Fat32Setup(BYTE drv, DWORD fst)
 		return ERROR_FILE;
 	fread(&buf[0xA00], 0x400, 1, f);
 	fclose(f);
+
+	printf("Writing... f32ldr\n");
+	if (RwSector(drv, TRUE, fst + boot.ldroff, 7, FAR2LINE((DWORD)((void far *)buf))) != NO_ERROR)
+		return ERROR_DISK;
+
+	printf("Writing... boot sector\n");
+	if (RwSector(drv, TRUE, fst, 1, FAR2LINE((DWORD)((void far *)&boot))) != NO_ERROR)
+		return ERROR_DISK;
 }
 
-void UlifsSetup(BYTE drv, DWORD fst)
+int UlifsSetup(BYTE drv, DWORD fst)
 {
+	BOOTSEC_ULIFS dbr, boot;
+	BYTE buf[0xE00];
+	FILE *f;
 
+	printf("Reading... boot sector\n");
+	if (RwSector(drv, FALSE, fst, 1, FAR2LINE((DWORD)((void far *)&dbr))) != NO_ERROR)
+		return ERROR_DISK;
+
+	printf("Reading... uliboot\n");
+	if ((f = fopen("ULIBOOT", "rb")) == NULL)
+		return ERROR_FILE;
+	fread(&boot, sizeof(BOOTSEC_ULIFS), 1, f);
+	fclose(f);
+
+	memcpy(&boot.bps, &dbr.bps, 22);
+	boot.secoff = fst;
+
+	memset(buf, 0, sizeof(buf));
+
+	printf("Reading... ulildr\n");
+	if ((f = fopen("ULILDR", "rb")) == NULL)
+		return ERROR_FILE;
+	fread(buf, 0xA00, 1, f);
+	fclose(f);
+
+	printf("Reading... setup\n");
+	if ((f = fopen("SETUP", "rb")) == NULL)
+		return ERROR_FILE;
+	fread(&buf[0xA00], 0x400, 1, f);
+	fclose(f);
+
+	printf("Writing... ulildr\n");
+	if (RwSector(drv, TRUE, fst + 1, 7, FAR2LINE((DWORD)((void far *)buf))) != NO_ERROR)
+		return ERROR_DISK;
+
+	printf("Writing... boot sector\n");
+	if (RwSector(drv, TRUE, fst, 1, FAR2LINE((DWORD)((void far *)&boot))) != NO_ERROR)
+		return ERROR_DISK;
 }
 
 int main()
 {
 	PART_INF part[32], *partp;
 	WORD partn, selp;
+	int res;
 	printf("Welcome to ulios file system setup program!\nI will setup ulios boot program to your hard disk.\nWrite f32boot/f32ldr/setup to partition when you select FAT32\nwrite uliboot/ulildr/setup when you select ULIFS.\n\n");
 	printf("Checking partition information...");
 	ReadPart(part);
@@ -284,10 +334,22 @@ int main()
 	switch (partp->fsid)
 	{
 	case 0x0B:
-		Fat32Setup(partp->drv, partp->fst);
+		res = Fat32Setup(partp->drv, partp->fst);
 		break;
 	case 0x7C:
-		UlifsSetup(partp->drv, partp->fst);
+		res = UlifsSetup(partp->drv, partp->fst);
+		break;
+	}
+	switch (res)
+	{
+	case NO_ERROR:
+		printf("Successful!\n");
+		break;
+	case ERROR_DISK:
+		printf("Disk Error!\n");
+		break;
+	case ERROR_FILE:
+		printf("File Error!\n");
 		break;
 	}
 	return NO_ERROR;
