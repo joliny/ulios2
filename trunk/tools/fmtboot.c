@@ -7,6 +7,7 @@
 
 #include <stdio.h>
 
+typedef unsigned short	BOOL;
 typedef unsigned char	BYTE;
 typedef unsigned short	WORD;
 typedef unsigned long	DWORD;
@@ -109,11 +110,12 @@ typedef struct _BOOTSEC_ULIFS
 #define ERROR_DISK	1
 #define ERROR_FILE	2
 
-/*读取扇区*/
-int ReadSector(BYTE DrvNum,		/*输入：驱动器号*/
-				DWORD BlockAddr,	/*输入：起始扇区号*/
-				WORD BlockCount,	/*输入：扇区数*/
-				DWORD BufferAddr)	/*输出：存放数据线性地址*/
+/*读写扇区*/
+int RwSector(	BYTE	DrvNum,		/*输入：驱动器号*/
+				BOOL	isWrite,	/*输入：是否写入*/
+				DWORD	BlockAddr,	/*输入：起始扇区号*/
+				WORD	BlockCount,	/*输入：扇区数*/
+				DWORD	BufferAddr)	/*输出：存放数据线性地址*/
 {
 	DAP dap;
 
@@ -124,13 +126,16 @@ int ReadSector(BYTE DrvNum,		/*输入：驱动器号*/
 	dap.BlockAddr[0] = BlockAddr;
 	dap.BlockAddr[1] = 0;
 
-	_AH = 0x42;
+	if (isWrite)
+		_AX = 0x4300;
+	else
+		_AX = 0x4200;
 	_DL = DrvNum;
 	_SI = (WORD)(&dap);
 	asm int 13h;
-	asm jc short ReadError;
+	asm jc short DiskError;
 	return NO_ERROR;
-ReadError:
+DiskError:
 	return ERROR_DISK;
 }
 
@@ -138,11 +143,10 @@ ReadError:
 void ReadPart(PART_INF *part)
 {
 	BYTE i, j;
-	BOOT_SEC mbr, ebr;
-
 	for (i = 0; i < 0x7F; i++)	/*每个硬盘*/
 	{
-		if (ReadSector(i + 0x80, 0, 1, FAR2LINE((DWORD)((void far *)&mbr))) != NO_ERROR)
+		BOOT_SEC mbr;
+		if (RwSector(i + 0x80, 0, 0, 1, FAR2LINE((DWORD)((void far *)&mbr))) != NO_ERROR)
 			continue;
 		if (mbr.aa55 != 0xAA55)	/*bad MBR*/
 			continue;
@@ -156,7 +160,8 @@ void ReadPart(PART_INF *part)
 				DWORD fst = CurPart->fst;
 				for (;;)	/*扩展分区的每个逻辑驱动器*/
 				{
-					if (ReadSector(i + 0x80, fst, 1, FAR2LINE((DWORD)((void far *)&ebr))) != NO_ERROR)
+					BOOT_SEC ebr;
+					if (RwSector(i + 0x80, 0, fst, 1, FAR2LINE((DWORD)((void far *)&ebr))) != NO_ERROR)
 						break;
 					if (ebr.aa55 != 0xAA55)	/*bad EBR*/
 						break;
@@ -170,12 +175,12 @@ void ReadPart(PART_INF *part)
 						part->cou = ebr.part[0].cou;
 						part++;
 					}
-					if (ebr.part[1].cou == 0)
-						break;	/*最后一个逻辑驱动器*/
+					if (ebr.part[1].cou == 0)	/*最后一个逻辑驱动器*/
+						break;
 					fst = CurPart->fst + ebr.part[1].fst;
 				}
 			}
-			else	/*普通基本分区*/
+			else	/*普通主分区*/
 			{
 				part->fsid = CurPart->fsid;
 				part->boot = CurPart->boot;
@@ -190,18 +195,18 @@ void ReadPart(PART_INF *part)
 	part->fsid = 0;
 }
 
-int Fat32Setup(BYTE drv, DWORD fst, DWORD cou)
+int Fat32Setup(BYTE drv, DWORD fst)
 {
 	BOOTSEC_FAT32 dbr, boot;
 	BYTE buf[0xE00];
 	FILE *f;
 
 	printf("Reading... boot sector\n");
-	if (ReadSector(drv, fst, 1, FAR2LINE((DWORD)((void far *)&dbr))) != NO_ERROR)
+	if (RwSector(drv, 0, fst, 1, FAR2LINE((DWORD)((void far *)&dbr))) != NO_ERROR)
 		return ERROR_DISK;
 
 	printf("Reading... f32boot\n");
-	if ((f = fopen("f32boot", "rb")) == NULL)
+	if ((f = fopen("F32BOOT", "rb")) == NULL)
 		return ERROR_FILE;
 	fread(&boot, sizeof(BOOTSEC_FAT32), 1, f);
 	fclose(f);
@@ -212,19 +217,19 @@ int Fat32Setup(BYTE drv, DWORD fst, DWORD cou)
 	memset(buf, 0, sizeof(buf));
 
 	printf("Reading... f32ldr\n");
-	if ((f = fopen("f32ldr", "rb")) == NULL)
+	if ((f = fopen("F32LDR", "rb")) == NULL)
 		return ERROR_FILE;
 	fread(buf, 0xA00, 1, f);
 	fclose(f);
 
 	printf("Reading... setup\n");
-	if ((f = fopen("setup", "rb")) == NULL)
+	if ((f = fopen("SETUP", "rb")) == NULL)
 		return ERROR_FILE;
-	fread(buf[0xA00], 0x400, 1, f);
+	fread(&buf[0xA00], 0x400, 1, f);
 	fclose(f);
 }
 
-void UlifsSetup(BYTE drv, DWORD fst, DWORD cou)
+void UlifsSetup(BYTE drv, DWORD fst)
 {
 
 }
@@ -279,10 +284,10 @@ int main()
 	switch (partp->fsid)
 	{
 	case 0x0B:
-		Fat32Setup(partp->drv, partp->fst, partp->cou);
+		Fat32Setup(partp->drv, partp->fst);
 		break;
 	case 0x7C:
-		UlifsSetup(partp->drv, partp->fst, partp->cou);
+		UlifsSetup(partp->drv, partp->fst);
 		break;
 	}
 	return NO_ERROR;

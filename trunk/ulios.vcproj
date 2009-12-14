@@ -646,6 +646,14 @@
 				</File>
 			</Filter>
 		</Filter>
+		<Filter
+			Name="tools"
+			>
+			<File
+				RelativePath=".\tools\fmtboot.c"
+				>
+			</File>
+		</Filter>
 		<File
 			RelativePath="Makefile"
 			>
