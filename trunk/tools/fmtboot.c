@@ -207,7 +207,6 @@ int Fat32Setup(BYTE drv, DWORD fst)
 	printf("Reading... boot sector\n");
 	if (RwSector(drv, FALSE, fst, 1, FAR2LINE((DWORD)((void far *)&dbr))) != NO_ERROR)
 		return ERROR_DISK;
-
 	printf("Reading... f32boot\n");
 	if ((f = fopen("F32BOOT", "rb")) == NULL)
 		return ERROR_FILE;
@@ -225,7 +224,6 @@ int Fat32Setup(BYTE drv, DWORD fst)
 		return ERROR_FILE;
 	fread(buf, 0xA00, 1, f);
 	fclose(f);
-
 	printf("Reading... setup\n");
 	if ((f = fopen("SETUP", "rb")) == NULL)
 		return ERROR_FILE;
@@ -235,10 +233,11 @@ int Fat32Setup(BYTE drv, DWORD fst)
 	printf("Writing... f32ldr\n");
 	if (RwSector(drv, TRUE, fst + boot.ldroff, 7, FAR2LINE((DWORD)((void far *)buf))) != NO_ERROR)
 		return ERROR_DISK;
-
 	printf("Writing... boot sector\n");
 	if (RwSector(drv, TRUE, fst, 1, FAR2LINE((DWORD)((void far *)&boot))) != NO_ERROR)
 		return ERROR_DISK;
+
+	return NO_ERROR;
 }
 
 int UlifsSetup(BYTE drv, DWORD fst)
@@ -250,7 +249,6 @@ int UlifsSetup(BYTE drv, DWORD fst)
 	printf("Reading... boot sector\n");
 	if (RwSector(drv, FALSE, fst, 1, FAR2LINE((DWORD)((void far *)&dbr))) != NO_ERROR)
 		return ERROR_DISK;
-
 	printf("Reading... uliboot\n");
 	if ((f = fopen("ULIBOOT", "rb")) == NULL)
 		return ERROR_FILE;
@@ -267,7 +265,6 @@ int UlifsSetup(BYTE drv, DWORD fst)
 		return ERROR_FILE;
 	fread(buf, 0xA00, 1, f);
 	fclose(f);
-
 	printf("Reading... setup\n");
 	if ((f = fopen("SETUP", "rb")) == NULL)
 		return ERROR_FILE;
@@ -277,10 +274,11 @@ int UlifsSetup(BYTE drv, DWORD fst)
 	printf("Writing... ulildr\n");
 	if (RwSector(drv, TRUE, fst + 1, 7, FAR2LINE((DWORD)((void far *)buf))) != NO_ERROR)
 		return ERROR_DISK;
-
 	printf("Writing... boot sector\n");
 	if (RwSector(drv, TRUE, fst, 1, FAR2LINE((DWORD)((void far *)&boot))) != NO_ERROR)
 		return ERROR_DISK;
+
+	return NO_ERROR;
 }
 
 int main()
