@@ -100,7 +100,7 @@ int main()
 	KPrintf("V_VBEsign:%s\n", vbe->VBESignature);
 	KPrintf("V_VBEver:%X\n", vbe->VBEVersion);
 	KPrintf("V_OEMstr:%s\nV_MList:", (DWORD)addr + FAR2LINE((DWORD)vbe->OEMString) - 0x90000);
-	ml = (DWORD)addr + FAR2LINE((DWORD)vbe->VideoMod) - 0x90000;
+	ml = (WORD*)((DWORD)addr + FAR2LINE((DWORD)vbe->VideoMod) - 0x90000);
 	while (*ml != 0xFFFF)
 		KPrintf(" %X", *ml++);
 	KPrintf("\nV_MEMsize:0x%X\n", vbe->VRAMMemory);

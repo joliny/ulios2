@@ -269,6 +269,10 @@ SOURCE=.\MicroKernel\ulios.c
 # End Group
 # Begin Source File
 
+SOURCE=.\MicroKernel\Makefile
+# End Source File
+# Begin Source File
+
 SOURCE=.\MicroKernel\ulios.ld
 # End Source File
 # End Group
