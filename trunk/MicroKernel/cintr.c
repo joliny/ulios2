@@ -65,8 +65,6 @@ void InitINTR()
 /*注册IRQ信号的响应线程*/
 long RegIrq(DWORD IrqN)
 {
-	if (IrqN >= IRQ_LEN)
-		return ERROR_WRONG_IRQN;
 	cli();
 	if (idt[0x20 + IrqN].d1)
 	{
@@ -98,8 +96,6 @@ long RegIrq(DWORD IrqN)
 /*注销IRQ信号的响应线程*/
 long UnregIrq(DWORD IrqN)
 {
-	if (IrqN >= IRQ_LEN)
-		return ERROR_WRONG_IRQN;
 	cli();
 	if (idt[0x20 + IrqN].d1 == 0)
 	{
@@ -179,6 +175,9 @@ void IsrProc(DWORD edi, DWORD esi, DWORD ebp, DWORD esp, DWORD ebx, DWORD edx, D
 /*所有中断信号的总调函数*/
 void IrqProc(DWORD edi, DWORD esi, DWORD ebp, DWORD esp, DWORD ebx, DWORD edx, DWORD ecx, DWORD eax, WORD gs, WORD fs, WORD es, WORD ds, DWORD IrqN)
 {
+	THREAD_DESC *CurThed;
+
+	CurThed = CurPmd->CurTmd;
 	/*进入中断处理程序以前中断已经关闭*/
 	if (IrqN == 0)
 	{
@@ -186,11 +185,14 @@ void IrqProc(DWORD edi, DWORD esi, DWORD ebp, DWORD esp, DWORD ebx, DWORD edx, D
 		if (SleepList && clock >= SleepList->WakeupClock)	/*延时阻塞链表中有已经超时的线程*/
 			wakeup(SleepList);
 		else
-			schedul();
-		if ((CurPmd->CurTmd->attr & (THED_ATTR_APPS | THED_ATTR_DEL)) == (THED_ATTR_APPS | THED_ATTR_DEL))	/*线程在应用程序态被杀死,立即退出*/
 		{
-			sti();
-			DeleteThed();
+			schedul();
+			if (CurThed->attr & (THED_ATTR_APPS | THED_ATTR_KILLED) == (THED_ATTR_APPS | THED_ATTR_KILLED))	/*线程在应用态下被杀死*/
+			{
+				CurThed->attr &= (~THED_ATTR_KILLED);
+				sti();
+				DeleteThed();
+			}
 		}
 	}
 	else	/*给中断处理进程发送消息*/
@@ -198,20 +200,22 @@ void IrqProc(DWORD edi, DWORD esi, DWORD ebp, DWORD esp, DWORD ebx, DWORD edx, D
 		MESSAGE_DESC *msg;
 
 		sti();
-		if ((msg = AllocMsg()) == NULL)
+		CurThed->attr &= (~THED_ATTR_APPS);	/*进入系统调用态*/
+		if ((msg = AllocMsg()) == NULL)	/*内存不足*/
 		{
-			DebugMsg("HaveNoMsg(irq)\n");
-			return;	/*内存不足*/
+			CurThed->attr |= THED_ATTR_APPS;	/*离开系统调用态*/
+			return;
 		}
 		msg->ptid = IrqPort[IrqN];
 		msg->data[0] = MSG_ATTR_IRQ | IrqN;
 		if (SendMsg(msg) != NO_ERROR)
-			DebugMsg("SendMsgError(irq)\n");
+			FreeMsg(msg);
+		CurThed->attr |= THED_ATTR_APPS;	/*离开系统调用态*/
 	}
 }
 
 /*系统调用接口*/
-void ApiCall(DWORD edi, DWORD esi, DWORD ebp, DWORD esp, DWORD ebx, DWORD edx, DWORD ecx, DWORD eax)
+void ApiCall(DWORD edi, DWORD esi, DWORD ebp, DWORD esp, DWORD ebx, DWORD edx, DWORD ecx, volatile DWORD eax)
 {
 	THREAD_DESC *CurThed;
 
@@ -223,10 +227,7 @@ void ApiCall(DWORD edi, DWORD esi, DWORD ebp, DWORD esp, DWORD ebx, DWORD edx, D
 	CurThed = CurPmd->CurTmd;
 	CurThed->attr &= (~THED_ATTR_APPS);	/*进入系统调用态*/
 	ApiCallTable[eax >> 16](&edi);
-	if (CurThed->attr & THED_ATTR_DEL)	/*线程正在被删除*/
-		DeleteThed();
 	CurThed->attr |= THED_ATTR_APPS;	/*离开系统调用态*/
-	return;
 }
 
 /*以下为API接口函数*/
@@ -289,7 +290,7 @@ void ApiKillThread(DWORD *argv)
 /*创建进程*/
 void ApiCreateProcess(DWORD *argv)
 {
-	argv[EAX_ID] = CreateProc(argv[EBX_ID] & (~EXEC_ARGS_BASESRV), (const BYTE*)argv[ESI_ID], (THREAD_ID*)&argv[EBX_ID]);
+	argv[EAX_ID] = CreateProc(argv[EBX_ID] & (~EXEC_ARGS_BASESRV), &argv[ECX_ID], (THREAD_ID*)&argv[EBX_ID]);
 }
 
 /*退出进程*/
@@ -327,6 +328,8 @@ void ApiRegIrq(DWORD *argv)
 {
 	if (CurPmd->attr & PROC_ATTR_APPS)
 		argv[EAX_ID] = ERROR_NOT_DRIVER;
+	else if (argv[EBX_ID] >= IRQ_LEN)
+		argv[EAX_ID] = ERROR_WRONG_IRQN;
 	else	/*驱动进程特权API*/
 		argv[EAX_ID] = RegIrq(argv[EBX_ID]);
 }
@@ -336,6 +339,8 @@ void ApiUnregIrq(DWORD *argv)
 {
 	if (CurPmd->attr & PROC_ATTR_APPS)
 		argv[EAX_ID] = ERROR_NOT_DRIVER;
+	else if (argv[EBX_ID] >= IRQ_LEN)
+		argv[EAX_ID] = ERROR_WRONG_IRQN;
 	else	/*驱动进程特权API*/
 		argv[EAX_ID] = UnregIrq(argv[EBX_ID]);
 }

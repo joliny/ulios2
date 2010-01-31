@@ -34,29 +34,6 @@ static inline void memcpy32(void *dest, const void *src, DWORD n)
 	__asm__ __volatile__("cld;rep movsl": "=&D"(_dest), "=&S"(_src), "=&c"(_n): "0"(dest), "1"(src), "2"(n): "flags", "memory");
 }
 
-/*8位字符串限长复制*/
-static inline void strncpy8(void *dest, const void *src, DWORD n)
-{
-	register void *_dest;
-	register const void *_src;
-	register DWORD _n;
-	__asm__ __volatile__
-	(
-		"cld\n"
-		"1:\n"
-		"decl %2\n"
-		"js 2f\n"
-		"lodsb\n"
-		"stosb\n"
-		"testb %%al, %%al\n"
-		"jne 1b\n"
-		"2:"
-		: "=&D"(_dest), "=&S"(_src), "=&c"(_n)
-		: "0"(dest), "1"(src), "2"(n)
-		: "flags", "memory"
-	);
-}
-
 /*关中断*/
 static inline void cli()
 {

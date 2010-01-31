@@ -24,41 +24,27 @@ void PutChar(char c)
 
 	if (c == '\n')	/*换行符*/
 	{
-		if (y == YCOU - 1)	/*光标在最后一行，向上滚屏*/
-		{
-			DWORD i;
-			memcpy32(txtmem, &txtmem[XCOU * 2], XCOU * 2 * (YCOU - 1) / sizeof(DWORD));
-			for (i = XCOU * 2 * (YCOU - 1); i < XCOU * 2 * YCOU; i += 2)
-				txtmem[i] = ' ';
-			x = 0;
-		}
-		else
-		{
-			x = 0;
-			y++;
-		}
+		x = 0;
+		y++;
+	}
+	else if (c == '\t')	/*制表符*/
+	{
+		while (x & 7)
+			txtmem[(x++ + y * XCOU) << 1] = ' ';
 	}
 	else
+		txtmem[(x++ + y * XCOU) << 1] = c;
+	if (x == XCOU)	/*光标在最后一列，回到前面*/
 	{
-		txtmem[(x + y * XCOU) << 1] = c;
-		if (x == XCOU - 1)	/*光标在最后一列，回到前面*/
-		{
-			if (y == YCOU - 1)	/*光标在最后一行，向上滚屏*/
-			{
-				DWORD i;
-				memcpy32(txtmem, &txtmem[XCOU * 2], XCOU * 2 * (YCOU - 1) / sizeof(DWORD));
-				for (i = XCOU * 2 * (YCOU - 1); i < XCOU * 2 * YCOU; i += 2)
-					txtmem[i] = ' ';
-				x = 0;
-			}
-			else
-			{
-				x = 0;
-				y++;
-			}
-		}
-		else
-			x++;
+		x = 0;
+		y++;
+	}
+	if (y == YCOU)	/*光标在最后一行，向上滚屏*/
+	{
+		DWORD i;
+		memcpy32(txtmem, &txtmem[XCOU * 2], XCOU * 2 * (YCOU - 1) / sizeof(DWORD));
+		memset32(&txtmem[XCOU * 2 * (YCOU - 1)], 0x07200720, XCOU / 2);
+		y--;
 	}
 
 	x += y * XCOU;

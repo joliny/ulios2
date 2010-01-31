@@ -146,8 +146,6 @@ void SleepCs(DWORD cs)
 		cli();
 		sleep(TRUE);
 		sti();
-		if (CurThed->attr & THED_ATTR_DEL)	/*被杀死的线程立即退出*/
-			DeleteThed();
 	}
 }
 
@@ -166,6 +164,11 @@ void schedul()
 			CurPmd = NxtProc;
 			NxtProc->CurTmd = NxtThed;
 			SwitchTS();
+			if (CurPmd->CurTmd->attr & THED_ATTR_DEL)	/*线程被杀死,立即退出*/
+			{
+				sti();
+				DeleteThed();
+			}
 		}
 	}
 }
@@ -258,6 +261,11 @@ void sleep(BOOL isWaitTime)
 		InsertSleepList(CurThed);
 	}
 	SwitchTS();
+	if (CurThed->attr & THED_ATTR_DEL)	/*被杀死的线程立即退出*/
+	{
+		sti();
+		DeleteThed();
+	}
 }
 
 /*创建线程*/
@@ -304,7 +312,7 @@ long CreateThed(const DWORD *args, THREAD_ID *ptid)
 	return NO_ERROR;
 }
 
-/*删除线程,结束当前线程*/
+/*删除线程*/
 void DeleteThed()
 {
 	PROCESS_DESC *CurProc;
@@ -317,7 +325,7 @@ void DeleteThed()
 	CurThed = CurProc->CurTmd;
 	CurExec = CurProc->exec;
 	CurThed->attr |= THED_ATTR_DEL;	/*标记为正在被删除*/
-	UnregAllIrq();
+	UnregAllIrq();	/*清除线程资源*/
 	UnregAllKnlPort();
 	FreeAllMsg();
 	LockFreeUFData(CurProc, CurThed->ustk, CurThed->UstkSiz);
@@ -330,7 +338,7 @@ void DeleteThed()
 			(*Thedi)->par = CurThed->par;
 	if (CurThed->nxt == CurThed)	/*只剩当前一个就绪线程,需要阻塞进程*/
 	{
-		if (CurProc->TmdCou == 0)	/*只剩当前一个进程,需要删除进程*/
+		if (CurProc->TmdCou == 0)	/*只剩当前一个线程,清除进程资源*/
 		{
 			PROCESS_DESC **Proci;
 			WORD CurPid;
@@ -373,14 +381,13 @@ void DeleteThed()
 	SwitchTS();
 }
 
-/*杀死线程,不能杀死当前线程*/
+/*杀死线程*/
 long KillThed(WORD ThedID)
 {
 	PROCESS_DESC *CurProc;
 	THREAD_DESC *DstThed;
 
 	CurProc = CurPmd;
-	clilock(CurProc->Ufdmt_l || Kmalloc_l);
 	DstThed = CurProc->tmt[ThedID];
 	if (DstThed == NULL)
 	{
@@ -398,7 +405,7 @@ long KillThed(WORD ThedID)
 }
 
 /*创建进程*/
-long CreateProc(DWORD attr, const BYTE *args, THREAD_ID *ptid)
+long CreateProc(DWORD attr, const DWORD *args, THREAD_ID *ptid)
 {
 	PROCESS_DESC *CurProc, *NewProc;
 	THREAD_DESC *NewThed;
@@ -439,7 +446,7 @@ long CreateProc(DWORD attr, const BYTE *args, THREAD_ID *ptid)
 	if (attr & EXEC_ARGS_BASESRV)
 		memcpy32(&NewThed->kstk[1], args, sizeof(PHYBLK_DESC) / sizeof(DWORD));
 	else
-		strncpy8(&NewThed->kstk[1], args, EXEC_ARGS_SIZ);
+		NewThed->kstk[1] = args[0];
 	cli();
 	if (AllocPid(NewProc) != NO_ERROR)
 	{
@@ -479,7 +486,7 @@ long CreateProc(DWORD attr, const BYTE *args, THREAD_ID *ptid)
 	return NO_ERROR;
 }
 
-/*删除进程,结束当前进程*/
+/*删除进程*/
 void DeleteProc()
 {
 	WORD CurTid, ThedID;
@@ -492,7 +499,7 @@ void DeleteProc()
 	DeleteThed();
 }
 
-/*杀死进程,不能杀死当前进程*/
+/*杀死进程*/
 long KillProc(WORD ProcID)
 {
 	return NO_ERROR;
