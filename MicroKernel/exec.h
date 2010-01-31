@@ -9,8 +9,6 @@
 
 #include "ulidef.h"
 
-#define EXEC_ARGS_SIZ		512			/*新建进程文件路径长度*/
-
 #define EXEC_ARGS_BASESRV	0x00000001	/*0:文件进程1:基础服务*/
 #define EXEC_ARGS_DRIVER	0x00000002	/*0:应用进程1:驱动进程*/
 

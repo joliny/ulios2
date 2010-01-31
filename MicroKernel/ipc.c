@@ -120,8 +120,6 @@ void WaitMsg(MESSAGE_DESC **msg)
 		cli();
 		sleep(FALSE);	/*没有消息就等待*/
 		sti();
-		if (CurPmd->CurTmd->attr & THED_ATTR_DEL)	/*被杀死的线程立即退出*/
-			DeleteThed();
 		RecvMsg(msg);
 	}
 }

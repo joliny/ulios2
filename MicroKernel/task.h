@@ -24,6 +24,7 @@ typedef struct _BLK_DESC
 #define THED_ATTR_WAITTIME	0x0002	/*0:不等待时钟1:等待时钟*/
 #define THED_ATTR_APPS		0x0004	/*0:系统调用态1:应用程序态*/
 #define THED_ATTR_DEL		0x0008	/*0:正常状态1:正在被删除*/
+#define THED_ATTR_KILLED	0x0010	/*0:正常状态1:被杀死标志*/
 #define KSTK_LEN			475		/*内核堆栈双字数,保证线程结构大小2KB*/
 #define THEDSTK_SIZ			0x00100000	/*线程默认堆栈大小*/
 typedef struct _THREAD_DESC
@@ -45,7 +46,7 @@ typedef struct _THREAD_DESC
 }THREAD_DESC;	/*线程结构*/
 
 #define PROC_ATTR_APPS		0x0001	/*0:驱动进程1:应用进程*/
-#define PROC_ATTR_DEL		0x0002	/*0:正常状态1:正在被删除*/
+#define PROC_ATTR_KILLED	0x0002	/*0:正常状态1:被杀死标志*/
 #define TMT_LEN				0x100	/*进程中线程表长度*/
 #define UBLKT_LEN			0x100	/*地址块管理表长度*/
 #define UFDMT_LEN			32		/*用户自由数据区管理表长度*/
@@ -97,7 +98,7 @@ void DeleteThed();
 long KillThed(WORD ThedID);
 
 /*创建进程*/
-long CreateProc(DWORD attr, const BYTE *args, THREAD_ID *ptid);
+long CreateProc(DWORD attr, const DWORD *args, THREAD_ID *ptid);
 
 /*删除进程*/
 void DeleteProc();
