@@ -62,7 +62,7 @@ long InitBaseSrv()
 	PHYBLK_DESC *CurSeg;
 
 	for (CurSeg = &BaseSrv[1]; CurSeg->addr; CurSeg++)
-		CreateProc(EXEC_ARGS_BASESRV | EXEC_ARGS_DRIVER, (const BYTE*)CurSeg, NULL);
+		CreateProc(EXEC_ARGS_BASESRV | EXEC_ARGS_DRIVER, (const DWORD*)CurSeg, NULL);
 	return NO_ERROR;
 }
 

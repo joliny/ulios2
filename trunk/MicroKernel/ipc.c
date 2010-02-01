@@ -47,6 +47,25 @@ void FreeMsg(MESSAGE_DESC *msg)
 	sti();
 }
 
+/*清除线程的消息队列*/
+void FreeAllMsg()
+{
+	THREAD_DESC *CurThed;
+	MESSAGE_DESC *msg;
+
+	CurThed = CurPmd->CurTmd;
+	cli();
+	for (msg = CurThed->msg; msg; msg = msg->nxt)
+	{
+		msg->data[0] = 0;
+		if (FstMsg > msg)
+			FstMsg = msg;
+	}
+	CurThed->msg = NULL;
+	CurThed->MsgCou = 0;
+	sti();
+}
+
 /*发送消息*/
 long SendMsg(MESSAGE_DESC *msg)
 {
@@ -113,32 +132,19 @@ long RecvMsg(MESSAGE_DESC **msg)
 }
 
 /*阻塞并等待消息*/
-void WaitMsg(MESSAGE_DESC **msg)
+long WaitMsg(MESSAGE_DESC **msg, DWORD cs)
 {
-	if (RecvMsg(msg) != NO_ERROR)	/*有消息返回消息*/
+	long res;
+
+	if ((res = RecvMsg(msg)) != ERROR_HAVENO_MSGDESC)	/*有消息返回消息*/
+		return res;
+	if (cs)
+		SleepCs(cs);	/*等待指定时间*/
+	else
 	{
 		cli();
 		sleep(FALSE);	/*没有消息就等待*/
 		sti();
-		RecvMsg(msg);
 	}
-}
-
-/*清除线程的消息队列*/
-void FreeAllMsg()
-{
-	THREAD_DESC *CurThed;
-	MESSAGE_DESC *msg;
-
-	CurThed = CurPmd->CurTmd;
-	cli();
-	for (msg = CurThed->msg; msg; msg = msg->nxt)
-	{
-		msg->data[0] = 0;
-		if (FstMsg > msg)
-			FstMsg = msg;
-	}
-	CurThed->msg = NULL;
-	CurThed->MsgCou = 0;
-	sti();
+	return RecvMsg(msg);
 }

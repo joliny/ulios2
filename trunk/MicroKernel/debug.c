@@ -41,7 +41,6 @@ void PutChar(char c)
 	}
 	if (y == YCOU)	/*光标在最后一行，向上滚屏*/
 	{
-		DWORD i;
 		memcpy32(txtmem, &txtmem[XCOU * 2], XCOU * 2 * (YCOU - 1) / sizeof(DWORD));
 		memset32(&txtmem[XCOU * 2 * (YCOU - 1)], 0x07200720, XCOU / 2);
 		y--;
