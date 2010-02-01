@@ -36,6 +36,9 @@ MESSAGE_DESC *AllocMsg();
 /*释放消息结构*/
 void FreeMsg(MESSAGE_DESC *msg);
 
+/*清除线程的消息队列*/
+void FreeAllMsg();
+
 /*发送消息*/
 long SendMsg(MESSAGE_DESC *msg);
 
@@ -43,9 +46,6 @@ long SendMsg(MESSAGE_DESC *msg);
 long RecvMsg(MESSAGE_DESC **msg);
 
 /*阻塞并等待消息*/
-void WaitMsg(MESSAGE_DESC **msg);
-
-/*清除线程的消息队列*/
-void FreeAllMsg();
+long WaitMsg(MESSAGE_DESC **msg, DWORD cs);
 
 #endif

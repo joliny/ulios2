@@ -46,7 +46,7 @@ typedef struct _THREAD_DESC
 }THREAD_DESC;	/*线程结构*/
 
 #define PROC_ATTR_APPS		0x0001	/*0:驱动进程1:应用进程*/
-#define PROC_ATTR_KILLED	0x0002	/*0:正常状态1:被杀死标志*/
+#define PROC_ATTR_DEL		0x0002	/*0:正常状态1:正在被删除*/
 #define TMT_LEN				0x100	/*进程中线程表长度*/
 #define UBLKT_LEN			0x100	/*地址块管理表长度*/
 #define UFDMT_LEN			32		/*用户自由数据区管理表长度*/

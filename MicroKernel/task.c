@@ -164,11 +164,6 @@ void schedul()
 			CurPmd = NxtProc;
 			NxtProc->CurTmd = NxtThed;
 			SwitchTS();
-			if (CurPmd->CurTmd->attr & THED_ATTR_DEL)	/*线程被杀死,立即退出*/
-			{
-				sti();
-				DeleteThed();
-			}
 		}
 	}
 }
@@ -261,8 +256,9 @@ void sleep(BOOL isWaitTime)
 		InsertSleepList(CurThed);
 	}
 	SwitchTS();
-	if (CurThed->attr & THED_ATTR_DEL)	/*被杀死的线程立即退出*/
+	if (CurThed->attr & THED_ATTR_KILLED)	/*线程被杀死*/
 	{
+		CurThed->attr &= (~THED_ATTR_KILLED);
 		sti();
 		DeleteThed();
 	}
@@ -306,9 +302,9 @@ long CreateThed(const DWORD *args, THREAD_ID *ptid)
 	NewThed->nxt = NxtThed;
 	CurThed->nxt = NewThed;
 	NxtThed->pre = NewThed;
+	sti();
 	if (ptid)
 		*ptid = NewThed->id;
-	sti();
 	return NO_ERROR;
 }
 
@@ -385,21 +381,21 @@ void DeleteThed()
 long KillThed(WORD ThedID)
 {
 	PROCESS_DESC *CurProc;
+	THREAD_DESC *CurThed;
 	THREAD_DESC *DstThed;
 
 	CurProc = CurPmd;
+	CurThed = CurProc->CurTmd;
+	cli();
 	DstThed = CurProc->tmt[ThedID];
-	if (DstThed == NULL)
+	if (DstThed == NULL || DstThed == CurThed || (DstThed->attr & THED_ATTR_DEL))
 	{
 		sti();
 		return ERROR_WRONG_THEDID;
 	}
-	if (!(DstThed->attr & (THED_ATTR_SLEEP | THED_ATTR_APPS)))	/*系统调用态的就绪线程不能直接删除*/
-	{
-		DstThed->attr |= THED_ATTR_DEL;
-		sti();
-		return NO_ERROR;
-	}
+	DstThed->attr |= THED_ATTR_KILLED;	/*标记为被杀死*/
+	if (DstThed->attr & THED_ATTR_SLEEP)	/*线程阻塞,首先唤醒线程*/
+		wakeup(DstThed);
 	sti();
 	return NO_ERROR;
 }
@@ -480,28 +476,73 @@ long CreateProc(DWORD attr, const DWORD *args, THREAD_ID *ptid)
 		CurPmd = NewProc;
 		SwitchTS();
 	}
+	sti();
 	if (ptid)
 		*ptid = NewThed->id;
-	sti();
 	return NO_ERROR;
 }
 
 /*删除进程*/
 void DeleteProc()
 {
-	WORD CurTid, ThedID;
+	PROCESS_DESC *CurProc;
+	THREAD_DESC **Thedi;
+	THREAD_DESC *CurThed;
 
-	CurPmd->attr |= PROC_ATTR_DEL;
-	CurTid = CurPmd->CurTmd->id.ThedID;
-	for (ThedID = 0; ThedID < TMT_LEN; ThedID++)
-		if (ThedID != CurTid)
-			KillThed(ThedID);
+	CurProc = CurPmd;
+	CurThed = CurProc->CurTmd;
+	cli();
+	CurProc->attr |= PROC_ATTR_DEL;	/*标记为正在被删除*/
+	for (Thedi = CurProc->tmt; Thedi < CurProc->EndTmd; Thedi++)
+	{
+		THREAD_DESC *DstThed;
+
+		DstThed = *Thedi;
+		if (DstThed && DstThed != CurThed && !(DstThed->attr & THED_ATTR_DEL))
+		{
+			DstThed->attr |= THED_ATTR_KILLED;	/*标记为被杀死*/
+			if (DstThed->attr & THED_ATTR_SLEEP)	/*线程阻塞,首先唤醒线程*/
+				wakeup(DstThed);
+		}
+	}
+	sti();
 	DeleteThed();
 }
 
 /*杀死进程*/
 long KillProc(WORD ProcID)
 {
+	PROCESS_DESC *CurProc;
+	PROCESS_DESC *DstProc;
+	THREAD_DESC **Thedi;
+
+	CurProc = CurPmd;
+	cli();
+	DstProc = pmt[ProcID];
+	if (DstProc == NULL || DstProc == CurProc || (DstProc->attr & PROC_ATTR_DEL))
+	{
+		sti();
+		return ERROR_WRONG_PROCID;
+	}
+	if (!(DstProc->attr & PROC_ATTR_APPS) && (CurProc->attr & PROC_ATTR_APPS))	/*应用进程无权杀死驱动进程*/
+	{
+		sti();
+		return ERROR_NOT_DRIVER;
+	}
+	DstProc->attr |= PROC_ATTR_DEL;	/*标记为正在被删除*/
+	for (Thedi = DstProc->tmt; Thedi < DstProc->EndTmd; Thedi++)
+	{
+		THREAD_DESC *DstThed;
+
+		DstThed = *Thedi;
+		if (DstThed && !(DstThed->attr & THED_ATTR_DEL))
+		{
+			DstThed->attr |= THED_ATTR_KILLED;	/*标记为被杀死*/
+			if (DstThed->attr & THED_ATTR_SLEEP)	/*线程阻塞,首先唤醒线程*/
+				wakeup(DstThed);
+		}
+	}
+	sti();
 	return NO_ERROR;
 }
 

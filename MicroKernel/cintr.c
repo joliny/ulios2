@@ -187,7 +187,7 @@ void IrqProc(DWORD edi, DWORD esi, DWORD ebp, DWORD esp, DWORD ebx, DWORD edx, D
 		else
 		{
 			schedul();
-			if (CurThed->attr & (THED_ATTR_APPS | THED_ATTR_KILLED) == (THED_ATTR_APPS | THED_ATTR_KILLED))	/*线程在应用态下被杀死*/
+			if ((CurThed->attr & (THED_ATTR_APPS | THED_ATTR_KILLED)) == (THED_ATTR_APPS | THED_ATTR_KILLED))	/*线程在应用态下被杀死*/
 			{
 				CurThed->attr &= (~THED_ATTR_KILLED);
 				sti();
@@ -230,8 +230,7 @@ void ApiCall(DWORD edi, DWORD esi, DWORD ebp, DWORD esp, DWORD ebx, DWORD edx, D
 	CurThed->attr |= THED_ATTR_APPS;	/*离开系统调用态*/
 }
 
-/*以下为API接口函数*/
-
+/*以下为API接口函数实现*/
 #define EDI_ID	0
 #define ESI_ID	1
 #define EBP_ID	2
@@ -284,7 +283,10 @@ void ApiExitThread(DWORD *argv)
 /*杀死线程*/
 void ApiKillThread(DWORD *argv)
 {
-	argv[EAX_ID] = KillThed(argv[EBX_ID]);
+	if (argv[EBX_ID] >= TMT_LEN)
+		argv[EAX_ID] = ERROR_WRONG_THEDID;
+	else
+		argv[EAX_ID] = KillThed(argv[EBX_ID]);
 }
 
 /*创建进程*/
@@ -302,7 +304,10 @@ void ApiExitProcess(DWORD *argv)
 /*杀死进程*/
 void ApiKillProcess(DWORD *argv)
 {
-	argv[EAX_ID] = KillThed(argv[EBX_ID]);
+	if (argv[EBX_ID] >= PMT_LEN)
+		argv[EAX_ID] = ERROR_WRONG_PROCID;
+	else
+		argv[EAX_ID] = KillProc(argv[EBX_ID]);
 }
 
 /*注册内核端口对应线程*/
@@ -351,32 +356,23 @@ void ApiSendMsg(DWORD *argv)
 	MESSAGE_DESC *msg;
 
 	if (((THREAD_ID*)&argv[EBX_ID])->ProcID >= PMT_LEN)
-	{
 		argv[EAX_ID] = ERROR_WRONG_PROCID;
-		return;
-	}
-	if (((THREAD_ID*)&argv[EBX_ID])->ThedID >= TMT_LEN)
-	{
+	else if (((THREAD_ID*)&argv[EBX_ID])->ThedID >= TMT_LEN)
 		argv[EAX_ID] = ERROR_WRONG_THEDID;
-		return;
-	}
-	if (argv[ECX_ID] < MSG_ATTR_PROC)
-	{
+	else if (argv[ECX_ID] < MSG_ATTR_PROC)
 		argv[EAX_ID] = ERROR_WRONG_APPMSG;
-		return;
-	}
-	if ((msg = AllocMsg()) == NULL)
-	{
+	else if ((msg = AllocMsg()) == NULL)
 		argv[EAX_ID] = ERROR_HAVENO_MSGDESC;
-		return;
+	else
+	{
+		msg->ptid = *((THREAD_ID*)&argv[EBX_ID]);
+		msg->data[0] = argv[ECX_ID];
+		msg->data[1] = argv[EDX_ID];
+		msg->data[2] = argv[ESI_ID];
+		msg->data[3] = argv[EDI_ID];
+		if ((argv[EAX_ID] = SendMsg(msg)) != NO_ERROR)
+			FreeMsg(msg);
 	}
-	msg->ptid = *((THREAD_ID*)&argv[EBX_ID]);
-	msg->data[0] = argv[ECX_ID];
-	msg->data[1] = argv[EDX_ID];
-	msg->data[2] = argv[ESI_ID];
-	msg->data[3] = argv[EDI_ID];
-	if ((argv[EAX_ID] = SendMsg(msg)) != NO_ERROR)
-		FreeMsg(msg);
 }
 
 /*接收消息*/
@@ -400,23 +396,15 @@ void ApiWaitMsg(DWORD *argv)
 {
 	MESSAGE_DESC *msg;
 
-	if (argv[EBX_ID])
+	if ((argv[EAX_ID] = WaitMsg(&msg, argv[EBX_ID])) == NO_ERROR)
 	{
-		SleepCs(argv[EBX_ID]);	/*等待指定时间*/
-		if ((argv[EAX_ID] = RecvMsg(&msg)) != NO_ERROR)
-			return;
+		argv[EBX_ID] = *((DWORD*)&msg->ptid);
+		argv[ECX_ID] = msg->data[0];
+		argv[EDX_ID] = msg->data[1];
+		argv[ESI_ID] = msg->data[2];
+		argv[EDI_ID] = msg->data[3];
+		FreeMsg(msg);
 	}
-	else
-	{
-		WaitMsg(&msg);
-		argv[EAX_ID] = NO_ERROR;
-	}
-	argv[EBX_ID] = *((DWORD*)&msg->ptid);
-	argv[ECX_ID] = msg->data[0];
-	argv[EDX_ID] = msg->data[1];
-	argv[ESI_ID] = msg->data[2];
-	argv[EDI_ID] = msg->data[3];
-	FreeMsg(msg);
 }
 
 /*映射物理地址*/
