@@ -165,10 +165,10 @@ void UnregAllIrq()
 /*所有异常信号的总调函数*/
 void IsrProc(DWORD edi, DWORD esi, DWORD ebp, DWORD esp, DWORD ebx, DWORD edx, DWORD ecx, DWORD eax, WORD gs, WORD fs, WORD es, WORD ds, DWORD IsrN, DWORD ErrCode, DWORD eip, WORD cs, DWORD eflags)
 {
-	DebugMsg("EAX=%X EBX=%X ECX=%X EDX=%X\n", eax, ebx, ecx, edx);
-	DebugMsg("EBP=%X ESI=%X EDI=%X ESP=%X EIP=%X\n", ebp, esi, edi, esp, eip);
-	DebugMsg("CS=%X DS=%X ES=%X FS=%X GS=%X\n", cs, ds, es, fs, gs);
-	DebugMsg("EFLAGS=%X ISR=%X ERR=%X\n", eflags, IsrN, ErrCode);
+	DebugMsg("EAX=%X\tEBX=%X\tECX=%X\tEDX=%X\n", eax, ebx, ecx, edx);
+	DebugMsg("EBP=%X\tESI=%X\tEDI=%X\tESP=%X\tEIP=%X\n", ebp, esi, edi, esp, eip);
+	DebugMsg("CS=%X\tDS=%X\tES=%X\tFS=%X\tGS=%X\n", cs, ds, es, fs, gs);
+	DebugMsg("EFLAGS=%X\tISR=%X\tERR=%X\n", eflags, IsrN, ErrCode);
 	DeleteThed();
 }
 
@@ -177,7 +177,7 @@ void IrqProc(DWORD edi, DWORD esi, DWORD ebp, DWORD esp, DWORD ebx, DWORD edx, D
 {
 	THREAD_DESC *CurThed;
 
-	CurThed = CurPmd->CurTmd;
+	CurThed = CurPmd ? CurPmd->CurTmd : NULL;
 	/*进入中断处理程序以前中断已经关闭*/
 	if (IrqN == 0)
 	{
@@ -187,7 +187,7 @@ void IrqProc(DWORD edi, DWORD esi, DWORD ebp, DWORD esp, DWORD ebx, DWORD edx, D
 		else
 		{
 			schedul();
-			if ((CurThed->attr & (THED_ATTR_APPS | THED_ATTR_KILLED)) == (THED_ATTR_APPS | THED_ATTR_KILLED))	/*线程在应用态下被杀死*/
+			if (CurThed && (CurThed->attr & (THED_ATTR_APPS | THED_ATTR_KILLED)) == (THED_ATTR_APPS | THED_ATTR_KILLED))	/*线程在应用态下被杀死*/
 			{
 				CurThed->attr &= (~THED_ATTR_KILLED);
 				sti();
@@ -200,17 +200,20 @@ void IrqProc(DWORD edi, DWORD esi, DWORD ebp, DWORD esp, DWORD ebx, DWORD edx, D
 		MESSAGE_DESC *msg;
 
 		sti();
-		CurThed->attr &= (~THED_ATTR_APPS);	/*进入系统调用态*/
+		if (CurThed)
+			CurThed->attr &= (~THED_ATTR_APPS);	/*进入系统调用态*/
 		if ((msg = AllocMsg()) == NULL)	/*内存不足*/
 		{
-			CurThed->attr |= THED_ATTR_APPS;	/*离开系统调用态*/
+			if (CurThed)
+				CurThed->attr |= THED_ATTR_APPS;	/*离开系统调用态*/
 			return;
 		}
 		msg->ptid = IrqPort[IrqN];
 		msg->data[0] = MSG_ATTR_IRQ | IrqN;
 		if (SendMsg(msg) != NO_ERROR)
 			FreeMsg(msg);
-		CurThed->attr |= THED_ATTR_APPS;	/*离开系统调用态*/
+		if (CurThed)
+			CurThed->attr |= THED_ATTR_APPS;	/*离开系统调用态*/
 	}
 }
 
