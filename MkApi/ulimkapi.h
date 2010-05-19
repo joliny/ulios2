@@ -51,17 +51,44 @@ typedef struct _THREAD_ID
 #define ERROR_IRQ_WRONG_CURPROC		-19	/*当前线程无法改动IRQ*/
 
 #define ERROR_NOT_DRIVER			-20	/*非法执行驱动API*/
-#define ERROR_INVALID_MAPADDR		-21	/*非法的映射地址*/
-#define ERROR_INVALID_MAPSIZE		-22	/*非法的映射大小*/
+#define ERROR_INVALID_ADDR			-21	/*无效的地址*/
+#define ERROR_INVALID_MAPADDR		-22	/*非法的映射地址*/
+#define ERROR_INVALID_MAPSIZE		-23	/*非法的映射大小*/
 
-#define MSG_ATTR_ISR		0x00010000	/*异常信号消息*/
-#define MSG_ATTR_IRQ		0x00020000	/*中断信号消息*/
-#define MSG_ATTR_SYS		0x00030000	/*系统消息*/
-#define MSG_ATTR_READ		0x00040000	/*读数据消息,页映射方式读*/
-#define MSG_ATTR_WRITE		0x00050000	/*写数据消息,页映射方式写*/
-#define MSG_ATTR_PROC		0x01000000	/*进程自定义消息最小值*/
+#define ERROR_OUT_OF_TIME			-24	/*超时错误*/
+
+#define MSG_DATA_LEN		8			/*消息数据总双字数*/
+
+#define MSG_ATTR_ISR		0x00010000	/*硬件陷阱消息*/
+#define MSG_ATTR_IRQ		0x00020000	/*硬件中断消息*/
+
+#define MSG_ATTR_THEDEXT	0x00100000	/*线程退出消息*/
+#define MSG_ATTR_PROCEXT	0x00110000	/*进程退出消息*/
+#define MSG_ATTR_EXCEP		0x00120000	/*异常退出消息*/
+#define MSG_ATTR_MAP		0x00130000	/*页映射消息*/
+#define MSG_ATTR_UNMAP		0x00140000	/*解除页映射消息*/
+#define MSG_ATTR_CNLMAP		0x00150000	/*取消页映射消息*/
+
+#define MSG_ATTR_USER		0x01000000	/*用户自定义消息最小值*/
 
 /**********基本操作**********/
+
+/*内存设置*/
+static inline void memset8(void *dest, BYTE b, DWORD n)
+{
+	void *_dest;
+	DWORD _n;
+	__asm__ __volatile__("cld;rep stosb": "=&D"(_dest), "=&c"(_n): "0"(dest), "a"(b), "1"(n): "flags", "memory");
+}
+
+/*内存复制*/
+static inline void memcpy8(void *dest, const void *src, DWORD n)
+{
+	void *_dest;
+	const void *_src;
+	DWORD _n;
+	__asm__ __volatile__("cld;rep movsb": "=&D"(_dest), "=&S"(_src), "=&c"(_n): "0"(dest), "1"(src), "2"(n): "flags", "memory");
+}
 
 /*32位内存设置*/
 static inline void memset32(void *dest, DWORD d, DWORD n)
@@ -80,30 +107,81 @@ static inline void memcpy32(void *dest, const void *src, DWORD n)
 	__asm__ __volatile__("cld;rep movsl": "=&D"(_dest), "=&S"(_src), "=&c"(_n): "0"(dest), "1"(src), "2"(n): "flags", "memory");
 }
 
-/*关中断*/
+/*字符串复制*/
+static inline BYTE *strcpy(BYTE *dest, const BYTE *src)
+{
+	BYTE *_dest;
+	const BYTE *_src;
+	__asm__ __volatile__
+	(
+		"cld\n"
+		"1:\tlodsb\n"
+		"stosb\n"
+		"testb %%al, %%al\n"
+		"jne 1b"
+		: "=&D"(_dest), "=&S"(_src): "0"(dest), "1"(src): "flags", "al", "memory"
+	);
+	return _dest;
+}
+
+/*字符串限量复制*/
+static inline void strncpy(BYTE *dest, const BYTE *src, DWORD n)
+{
+	BYTE *_dest;
+	const BYTE *_src;
+	DWORD _n;
+	__asm__ __volatile__
+	(
+		"cld\n"
+		"1:\tdecl %2\n"
+		"js 2f\n"
+		"lodsb\n"
+		"stosb\n"
+		"testb %%al, %%al\n"
+		"jne 1b\n"
+		"rep stosb\n"
+		"2:"
+		: "=&D"(_dest), "=&S"(_src), "=&c"(_n): "0"(dest), "1"(src), "2"(n): "flags", "al", "memory"
+	);
+}
+
+/*关中断(驱动专用)*/
 static inline void cli()
 {
 	__asm__("cli");
 }
 
-/*开中断*/
+/*开中断(驱动专用)*/
 static inline void sti()
 {
 	__asm__("sti");
 }
 
-/*端口输出字节*/
+/*端口输出字节(驱动专用)*/
 static inline void outb(WORD port, BYTE b)
 {
-	__asm__ __volatile__("outb %1, %0":: "Nd"(port), "a"(b));
+	__asm__ __volatile__("outb %1, %w0":: "d"(port), "a"(b));
 }
 
-/*端口输入字节*/
+/*端口输入字节(驱动专用)*/
 static inline BYTE inb(WORD port)
 {
 	register BYTE b;
-	__asm__ __volatile__("inb %1, %0": "=a"(b): "Nd"(port));
+	__asm__ __volatile__("inb %w1, %0": "=a"(b): "d"(port));
 	return b;
+}
+
+/*设置用户态段寄存器*/
+static inline void SetUserSeg()
+{
+	__asm__
+	(
+		"movw %ss, %ax\n"
+		"movw %ax, %ds\n"
+		"movw %ax, %es\n"
+		"movw %ax, %fs\n"
+		"movw %ax, %gs\n"
+	);
 }
 
 /**********系统调用接口**********/
@@ -133,10 +211,10 @@ static inline long KSleep(DWORD CentiSeconds)
 }
 
 /*创建线程*/
-static inline long KCreateThread(void (*ThreadProc)(), DWORD StackSize, THREAD_ID *ptid)
+static inline long KCreateThread(void (*ThreadProc)(void *data), DWORD StackSize, void *data, THREAD_ID *ptid)
 {
 	register long res;
-	__asm__ __volatile__("int $0xF0": "=a"(res), "=b"(*ptid): "0"(0x030000), "1"(ThreadProc), "c"(StackSize));
+	__asm__ __volatile__("int $0xF0": "=a"(res), "=b"(*ptid): "0"(0x030000), "1"(ThreadProc), "c"(StackSize), "d"(data));
 	return res;
 }
 
@@ -155,10 +233,10 @@ static inline long KKillThread(DWORD ThreadID)
 }
 
 /*创建进程*/
-static inline long KCreateProcess(DWORD attr, DWORD FileID, THREAD_ID *ptid)
+static inline long KCreateProcess(DWORD attr, DWORD FileID, DWORD CentiSeconds, THREAD_ID *ptid)
 {
 	register long res;
-	__asm__ __volatile__("int $0xF0": "=a"(res), "=b"(*ptid): "0"(0x060000), "1"(attr), "c"(FileID));
+	__asm__ __volatile__("int $0xF0": "=a"(res), "=b"(*ptid): "0"(0x060000), "1"(attr), "c"(FileID), "d"(CentiSeconds));
 	return res;
 }
 
@@ -217,51 +295,101 @@ static inline long KUnregIrq(DWORD irq)
 }
 
 /*发送消息*/
-static inline long KSendMsg(THREAD_ID ptid, DWORD c, DWORD d, DWORD src, DWORD dest)
+static inline long KSendMsg(THREAD_ID ptid, DWORD data[MSG_DATA_LEN], DWORD CentiSeconds)
 {
 	register long res;
-	__asm__ __volatile__("int $0xF0": "=a"(res): "0"(0x0E0000), "b"(ptid), "c"(c), "d"(d), "S"(src), "D"(dest));
+	__asm__ __volatile__("int $0xF0": "=a"(res): "0"(0x0E0000), "b"(ptid), "c"(CentiSeconds), "S"(data): "memory");
 	return res;
 }
 
 /*接收消息*/
-static inline long KRecvMsg(THREAD_ID *ptid, DWORD *c, DWORD *d, DWORD *src, DWORD *dest)
+static inline long KRecvMsg(THREAD_ID *ptid, DWORD data[MSG_DATA_LEN], DWORD CentiSeconds)
 {
 	register long res;
-	__asm__ __volatile__("int $0xF0": "=a"(res), "=b"(*ptid), "=c"(*c), "=d"(*d), "=S"(*src), "=D"(*dest): "0"(0x0F0000));
-	return res;
-}
-
-/*阻塞并等待消息*/
-static inline long KWaitMsg(DWORD CentiSeconds, THREAD_ID *ptid, DWORD *c, DWORD *d, DWORD *src, DWORD *dest)
-{
-	register long res;
-	__asm__ __volatile__("int $0xF0": "=a"(res), "=b"(*ptid), "=c"(*c), "=d"(*d), "=S"(*src), "=D"(*dest): "0"(0x100000), "1"(CentiSeconds));
+	__asm__ __volatile__("int $0xF0": "=a"(res), "=b"(*ptid): "0"(0x0F0000), "1"(CentiSeconds), "S"(data): "memory");
 	return res;
 }
 
 /*映射物理地址*/
-static inline long KMapPhyAddr(DWORD *addr, DWORD PhyAddr, DWORD siz)
+static inline long KMapPhyAddr(void **addr, DWORD PhyAddr, DWORD siz)
 {
 	register long res;
-	__asm__ __volatile__("int $0xF0": "=a"(res), "=b"(*addr): "0"(0x110000), "1"(PhyAddr), "c"(siz));
+	__asm__ __volatile__("int $0xF0": "=a"(res), "=S"(*addr): "0"(0x100000), "b"(PhyAddr), "c"(siz): "memory");
 	return res;
 }
 
 /*映射用户地址*/
-static inline long KMapUserAddr(DWORD *addr, DWORD siz)
+static inline long KMapUserAddr(void **addr, DWORD siz)
 {
 	register long res;
-	__asm__ __volatile__("int $0xF0": "=a"(res), "=b"(*addr): "0"(0x120000), "1"(siz));
+	__asm__ __volatile__("int $0xF0": "=a"(res), "=S"(*addr): "0"(0x110000), "c"(siz));
 	return res;
 }
 
 /*回收用户地址块*/
-static inline long KFreeAddr(DWORD addr)
+static inline long KFreeAddr(void *addr)
 {
 	register long res;
-	__asm__ __volatile__("int $0xF0": "=a"(res): "0"(0x130000), "b"(addr));
+	__asm__ __volatile__("int $0xF0": "=a"(res): "0"(0x120000), "S"(addr): "memory");
 	return res;
+}
+
+/*映射进程地址读取*/
+static inline long KReadProcAddr(void *addr, DWORD siz, THREAD_ID ptid, DWORD data[MSG_DATA_LEN], DWORD CentiSeconds)
+{
+	register long res;
+	__asm__ __volatile__("int $0xF0": "=a"(res): "0"(0x130000), "b"(ptid), "c"(siz), "d"(CentiSeconds), "S"(data), "D"(addr): "memory");
+	return res;
+}
+
+/*映射进程地址写入*/
+static inline long KWriteProcAddr(void *addr, DWORD siz, THREAD_ID ptid, DWORD data[MSG_DATA_LEN], DWORD CentiSeconds)
+{
+	register long res;
+	__asm__ __volatile__("int $0xF0": "=a"(res): "0"(0x140000), "b"(ptid), "c"(siz), "d"(CentiSeconds), "S"(data), "D"(addr): "memory");
+	return res;
+}
+
+/*撤销映射进程地址*/
+static inline long KUnmapProcAddr(void *addr, const DWORD data[MSG_DATA_LEN - 2])
+{
+	register long res;
+	__asm__ __volatile__("int $0xF0": "=a"(res): "0"(0x150000), "S"(data), "D"(addr): "memory");
+	return res;
+}
+
+/*取消映射进程地址*/
+static inline long KCnlmapProcAddr(void *addr, const DWORD data[MSG_DATA_LEN - 2])
+{
+	register long res;
+	__asm__ __volatile__("int $0xF0": "=a"(res): "0"(0x160000), "S"(data), "D"(addr): "memory");
+	return res;
+}
+
+/*取得开机经过的时钟*/
+static inline long KGetClock(DWORD *clock)
+{
+	register long res;
+	__asm__ __volatile__("int $0xF0": "=a"(res), "=b"(*clock): "0"(0x170000));
+	return res;
+}
+
+/**********其他**********/
+
+/*锁变量锁定(驱动专用)*/
+static inline void lock(volatile DWORD *l)
+{
+	cli();
+	while (*l)
+		KGiveUp();
+	*l = TRUE;
+	sti();
+}
+
+/*锁变量解锁(驱动专用)*/
+static inline void ulock(volatile DWORD *l)
+{
+	*l = FALSE;
 }
 
 #endif

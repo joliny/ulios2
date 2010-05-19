@@ -12,18 +12,15 @@ int main()
 
 	InitKnlVal();		/*内核变量*/
 	InitKFMT();			/*内核内存管理*/
-	res = InitPMM();	/*物理内存管理*/
-	if (res != NO_ERROR)
+	if ((res = InitPMM()) != NO_ERROR)	/*物理内存管理*/
 		return res;
-	res = InitMsg();	/*消息管理*/
-	if (res != NO_ERROR)
+	if ((res = InitMsg()) != NO_ERROR)	/*消息管理*/
+		return res;
+	if ((res = InitMap()) != NO_ERROR)	/*地址映射管理*/
 		return res;
 	InitEXMT();			/*可执行体管理*/
 	InitPMT();			/*进程管理*/
 	InitKnlProc();		/*内核进程*/
 	InitINTR();			/*中断处理*/
-	res = InitBaseSrv();/*基础服务*/
-	if (res != NO_ERROR)
-		return res;
-	return NO_ERROR;	/*内核初始化完成*/
+	return InitBaseSrv();/*基础服务*/
 }

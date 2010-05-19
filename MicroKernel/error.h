@@ -32,7 +32,10 @@
 #define ERROR_IRQ_WRONG_CURPROC		-19	/*当前线程无法改动IRQ*/
 
 #define ERROR_NOT_DRIVER			-20	/*非法执行驱动API*/
-#define ERROR_INVALID_MAPADDR		-21	/*非法的映射地址*/
-#define ERROR_INVALID_MAPSIZE		-22	/*非法的映射大小*/
+#define ERROR_INVALID_ADDR			-21	/*无效的地址*/
+#define ERROR_INVALID_MAPADDR		-22	/*非法的映射地址*/
+#define ERROR_INVALID_MAPSIZE		-23	/*非法的映射大小*/
+
+#define ERROR_OUT_OF_TIME			-24	/*超时错误*/
 
 #endif

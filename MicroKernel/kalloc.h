@@ -4,8 +4,8 @@
 	最后修改日期：2009-05-29
 */
 
-#ifndef	_KMALLOC_H_
-#define	_KMALLOC_H_
+#ifndef	_KALLOC_H_
+#define	_KALLOC_H_
 
 #include "ulidef.h"
 

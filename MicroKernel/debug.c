@@ -79,7 +79,7 @@ void PutNum(DWORD n, DWORD r)
 	}
 }
 
-/*输出字符窗*/
+/*输出字符串*/
 void PutS(const char *str)
 {
 	while (*str)
@@ -133,6 +133,71 @@ void Print(const char *fmtstr, ...)
 			PutChar(*fmtstr);
 		fmtstr++;
 	}
+}
 
-	return;
+/*格式化输出到指定位置*/
+void XYPrint(DWORD x, DWORD y, const char *fmtstr, ...)
+{
+	DWORD tmpx, tmpy;
+	long num;
+	const DWORD *args = (DWORD*)(&fmtstr);
+
+	outb(0x3D4, 0xF);	/*低字节*/
+	tmpx = inb(0x3D5);
+	outb(0x3D4, 0xE);	/*高字节*/
+	tmpy = inb(0x3D5);
+
+	x += y * XCOU;
+	y = (x >> 8);
+	x &= 0xFF;
+	outb(0x3D4, 0xF);
+	outb(0x3D5, x);
+	outb(0x3D4, 0xE);
+	outb(0x3D5, y);
+
+	while (*fmtstr)
+	{
+		if (*fmtstr == '%')
+		{
+			fmtstr++;
+			switch (*fmtstr)
+			{
+			case 'd':
+				num = *((long*)++args);
+				if (num < 0)
+				{
+					PutChar('-');
+					PutNum(-num, 10);
+				}
+				else
+					PutNum(num, 10);
+				break;
+			case 'u':
+				PutNum(*((DWORD*)++args), 10);
+				break;
+			case 'x':
+			case 'X':
+				PutNum(*((DWORD*)++args), 16);
+				break;
+			case 'o':
+				PutNum(*((DWORD*)++args), 8);
+				break;
+			case 's':
+				PutS(*((char**)++args));
+				break;
+			case 'c':
+				PutChar(*((char*)++args));
+				break;
+			default:
+				PutChar(*fmtstr);
+			}
+		}
+		else
+			PutChar(*fmtstr);
+		fmtstr++;
+	}
+	outb(0x3D4, 0xF);
+	outb(0x3D5, tmpx);
+	outb(0x3D4, 0xE);
+	outb(0x3D5, tmpy);
 }

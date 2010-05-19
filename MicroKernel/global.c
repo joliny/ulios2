@@ -52,17 +52,25 @@ BYTE pg0[PG_LEN];			/*当前页副本4MB*/
 /*初始化内核变量*/
 void InitKnlVal()
 {
-	memset32(kpt, 0xFFFFFFFF, KPT_LEN * sizeof(THREAD_ID) / sizeof(DWORD));	/*初始化内核端口注册表*/
-	memset32(KnlValue, 0, KVAL_LEN * sizeof(BYTE) / sizeof(DWORD));	/*清空零散变量*/
+	memset32(kpt, 0xFFFFFFFF, sizeof(kpt) / sizeof(DWORD));	/*初始化内核端口注册表*/
+	memset32(KnlValue, 0, sizeof(KnlValue) / sizeof(DWORD));	/*清空零散变量*/
 }
 
 /*初始化基础服务*/
 long InitBaseSrv()
 {
+	long res;
 	PHYBLK_DESC *CurSeg;
+	DWORD argv[3];
 
+	argv[0] = EXEC_ARGV_BASESRV | EXEC_ARGV_DRIVER;
 	for (CurSeg = &BaseSrv[1]; CurSeg->addr; CurSeg++)
-		CreateProc(EXEC_ARGS_BASESRV | EXEC_ARGS_DRIVER, (const DWORD*)CurSeg, NULL);
+	{
+		argv[1] = CurSeg->addr;
+		argv[2] = CurSeg->siz;
+		if ((res = CreateProc(argv, (THREAD_ID*)&argv[1])) != NO_ERROR)
+			return res;
+	}
 	return NO_ERROR;
 }
 
@@ -72,7 +80,7 @@ long RegKnlPort(DWORD PortN)
 	if (PortN >= KPT_LEN)
 		return ERROR_WRONG_KPTN;
 	cli();
-	if (kpt[PortN].ProcID != INVWID)
+	if (*(DWORD*)(&kpt[PortN]) != INVALID)
 	{
 		sti();
 		return ERROR_KPT_ISENABLED;
@@ -88,7 +96,7 @@ long UnregKnlPort(DWORD PortN)
 	if (PortN >= KPT_LEN)
 		return ERROR_WRONG_KPTN;
 	cli();
-	if (kpt[PortN].ProcID == INVWID)
+	if (*(DWORD*)(&kpt[PortN]) == INVALID)
 	{
 		sti();
 		return ERROR_KPT_ISDISABLED;
@@ -109,7 +117,7 @@ long GetKpToThed(DWORD PortN, THREAD_ID *ptid)
 	if (PortN >= KPT_LEN)
 		return ERROR_WRONG_KPTN;
 	cli();
-	if (kpt[PortN].ProcID == INVWID)
+	if (*(DWORD*)(&kpt[PortN]) == INVALID)
 	{
 		sti();
 		return ERROR_KPT_ISDISABLED;

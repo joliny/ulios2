@@ -7,7 +7,15 @@
 
 	.186
 	EXTRN	_main:	NEAR
-	ASSUME	CS:_TEXT
+_TEXT	SEGMENT	BYTE	PUBLIC	'CODE'
+_TEXT	ENDS
+_DATA	SEGMENT	PARA	PUBLIC	'DATA'
+_DATA	ENDS
+_BSS	SEGMENT	WORD	PUBLIC	'BSS'
+_BSS	ENDS
+DGROUP	GROUP	_TEXT,	_DATA,	_BSS	;代码段和数据段构成一个组
+ASSUME	CS:_TEXT
+
 _TEXT	SEGMENT
 	ORG	100h
 START	PROC	NEAR
@@ -15,7 +23,7 @@ START	PROC	NEAR
 	mov	ds,	ax
 	mov	es,	ax
 	mov	ss,	ax
-	mov	sp,	-4096
+	mov	sp,	-4096		;堆栈设在0xF000
 	xor	ax,	ax
 	push	ax
 	call	_main

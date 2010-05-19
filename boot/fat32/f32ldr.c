@@ -187,7 +187,7 @@ void ReadSector(BYTE DrvNum,		/*输入：驱动器号*/
 	asm jc short ReadError;
 	return;
 ReadError:	/*注意：扩展INT13可能不会处理DMA边界错误，调用本函数时需注意参数*/
-	PutChar('!');
+	PutS(" INT13 ERROR!");
 	for (;;);
 }
 
@@ -199,6 +199,8 @@ DWORD ReadFile(	BPB *bpb,			/*输入：分区BPB*/
 {
 	DWORD prei, clui;/*簇号计数,上一簇号*/
 
+	if (SrcDir->len == 0)	/*空文件*/
+		return BufferAddr;
 	prei = 0xFFFFFFFF;
 	clui = ((DWORD)(SrcDir->idxh) << 16) | SrcDir->idxl;
 	for (;;)
@@ -209,16 +211,14 @@ DWORD ReadFile(	BPB *bpb,			/*输入：分区BPB*/
 		for (i = 0; i < bpb->spc; i++)
 		{
 			ReadSector(bpb->DRV_num, fstblk, 1, BufferAddr);	/*读取数据扇区*/
-			PutChar('#');
+			PutChar('.');
 			fstblk++;
 			BufferAddr += bpb->bps;
 		}
-		i = clui / (bpb->bps >> 2);
-		if (i != prei / (bpb->bps >> 2))	/*下一簇号不在缓冲中*/
+		if ((i = clui / (bpb->bps >> 2)) != prei / (bpb->bps >> 2))	/*下一簇号不在缓冲中*/
 			ReadSector(bpb->DRV_num, bpb->secoff + bpb->res + i, 1, FAR2LINE((DWORD)((void far *)idx)));
 		prei = clui;
-		clui = idx[clui % (bpb->bps >> 2)];
-		if (clui == 0x0FFFFFFF)	/*文件结束*/
+		if ((clui = idx[clui % (bpb->bps >> 2)] & 0x0FFFFFFF) >= 0x0FFFFFF8)	/*文件结束*/
 			return BufferAddr;
 	}
 }
@@ -253,12 +253,10 @@ WORD SearchDir(	BPB *bpb,			/*输入：分区BPB*/
 				}
 			fstblk++;
 		}
-		i = clui / (bpb->bps >> 2);
-		if (i != prei / (bpb->bps >> 2))	/*下一簇号不在缓冲中*/
+		if ((i = clui / (bpb->bps >> 2)) != prei / (bpb->bps >> 2))	/*下一簇号不在缓冲中*/
 			ReadSector(bpb->DRV_num, bpb->secoff + bpb->res + i, 1, FAR2LINE((DWORD)((void far *)idx)));
 		prei = clui;
-		clui = idx[clui % (bpb->bps >> 2)];
-		if (clui == 0x0FFFFFFF)	/*文件结束*/
+		if ((clui = idx[clui % (bpb->bps >> 2)] & 0x0FFFFFFF) >= 0x0FFFFFF8)	/*文件结束*/
 			return NOT_FOUND;
 	}
 }
@@ -275,6 +273,7 @@ DWORD ReadPath(	BPB *bpb,			/*输入：分区BPB*/
 	while (*path)
 	{
 		BYTE *cp = path;
+
 		while (*cp != '/' && *cp != 0)
 			cp++;
 		if (*cp)
@@ -291,15 +290,19 @@ DWORD ReadPath(	BPB *bpb,			/*输入：分区BPB*/
 		}
 		else
 		{
+			DWORD end;
+
 			PutS(path);
 			if (SearchDir(bpb, idx, buf, SrcDir, path, DstDir) != NO_ERROR)	/*取得文件目录项*/
 				return 0;
 			if (DstDir->attr & 0x10 != 0)	/*检查是否是文件*/
 				return 0;
-			BufferAddr = ReadFile(bpb, idx, DstDir, BufferAddr);	/*读取文件*/
+			end = ReadFile(bpb, idx, DstDir, BufferAddr);	/*读取文件*/
+			if (end == BufferAddr)
+				PutS("<-File is empty!");
 			PutChar(13);
 			PutChar(10);
-			return BufferAddr;
+			return end;
 		}
 	}
 }
@@ -312,11 +315,11 @@ void main(BPB0 *bpb0)
 	BPB bpb;
 	DIR RootDir, SrcDir, DstDir;	/*目录项缓存*/
 	BYTE BootList[4096], *cmd;	/*启动列表*/
-	DWORD addr = 0x10000, *BinAddr = BIN_ADDR;	/*内核存放位置, 程序段数据指针*/
+	DWORD addr = 0x10000, *BinAddr = BIN_ADDR, end;	/*内核存放位置, 程序段数据指针*/
 	WORD *VesaMode = VESA_MODE;
 
 	if (bpb0->bps > BUF_COU)	/*检查每扇区字节数是否合法*/
-		goto BootError;
+		goto errip;
 	bpb.DRV_num = bpb0->DRV_num;	/*驱动器号*/
 	bpb.bps = bpb0->bps;	/*每扇区字节数*/
 	bpb.spc = bpb0->spc;	/*每簇扇区数*/
@@ -328,15 +331,17 @@ void main(BPB0 *bpb0)
 	RootDir.idxl = (WORD)bpb0->rcn;
 	RootDir.len = 0;
 	SrcDir = RootDir;
-	if (ReadPath(&bpb, idx, buf, &SrcDir, &DstDir, bpb0->BootPath, FAR2LINE((DWORD)((void far *)BootList))) == 0)
-		goto BootError;
+	end = ReadPath(&bpb, idx, buf, &SrcDir, &DstDir, bpb0->BootPath, FAR2LINE((DWORD)((void far *)BootList)));
+	if (end == 0)
+		goto errfnf;
+	if (end == FAR2LINE((DWORD)((void far *)BootList)))
+		goto errfie;
 	cmd = BootList;
 	BootList[DstDir.len] = 0;
 	*VesaMode = 0;
 	for (;;)
 	{
 		BYTE *cp = cmd;
-		DWORD end;
 
 		while (*cp != '\n' && *cp != 0)
 			cp++;
@@ -345,15 +350,20 @@ void main(BPB0 *bpb0)
 		switch (*cmd++)
 		{
 		case 'F':	/*File*/
+		case 'f':
 			SrcDir = RootDir;
-			if ((end = ReadPath(&bpb, idx, buf, &SrcDir, &DstDir, cmd, addr)) == 0)
-				goto BootError;
+			end = ReadPath(&bpb, idx, buf, &SrcDir, &DstDir, cmd, addr);
+			if (end == 0)
+				goto errfnf;
+			if (end == addr)
+				break;
 			end = (end + 0x00000FFF) & 0xFFFFF000;		/*调整到4K边界*/
 			*BinAddr++ = addr;
 			*BinAddr++ = end - addr;
 			addr = end;
 			break;
 		case 'V':	/*VesaMode*/
+		case 'v':
 			*VesaMode = atol(cmd);
 			break;
 		}
@@ -365,7 +375,11 @@ void main(BPB0 *bpb0)
 			SETUP();
 		}
 	}
-BootError:
-	PutChar('!');
+errip:
+	PutS("invalid partition!");
+	for (;;);
+errfnf:
+	PutS("<-File not found!");
+errfie:
 	for (;;);
 }

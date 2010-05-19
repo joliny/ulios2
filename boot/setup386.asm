@@ -1,6 +1,6 @@
-;setup.asm for ulios
+;setup386.asm for ulios
 ;作者：孙亮
-;功能：进行保护模式前的准备，设置保护模式最终进入32位内核，本setup版本可打开Pentium Pro的高级功能
+;功能：进行保护模式前的准备，设置保护模式最终进入32位内核，本setup版本只基于80386 CPU，没有打开pentium pro高级功能的操作
 ;最后修改日期：2009-06-25
 ;备注：使用NASM编译器编译成BIN文件
 
@@ -168,9 +168,9 @@ A20LineOk:
 	mov	ax,	KPDTseg
 	mov	es,	ax
 	mov	di,	KPDToff
-	mov	eax,	0x000001E3	;内核页0(内核访问的4M全局页面)
+	mov	eax,	0x0000D063	;内核页0
 	stosd
-	mov	eax,	0x004001E3	;内核页1(内核访问的4M全局页面)
+	mov	eax,	0x0000E063	;内核页1
 	stosd
 	mov	eax,	KPDTseg * 0x10 + KPDToff + 0x1063	;PDDT(内核访问的4K局部页面)
 	stosd
@@ -179,6 +179,14 @@ A20LineOk:
 	xor	eax,	eax	;其他表项清0
 	mov	cx,	KPDTsize / 4 - 4
 	rep	stosd
+;----------------------------------------
+;设置页表
+	mov	di,	0xD000
+	mov	cx,	0x800	;共2048页 对等映射
+	mov	eax,	0x0063
+PteLop:	stosd
+	add	eax,	0x1000
+	loop	PteLop
 ;----------------------------------------
 ;对8259中断芯片进行编程,参考linux 0.11
 	mov	al,	0x11
@@ -216,11 +224,6 @@ A20LineOk:
 	lidt	[IDTaddr]
 	mov	eax,	KPDTseg * 0x10 + KPDToff
 	mov	cr3,	eax
-;----------------------------------------
-;开启4M页面允许位和全局页允许位
-	mov	eax,	cr4
-	or	eax,	0x00000090
-	mov	cr4,	eax
 ;----------------------------------------
 ;开启32位分页保护模式
 	mov	eax,	cr0
