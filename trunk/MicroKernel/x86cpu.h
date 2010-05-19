@@ -111,7 +111,7 @@ typedef struct _I387
 	DWORD foo;
 	DWORD fos;
 	DWORD st[20];
-}I387;	/*数学协处理器寄存器*/
+}I387;	/*浮点协处理器寄存器*/
 
 /*页目录表页表项*/
 #define PAGE_ATTR_P		0x00000001	/*0:页不存在1:页存在*/
@@ -124,6 +124,7 @@ typedef struct _I387
 #define PAGE_ATTR_PS	0x00000080	/*0:页面大小为4KB，页目录项指向一个页表1:页面大小为4MB或2MB(由CR4的PAE位决定)，页目录项直接指向一个页*/
 #define PAGE_ATTR_G		0x00000100	/*0:普通页1:全局页(当PGE为1时，若发生CR3载入新值或任务切换，指向全局页的表项在TLB中仍然有效。这个标志只在直接指向一个页的表项中有效，否则会被忽略。)*/
 #define PAGE_ATTR_AVL	0x00000E00	/*软件自定*/
+#define PAGE_ATTR_ROMAP	0x00000200	/*0:进程所属页1:只读映射页*/
 
 typedef DWORD PAGE_DESC;	/*页目录表页表项*/
 
@@ -165,6 +166,27 @@ static inline void SetGate(SEG_GATE_DESC *desc, DWORD seg, DWORD off, DWORD attr
 {
 	desc->d0 = (off & 0x0000FFFF) | (seg << 16);
 	desc->d1 = (off & 0xFFFF0000) | attr;
+}
+
+/*清除CR0的TS标志*/
+static inline void ClearTs()
+{
+	__asm__("clts");
+}
+
+/*刷新页表缓冲*/
+static inline void RefreshTlb()
+{
+	register DWORD reg;
+	__asm__ __volatile__("movl %%cr3, %0;movl %0, %%cr3": "=r"(reg));
+}
+
+/*取得页故障线性地址*/
+static inline void *GetPageFaultAddr()
+{
+	register void *_addr;
+	__asm__ __volatile__("movl %%cr2, %0": "=r"(_addr));
+	return _addr;
 }
 
 #endif

@@ -1,11 +1,12 @@
-/*	fmtboot.c for ulios tools
+/*	ulifsfmt.c for ulios tools
 	作者：孙亮
-	功能：格式化分区成为可引导ulios分区
-	最后修改日期：2009-12-11
+	功能：格式化分区成为ULIFS分区
+	最后修改日期：2010-03-05
 	备注：使用Turbo C TCC编译器编译成DOS平台COM或EXE文件
 */
 
 #include <stdio.h>
+#include <time.h>
 
 typedef unsigned short	BOOL;
 typedef unsigned char	BYTE;
@@ -49,45 +50,9 @@ typedef struct _PART_INF
 	BYTE lev;	/*层级*/
 	DWORD fst;	/*起始扇区号*/
 	DWORD cou;	/*扇区数*/
+	DWORD idsec;/*FSID所在扇区号*/
+	WORD pid;	/*FSID所在分区表ID*/
 }PART_INF;	/*分区信息*/
-
-typedef struct _FAT32_BOOTSEC
-{
-	BYTE	jmpi[3];/*跳转指令*/
-	BYTE	oem[8];	/*OEM ID(tian&uli2k_X)*/
-	WORD	bps;	/*每扇区字节数*/
-	BYTE	spc;	/*每簇扇区数*/
-	WORD	res;	/*保留扇区数*/
-	BYTE	nf;		/*FAT数*/
-	WORD	nd;		/*根目录项数*/
-	WORD	sms;	/*小扇区数(FAT32不用)*/
-	BYTE	md;		/*媒体描述符*/
-	WORD	spf16;	/*每FAT扇区数(FAT32不用)*/
-	WORD	spt;	/*每道扇区数*/
-	WORD	nh;		/*磁头数*/
-	DWORD	hs;		/*隐藏扇区数*/
-	DWORD	ls;		/*总扇区数*/
-	DWORD	spf;	/*每FAT扇区数(FAT32专用)*/
-	WORD	ef;		/*扩展标志(FAT32专用)*/
-	WORD	fv;		/*文件系统版本(FAT32专用)*/
-	DWORD	rcn;	/*根目录簇号(FAT32专用)*/
-	WORD	fsis;	/*文件系统信息扇区号(FAT32专用)*/
-	WORD	backup;	/*备份引导扇区(FAT32专用)*/
-	DWORD	res1[3];/*保留(FAT32专用)*/
-
-	BYTE	pdn;	/*物理驱动器号*/
-	BYTE	res2;	/*保留*/
-	BYTE	ebs;	/*扩展引导标签*/
-	DWORD	vsn;	/*分区序号*/
-	BYTE	vl[11];	/*卷标*/
-	BYTE	sid[8];	/*系统ID*/
-
-	WORD	ldroff;	/*ulios载入程序所在扇区偏移*/
-	DWORD	secoff;	/*分区在磁盘上的起始扇区偏移*/
-	BYTE	BootPath[32];/*启动列表文件路径*/
-	BYTE	code[382];	/*引导代码*/
-	WORD	aa55;	/*引导标志*/
-}FAT32_BOOTSEC;	/*FAT32引导扇区数据*/
 
 typedef struct _ULIFS_BOOTSEC
 {
@@ -106,7 +71,34 @@ typedef struct _ULIFS_BOOTSEC
 	BYTE	BootPath[88];/*启动列表文件路径*/
 	BYTE	code[382];	/*引导代码*/
 	WORD	aa55;	/*引导标志*/
-}ULIFS_BOOTSEC;	/*ULIFS引导扇区数据24*/
+}ULIFS_BOOTSEC;	/*ULIFS引导扇区数据*/
+
+typedef struct _BLKID
+{
+	DWORD fst;	/*首簇*/
+	DWORD cou;	/*数量*/
+}BLKID;	/*块索引节点*/
+
+#define ULIFS_FILE_NAME_SIZE	80
+#define ULIFS_FILE_ATTR_RDONLY	0x00000001	/*只读*/
+#define ULIFS_FILE_ATTR_HIDDEN	0x00000002	/*隐藏*/
+#define ULIFS_FILE_ATTR_SYSTEM	0x00000004	/*系统*/
+#define ULIFS_FILE_ATTR_LABEL	0x00000008	/*卷标*/
+#define ULIFS_FILE_ATTR_DIREC	0x00000010	/*目录(只读)*/
+#define ULIFS_FILE_ATTR_ARCH	0x00000020	/*归档*/
+#define ULIFS_FILE_ATTR_EXEC	0x00000040	/*可执行*/
+#define ULIFS_FILE_ATTR_UNMDFY	0x80000000	/*属性不可修改*/
+
+typedef struct _ULIFS_DIR
+{
+	BYTE name[ULIFS_FILE_NAME_SIZE];/*文件名*/
+	DWORD CreateTime;	/*创建时间1970-01-01经过的秒数*/
+	DWORD ModifyTime;	/*修改时间*/
+	DWORD AccessTime;	/*访问时间*/
+	DWORD attr;			/*属性*/
+	DWORD size[2];		/*文件字节数,目录文件的字节数有效*/
+	BLKID idx[3];		/*最后有3个自带的索引块,所以一个文件有可能用不到索引簇*/
+}ULIFS_DIR;	/*目录项结构*/
 
 #define FALSE		0
 #define TRUE		1
@@ -178,6 +170,8 @@ void ReadPart(PART_INF *part)
 						part->lev = 1;
 						part->fst = fst + ebr.part[0].fst;
 						part->cou = ebr.part[0].cou;
+						part->idsec = fst;
+						part->pid = 0;
 						part++;
 					}
 					if (ebr.part[1].cou == 0)	/*最后一个逻辑驱动器*/
@@ -193,6 +187,8 @@ void ReadPart(PART_INF *part)
 				part->lev = 0;
 				part->fst = CurPart->fst;
 				part->cou = CurPart->cou;
+				part->idsec = 0;
+				part->pid = j;
 				part++;
 			}
 		}
@@ -200,84 +196,79 @@ void ReadPart(PART_INF *part)
 	part->fsid = 0;
 }
 
-int Fat32Setup(PART_INF *part)
+int FormatUlifs(PART_INF *part, WORD spc, WORD res, BYTE *label)
 {
-	FAT32_BOOTSEC dbr, boot;
-	BYTE buf[0xE00];
-	FILE *f;
+	WORD i, spbm;
+	BYTE *p;
+	ULIFS_BOOTSEC dbr;
+	ULIFS_DIR dir;
+	BYTE buf[512];
 
-	printf("Reading... boot sector\n");
-	if (RwSector(part->drv, FALSE, part->fst, 1, FAR2LINE((DWORD)((void far *)&dbr))) != NO_ERROR)
+	printf("Writing... boot sector");
+	memset(&dbr, 0, sizeof(ULIFS_BOOTSEC));
+	memcpy(dbr.oem, "TUX soft", 8);
+	dbr.fsid = 0x4E544C55;
+	dbr.bps = 512;
+	dbr.spc = 1 << spc;
+	dbr.res = res;
+	dbr.secoff = part->fst;
+	dbr.seccou = part->cou;
+	for (;;)
+	{
+		dbr.clucou = (dbr.seccou - res - dbr.spbm - dbr.spbm) >> spc;
+		spbm = (dbr.clucou + 0xFFF) >> 12;
+		if (spbm == dbr.spbm)
+			break;
+		dbr.spbm = spbm;
+	}
+	dbr.cluoff = res + spbm + spbm;
+	dbr.aa55 = 0xAA55;
+	if (RwSector(part->drv, TRUE, dbr.secoff, 1, FAR2LINE((DWORD)((void far *)&dbr))) != NO_ERROR)
 		return ERROR_DISK;
-	printf("Reading... f32boot\n");
-	if ((f = fopen("F32BOOT", "rb")) == NULL)
-		return ERROR_FILE;
-	fread(&boot, sizeof(FAT32_BOOTSEC), 1, f);
-	fclose(f);
 
-	memcpy(&boot.bps, &dbr.bps, 79);
-	boot.ldroff = dbr.backup + 2;
-	boot.secoff = part->fst;
-
+	printf("\nWriting... bad sector bmp");
 	memset(buf, 0, sizeof(buf));
+	for (i = 0; i < spbm; i++)
+	{
+		if (RwSector(part->drv, TRUE, dbr.secoff + res + i, 1, FAR2LINE((DWORD)((void far *)buf))) != NO_ERROR)
+			return ERROR_DISK;
+		printf(".");
+	}
 
-	printf("Reading... f32ldr\n");
-	if ((f = fopen("F32LDR", "rb")) == NULL)
-		return ERROR_FILE;
-	fread(buf, 0xA00, 1, f);
-	fclose(f);
-	printf("Reading... setup\n");
-	if ((f = fopen("SETUP", "rb")) == NULL)
-		return ERROR_FILE;
-	fread(&buf[0xA00], 0x400, 1, f);
-	fclose(f);
-
-	printf("Writing... f32ldr\n");
-	if (RwSector(part->drv, TRUE, part->fst + boot.ldroff, 7, FAR2LINE((DWORD)((void far *)buf))) != NO_ERROR)
+	printf("\nWriting... used sector bmp");
+	buf[0] = 1;
+	if (RwSector(part->drv, TRUE, dbr.secoff + res + spbm, 1, FAR2LINE((DWORD)((void far *)buf))) != NO_ERROR)
 		return ERROR_DISK;
-	printf("Writing... boot sector\n");
-	if (RwSector(part->drv, TRUE, part->fst, 1, FAR2LINE((DWORD)((void far *)&boot))) != NO_ERROR)
+	printf(".");
+	buf[0] = 0;
+	for (i = 1; i < spbm; i++)
+	{
+		if (RwSector(part->drv, TRUE, dbr.secoff + res + spbm + i, 1, FAR2LINE((DWORD)((void far *)buf))) != NO_ERROR)
+			return ERROR_DISK;
+		printf(".");
+	}
+
+	printf("\nWriting... root dir");
+	memset(&dir, 0, sizeof(ULIFS_DIR));
+	p = label;
+	for (p++; *p; p++)
+		if (*p == '/' || (p - label) >= ULIFS_FILE_NAME_SIZE - 1)
+			break;
+	memcpy(dir.name, label, p - label);
+	time((time_t*)&dir.CreateTime);
+	dir.AccessTime = dir.ModifyTime = dir.CreateTime;
+	dir.attr = ULIFS_FILE_ATTR_LABEL | ULIFS_FILE_ATTR_DIREC;
+	dir.size[0] = sizeof(ULIFS_DIR);
+	dir.idx[0].cou = 1;
+	memcpy(buf, &dir, sizeof(ULIFS_DIR));
+	if (RwSector(part->drv, TRUE, dbr.secoff + dbr.cluoff, 1, FAR2LINE((DWORD)((void far *)buf))) != NO_ERROR)
 		return ERROR_DISK;
 
-	return NO_ERROR;
-}
-
-int UlifsSetup(PART_INF *part)
-{
-	ULIFS_BOOTSEC dbr, boot;
-	BYTE buf[0xE00];
-	FILE *f;
-
-	printf("Reading... boot sector\n");
-	if (RwSector(part->drv, FALSE, part->fst, 1, FAR2LINE((DWORD)((void far *)&dbr))) != NO_ERROR)
+	printf("\nSetting... ulifs id\n");
+	if (RwSector(part->drv, FALSE, part->idsec, 1, FAR2LINE((DWORD)((void far *)buf))) != NO_ERROR)
 		return ERROR_DISK;
-	printf("Reading... uliboot\n");
-	if ((f = fopen("ULIBOOT", "rb")) == NULL)
-		return ERROR_FILE;
-	fread(&boot, sizeof(ULIFS_BOOTSEC), 1, f);
-	fclose(f);
-
-	memcpy(&boot.bps, &dbr.bps, 22);
-	boot.secoff = part->fst;
-
-	memset(buf, 0, sizeof(buf));
-
-	printf("Reading... ulildr\n");
-	if ((f = fopen("ULILDR", "rb")) == NULL)
-		return ERROR_FILE;
-	fread(buf, 0xA00, 1, f);
-	fclose(f);
-	printf("Reading... setup\n");
-	if ((f = fopen("SETUP", "rb")) == NULL)
-		return ERROR_FILE;
-	fread(&buf[0xA00], 0x400, 1, f);
-	fclose(f);
-
-	printf("Writing... ulildr\n");
-	if (RwSector(part->drv, TRUE, part->fst + 1, 7, FAR2LINE((DWORD)((void far *)buf))) != NO_ERROR)
-		return ERROR_DISK;
-	printf("Writing... boot sector\n");
-	if (RwSector(part->drv, TRUE, part->fst, 1, FAR2LINE((DWORD)((void far *)&boot))) != NO_ERROR)
+	((BOOT_SEC*)buf)->part[part->pid].fsid = 0x7C;
+	if (RwSector(part->drv, TRUE, part->idsec, 1, FAR2LINE((DWORD)((void far *)buf))) != NO_ERROR)
 		return ERROR_DISK;
 
 	return NO_ERROR;
@@ -287,8 +278,9 @@ int main()
 {
 	PART_INF part[32], *partp;
 	WORD partn, sel;
+	BYTE buf[ULIFS_FILE_NAME_SIZE];
 	int res;
-	printf("Welcome to ulios loader install program!\nI will write ulios loader to your hard disk.\nWrite f32boot/f32ldr/setup to partition when you select FAT32\nwrite uliboot/ulildr/setup when you select ULIFS.\n\n");
+	printf("Welcome to ulifs format program!\nWARNING! I will clean up all of the data on partition you selected.\n\n");
 	printf("Checking partition information...");
 	ReadPart(part);
 	printf("Done\n");
@@ -311,10 +303,9 @@ int main()
 		}
 		printf("\t%s\t0x%X\t%s\t%lu\t%lu\n", partp->boot ? "yes" : "no", partp->drv, partp->lev ? "Logical" : "Primary", partp->fst, partp->cou);
 	}
-	printf("Which partition you want to setup ulios?\n[0:Exit, 1 to %u:Select partition]:", partn);
+	printf("Which partition you want to format?\n[0:Exit, 1 to %u:Select partition]:", partn);
 	for (;;)
 	{
-		char buf[16];
 		gets(buf);
 		sel = atoi(buf);
 		if (sel == 0)
@@ -325,24 +316,34 @@ int main()
 			continue;
 		}
 		partp = &part[--sel];
-		if (partp->fsid != 0x7C && partp->fsid != 0x01 && partp->fsid != 0x0B && partp->fsid != 0x0C)
+		break;
+	}
+	printf("How many bytes per cluster?\n[0:Exit, 1:512 byte, 2:1KB(default), 3:2KB, 4:4KB, 5:8KB, 6:16KB, 7:32KB, 8:64KB]:");
+	for (;;)
+	{
+		gets(buf);
+		if (buf[0] == '\0')
+			sel = 1;
+		else
 		{
-			printf("Partition is not supported, Select again:");
-			continue;
+			sel = atoi(buf);
+			if (sel == 0)
+				return NO_ERROR;
+			if (sel > 8)
+			{
+				printf("Select 0 to 8:");
+				continue;
+			}
+			sel--;
 		}
 		break;
 	}
-	switch (partp->fsid)
-	{
-	case 0x01:
-	case 0x0B:
-	case 0x0C:
-		res = Fat32Setup(partp);
-		break;
-	case 0x7C:
-		res = UlifsSetup(partp);
-		break;
-	}
+	printf("Volume label?\n[78 characters, / for none, ENTER for Exit]:");
+	gets(buf + 1);
+	if (buf[1] == '\0')
+		return NO_ERROR;
+	buf[0] = '/';
+	res = FormatUlifs(partp, sel, 8, buf);
 	switch (res)
 	{
 	case NO_ERROR:

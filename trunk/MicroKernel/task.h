@@ -9,23 +9,18 @@
 
 #include "ulidef.h"
 
-#define INVWID				0xFFFF	/*无效进程线程ID*/
-
-#define BLK_PTID_SPECIAL	0xFFFF0000	/*特殊PTID的蒙板*/
-#define BLK_PTID_FREEPG		0x0001	/*0:不释放物理页1:释放物理页*/
 typedef struct _BLK_DESC
 {
 	void *addr;					/*起始地址*/
 	DWORD siz;					/*字节数,0表示空项*/
-	DWORD ptid;					/*THREAD_ID:被映射线程ID,其他为特殊PTID*/
 }BLK_DESC;	/*线性地址块描述符*/
 
-#define THED_ATTR_SLEEP		0x0001	/*0:就绪1:阻塞*/
+#define THED_ATTR_SLEEP		0x0001	/*0:就绪状态1:阻塞状态*/
 #define THED_ATTR_WAITTIME	0x0002	/*0:不等待时钟1:等待时钟*/
 #define THED_ATTR_APPS		0x0004	/*0:系统调用态1:应用程序态*/
 #define THED_ATTR_DEL		0x0008	/*0:正常状态1:正在被删除*/
 #define THED_ATTR_KILLED	0x0010	/*0:正常状态1:被杀死标志*/
-#define KSTK_LEN			475		/*内核堆栈双字数,保证线程结构大小2KB*/
+#define KSTK_LEN			474		/*内核堆栈双字数,保证线程结构大小2KB*/
 #define THEDSTK_SIZ			0x00100000	/*线程默认堆栈大小*/
 typedef struct _THREAD_DESC
 {
@@ -35,7 +30,7 @@ typedef struct _THREAD_DESC
 
 	MESSAGE_DESC *msg, *lst;	/*消息链表,最后一项消息指针*/
 	DWORD MsgCou;				/*已用消息数*/
-
+	THREAD_ID WaitId;			/*等待线程ID*/
 	DWORD WakeupClock;			/*延时唤醒时钟*/
 
 	void *ustk;					/*用户堆栈地址*/
@@ -56,8 +51,11 @@ typedef struct _PROCESS_DESC
 	WORD par, attr;				/*父进程ID,属性*/
 
 	DWORD MemSiz;				/*已占用内存字节数*/
-
 	EXEC_DESC *exec;			/*可执行体指针*/
+	MAPBLK_DESC *map;			/*映射结构链表*/
+	MAPBLK_DESC *map2;			/*被映射结构链表*/
+	DWORD MapCou;				/*已用映射结构数*/
+	volatile DWORD Map_l;		/*映射过程锁*/
 
 	THREAD_DESC *tmt[TMT_LEN];	/*线程管理表*/
 	THREAD_DESC **FstTmd;		/*首个空线程项指针*/
@@ -79,17 +77,14 @@ void InitPMT();
 /*初始化内核进程*/
 void InitKnlProc();
 
-/*延时cs厘秒*/
-void SleepCs(DWORD cs);
-
-/*唤醒线程,线程必须有效且阻塞,不允许唤醒内核任务*/
+/*唤醒线程*/
 void wakeup(THREAD_DESC *thed);
 
-/*阻塞线程,线程必须有效且就绪,不允许阻塞内核任务*/
-void sleep(BOOL isWaitTime);
+/*阻塞线程*/
+void sleep(DWORD cs);
 
 /*创建线程*/
-long CreateThed(const DWORD *args, THREAD_ID *ptid);
+long CreateThed(const DWORD *argv, THREAD_ID *ptid);
 
 /*删除线程*/
 void DeleteThed();
@@ -98,7 +93,7 @@ void DeleteThed();
 long KillThed(WORD ThedID);
 
 /*创建进程*/
-long CreateProc(DWORD attr, const DWORD *args, THREAD_ID *ptid);
+long CreateProc(const DWORD *argv, THREAD_ID *ptid);
 
 /*删除进程*/
 void DeleteProc();
@@ -107,10 +102,57 @@ void DeleteProc();
 long KillProc(WORD ProcID);
 
 /*分配用户地址块*/
-void *LockAllocUBlk(PROCESS_DESC *proc, DWORD siz, DWORD ptid);
+BLK_DESC *AllocUBlk(PROCESS_DESC *proc, DWORD siz);
+
+/*搜索用户地址块*/
+BLK_DESC *FindUBlk(PROCESS_DESC *proc, void *addr);
 
 /*回收用户地址块*/
-long LockFreeUBlk(PROCESS_DESC *proc, void *addr);
+void FreeUBlk(PROCESS_DESC *proc, BLK_DESC *blk);
+
+/*唤醒线程(关中断方式)*/
+static inline void CliWakeup(THREAD_DESC *thed)
+{
+	cli();
+	wakeup(thed);
+	sti();
+}
+
+/*阻塞线程(关中断方式)*/
+static inline void CliSleep(DWORD cs)
+{
+	cli();
+	sleep(cs);
+	sti();
+}
+
+/*分配用户地址块(锁定方式)*/
+static inline BLK_DESC *LockAllocUBlk(PROCESS_DESC *proc, DWORD siz)
+{
+	BLK_DESC *res;
+	lock(&proc->Ufdmt_l);
+	res = AllocUBlk(proc, siz);
+	ulock(&proc->Ufdmt_l);
+	return res;
+}
+
+/*搜索用户地址块(锁定方式)*/
+static inline BLK_DESC *LockFindUBlk(PROCESS_DESC *proc, void *addr)
+{
+	BLK_DESC *res;
+	lock(&proc->Ufdmt_l);
+	res = FindUBlk(proc, addr);
+	ulock(&proc->Ufdmt_l);
+	return res;
+}
+
+/*回收用户地址块(锁定方式)*/
+static inline void LockFreeUBlk(PROCESS_DESC *proc, BLK_DESC *blk)
+{
+	lock(&proc->Ufdmt_l);
+	FreeUBlk(proc, blk);
+	ulock(&proc->Ufdmt_l);
+}
 
 /*分配用户自由数据区(锁定方式)*/
 static inline void *LockAllocUFData(PROCESS_DESC *proc, DWORD siz)

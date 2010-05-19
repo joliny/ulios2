@@ -12,6 +12,12 @@ typedef unsigned short		WORD;	/*16位*/
 typedef unsigned long		DWORD;	/*32位*/
 typedef unsigned long		BOOL;
 
+typedef struct _THREAD_ID
+{
+	WORD ProcID;
+	WORD ThedID;
+}THREAD_ID;	/*进程线程ID*/
+
 #define TRUE	1
 #define FALSE	0
 #define NULL	((void*)0)
@@ -49,22 +55,16 @@ static inline void sti()
 /*端口输出字节*/
 static inline void outb(WORD port, BYTE b)
 {
-	__asm__ __volatile__("outb %1, %0":: "Nd"(port), "a"(b));
+	__asm__ __volatile__("outb %1, %w0":: "d"(port), "a"(b));
 }
 
 /*端口输入字节*/
 static inline BYTE inb(WORD port)
 {
 	register BYTE b;
-	__asm__ __volatile__("inb %1, %0": "=a"(b): "Nd"(port));
+	__asm__ __volatile__("inb %w1, %0": "=a"(b): "d"(port));
 	return b;
 }
-
-typedef struct _THREAD_ID
-{
-	WORD ProcID;
-	WORD ThedID;
-}THREAD_ID;	/*进程线程ID*/
 
 /*进程调度*/
 void schedul();
@@ -83,6 +83,32 @@ static inline void lock(volatile DWORD *l)
 static inline void ulock(volatile DWORD *l)
 {
 	*l = FALSE;
+}
+
+/*锁定并赋值*/
+static inline void lockset(volatile DWORD *l, DWORD val)
+{
+	cli();
+	while (*l)
+		schedul();
+	*l = val;
+	sti();
+}
+
+/*关中断并加1*/
+static inline void cliadd(volatile DWORD *l)
+{
+	cli();
+	(*l)++;
+	sti();
+}
+
+/*关中断并减1*/
+static inline void clisub(volatile DWORD *l)
+{
+	cli();
+	(*l)--;
+	sti();
 }
 
 /*检查锁变量并关中断*/

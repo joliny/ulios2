@@ -23,4 +23,7 @@ void PutS(const char *str);
 /*格式化输出*/
 void Print(const char *fmtstr, ...);
 
+/*格式化输出到指定位置*/
+void XYPrint(DWORD x, DWORD y, const char *fmtstr, ...);
+
 #endif

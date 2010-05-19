@@ -69,82 +69,144 @@ void FreeAllMsg()
 /*发送消息*/
 long SendMsg(MESSAGE_DESC *msg)
 {
-	PROCESS_DESC *RcvProc;
-	THREAD_DESC *RcvThed;
-	THREAD_ID rptid;
+	PROCESS_DESC *DstProc;
+	THREAD_DESC *CurThed, *DstThed;
+	THREAD_ID ptid;
 
-	rptid = msg->ptid;
+	ptid = msg->ptid;
+	if (ptid.ProcID >= PMT_LEN)
+		return ERROR_WRONG_PROCID;
+	if (ptid.ThedID >= TMT_LEN)
+		return ERROR_WRONG_THEDID;
+	if (msg->data[0] >= MSG_ATTR_THEDEXT)
+		CurThed = CurPmd->CurTmd;
+	else
+		CurThed = NULL;
 	cli();	/*要访问其他进程的信息,所以防止任务切换*/
-	RcvProc = pmt[rptid.ProcID];
-	if (RcvProc == NULL || (RcvProc->attr & PROC_ATTR_DEL))
+	DstProc = pmt[ptid.ProcID];
+	if (DstProc == NULL || (DstProc->attr & PROC_ATTR_DEL))
 	{
 		sti();
 		return ERROR_WRONG_PROCID;
 	}
-	RcvThed = RcvProc->tmt[rptid.ThedID];
-	if (RcvThed == NULL || (RcvThed->attr & THED_ATTR_DEL))
+	DstThed = DstProc->tmt[ptid.ThedID];
+	if (DstThed == NULL || (DstThed->attr & THED_ATTR_DEL))
 	{
 		sti();
 		return ERROR_WRONG_THEDID;
 	}
-	if (RcvThed->MsgCou >= THED_MSG_LEN)
+	if (DstThed->MsgCou >= THED_MSG_LEN && msg->data[0] >= MSG_ATTR_USER && (!CurThed || *(DWORD*)(&DstThed->WaitId) != *(DWORD*)(&CurThed->id)))
 	{
 		sti();
-		return ERROR_HAVENO_MSGDESC;
+		return ERROR_HAVENO_MSGDESC;	/*消息满且是用户消息且目标线程没有等待本线程的消息,取消发送消息*/
 	}
-	if (CurPmd)	/*设置发送者ID*/
-		msg->ptid = CurPmd->CurTmd->id;
+	if (CurThed)	/*设置发送者ID*/
+		msg->ptid = CurThed->id;
 	else
-		msg->ptid.ProcID = INVWID;
+		*(DWORD*)(&msg->ptid) = INVALID;
 	msg->nxt = NULL;
-	if (RcvThed->msg == NULL)
-		RcvThed->msg = msg;
+	if (DstThed->msg == NULL)
+		DstThed->msg = msg;
 	else
-		RcvThed->lst->nxt = msg;
-	RcvThed->lst = msg;
-	RcvThed->MsgCou++;
-	if (RcvThed->attr & THED_ATTR_SLEEP)	/*线程阻塞,首先唤醒线程*/
-		wakeup(RcvThed);
+		DstThed->lst->nxt = msg;
+	DstThed->lst = msg;
+	DstThed->MsgCou++;
+	if (DstThed->attr & THED_ATTR_SLEEP)	/*线程阻塞,首先唤醒线程*/
+		wakeup(DstThed);
 	sti();
 	return NO_ERROR;
 }
 
 /*接收消息*/
-long RecvMsg(MESSAGE_DESC **msg)
+long RecvMsg(MESSAGE_DESC **msg, DWORD cs)
 {
 	THREAD_DESC *CurThed;
 
 	CurThed = CurPmd->CurTmd;
 	cli();
-	if (CurThed->msg)	/*检查消息链表*/
-	{
-		*msg = CurThed->msg;
-		CurThed->msg = (*msg)->nxt;
-		CurThed->MsgCou--;
-	}
-	else	/*没有消息*/
+	if (CurThed->msg)
+		goto getmsg;
+	if (cs == 0)	/*没有消息且不等待*/
 	{
 		sti();
 		return ERROR_HAVENO_MSGDESC;
 	}
+	sleep(cs);
+	if (CurThed->msg == NULL)	/*仍然没有消息*/
+	{
+		sti();
+		return ERROR_OUT_OF_TIME;
+	}
+getmsg:
+	*msg = CurThed->msg;
+	CurThed->msg = (*msg)->nxt;
+	CurThed->MsgCou--;
 	sti();
 	return NO_ERROR;
 }
 
-/*阻塞并等待消息*/
-long WaitMsg(MESSAGE_DESC **msg, DWORD cs)
+/*阻塞并等待指定进程的消息*/
+long WaitThedMsg(MESSAGE_DESC **msg, THREAD_ID ptid, DWORD cs)
 {
-	long res;
+	THREAD_DESC *CurThed;
+	MESSAGE_DESC *PreMsg, *CurMsg;
 
-	if ((res = RecvMsg(msg)) != ERROR_HAVENO_MSGDESC)	/*有消息返回消息*/
-		return res;
-	if (cs)
-		SleepCs(cs);	/*等待指定时间*/
+	CurThed = CurPmd->CurTmd;
+	cli();
+	for (PreMsg = NULL, CurMsg = CurThed->msg; CurMsg; CurMsg = (PreMsg = CurMsg)->nxt)	/*查找已有消息*/
+		if (CurMsg->ptid.ProcID == ptid.ProcID)
+			goto getmsg;
+	CurThed->WaitId = ptid;	/*设置等待消息线程*/
+	if (cs != INVALID)
+		for (;;)	/*等待一定时间*/
+		{
+			DWORD CurClock;
+
+			CurClock = clock;
+			sleep(cs);
+			if (PreMsg)
+				CurMsg = PreMsg->nxt;
+			else
+				CurMsg = CurThed->msg;
+			if (CurMsg == NULL)	/*超时无消息*/
+			{
+				*(DWORD*)(&CurThed->WaitId) = INVALID;
+				sti();
+				return ERROR_OUT_OF_TIME;
+			}
+			if (CurMsg->ptid.ProcID == ptid.ProcID)
+				break;
+			if (clock - CurClock >= cs)
+			{
+				*(DWORD*)(&CurThed->WaitId) = INVALID;
+				sti();
+				return ERROR_OUT_OF_TIME;
+			}
+			cs -= clock - CurClock;
+			PreMsg = CurMsg;
+		}
 	else
-	{
-		cli();
-		sleep(FALSE);	/*没有消息就等待*/
-		sti();
-	}
-	return RecvMsg(msg);
+		for (;;)	/*无限等待*/
+		{
+			sleep(INVALID);
+			if (PreMsg)
+				CurMsg = PreMsg->nxt;
+			else
+				CurMsg = CurThed->msg;
+			if (CurMsg->ptid.ProcID == ptid.ProcID)
+				break;
+			PreMsg = CurMsg;
+		}
+	*(DWORD*)(&CurThed->WaitId) = INVALID;
+getmsg:
+	if (PreMsg)
+		PreMsg->nxt = CurMsg->nxt;
+	else
+		CurThed->msg = CurMsg->nxt;
+	if (CurThed->lst == CurMsg)
+		CurThed->lst = PreMsg;
+	CurThed->MsgCou--;
+	sti();
+	*msg = CurMsg;
+	return NO_ERROR;
 }

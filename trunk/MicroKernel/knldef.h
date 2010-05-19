@@ -1,23 +1,23 @@
-/*	kernel.h for ulios
+/*	knldef.h for ulios
 	作者：孙亮
 	功能：内核相关结构体、变量分布定义
 	最后修改日期：2009-05-26
 */
 
-#ifndef	_KERNEL_H_
-#define	_KERNEL_H_
+#ifndef	_KNLDEF_H_
+#define	_KNLDEF_H_
 
 #include "ulidef.h"
-#include "error.h"
 #include "x86cpu.h"
+#include "error.h"
+#include "kalloc.h"
 #include "bootdata.h"
 #include "cintr.h"
 #include "debug.h"
 #include "exec.h"
 #include "ipc.h"
-#include "kalloc.h"
-#include "task.h"
 #include "page.h"
+#include "task.h"
 
 /**********内核属性常数**********/
 
@@ -78,9 +78,13 @@ extern BYTE KnlValue[];		/*内核零散变量区4KB*/
 /*消息管理*/
 #define msgmt		(*((MESSAGE_DESC**)	(KnlValue + 0x0028)))	/*消息管理表指针*/
 #define FstMsg		(*((MESSAGE_DESC**)	(KnlValue + 0x002C)))	/*首个空消息指针*/
+/*地址映射管理*/
+#define mapmt		(*((MAPBLK_DESC**)	(KnlValue + 0x0030)))	/*地址映射管理表指针*/
+#define FstMap		(*((MAPBLK_DESC**)	(KnlValue + 0x0034)))	/*首个空地址映射结构指针*/
 
-#define clock		(*((DWORD*)			(KnlValue + 0x0030)))	/*时钟计数器*/
-#define SleepList	(*((THREAD_DESC**)	(KnlValue + 0x0034)))	/*延时阻塞链表指针*/
+#define clock		(*((DWORD*)			(KnlValue + 0x0038)))	/*时钟计数器*/
+#define SleepList	(*((THREAD_DESC**)	(KnlValue + 0x003C)))	/*延时阻塞链表指针*/
+#define LastI387	(*((I387**)			(KnlValue + 0x0040)))	/*被推迟保存的协处理器寄存器指针*/
 
 #define Kmalloc_l	(*((volatile DWORD*)(KnlValue + 0x0F50)))	/*kmalloc锁*/
 #define AllocPage_l	(*((volatile DWORD*)(KnlValue + 0x0F54)))	/*AllocPage锁*/

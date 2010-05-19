@@ -5,7 +5,7 @@
 
 [BITS 32]
 global _start
-extern main
+extern _main
 _start:		;初始化段寄存器
 	mov	ax,	0x10	;数据段选择子
 	mov	ds,	ax
@@ -15,7 +15,7 @@ _start:		;初始化段寄存器
 	mov	ss,	ax
 	mov	esp,	0x0009F000
 
-	call	main
+	call	_main
 HltLoop:
 	hlt
 	jmp	short	HltLoop

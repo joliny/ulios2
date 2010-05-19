@@ -14,7 +14,6 @@
 #define IRQ_INIT_MASK	0xFA	/*开启时钟和从片8259中断的掩码*/
 
 #define INTN_APICALL	0xF0	/*系统调用号*/
-#define APICALL_LEN		0x14	/*系统调用表长度，也就是系统调用数量*/
 
 /*中断异常系统调用处理函数*/
 extern void AsmIsr00();
@@ -69,8 +68,11 @@ long UnregIrq(DWORD IrqN);
 /*注销线程的所有IRQ信号*/
 void UnregAllIrq();
 
-/*所有异常信号的总调函数*/
+/*不可恢复异常处理程序*/
 void IsrProc(DWORD edi, DWORD esi, DWORD ebp, DWORD esp, DWORD ebx, DWORD edx, DWORD ecx, DWORD eax, WORD gs, WORD fs, WORD es, WORD ds, DWORD IsrN, DWORD ErrCode, DWORD eip, WORD cs, DWORD eflags);
+
+/*浮点协处理器异常处理程序*/
+void FpuFaultProc(DWORD edi, DWORD esi, DWORD ebp, DWORD esp, DWORD ebx, DWORD edx, DWORD ecx, DWORD eax, WORD gs, WORD fs, WORD es, WORD ds, DWORD IsrN, DWORD ErrCode, DWORD eip, WORD cs, DWORD eflags);
 
 /*所有中断信号的总调函数*/
 void IrqProc(DWORD edi, DWORD esi, DWORD ebp, DWORD esp, DWORD ebx, DWORD edx, DWORD ecx, DWORD eax, WORD gs, WORD fs, WORD es, WORD ds, DWORD IrqN);
@@ -128,9 +130,6 @@ void ApiSendMsg(DWORD *argv);
 /*接收消息*/
 void ApiRecvMsg(DWORD *argv);
 
-/*阻塞并等待消息*/
-void ApiWaitMsg(DWORD *argv);
-
 /*映射物理地址*/
 void ApiMapPhyAddr(DWORD *argv);
 
@@ -139,5 +138,20 @@ void ApiMapUserAddr(DWORD *argv);
 
 /*回收用户地址块*/
 void ApiFreeAddr(DWORD *argv);
+
+/*映射进程地址读取*/
+void ApiReadProcAddr(DWORD *argv);
+
+/*映射进程地址写入*/
+void ApiWriteProcAddr(DWORD *argv);
+
+/*撤销映射进程地址*/
+void ApiUnmapProcAddr(DWORD *argv);
+
+/*取消映射进程地址*/
+void ApiCnlmapProcAddr(DWORD *argv);
+
+/*取得开机经过的时钟*/
+void ApiGetClock(DWORD *argv);
 
 #endif

@@ -32,7 +32,7 @@ SEG_GATE_DESC IsrIdtTable[] = {
 
 /*C异常表*/
 void (*IsrCallTable[])(DWORD edi, DWORD esi, DWORD ebp, DWORD esp, DWORD ebx, DWORD edx, DWORD ecx, DWORD eax, WORD gs, WORD fs, WORD es, WORD ds, DWORD IsrN, DWORD ErrCode, DWORD eip, WORD cs, DWORD eflags) = {
-	IsrProc, IsrProc, IsrProc, IsrProc, IsrProc, IsrProc, IsrProc, IsrProc,
+	IsrProc, IsrProc, IsrProc, IsrProc, IsrProc, IsrProc, IsrProc, FpuFaultProc,
 	IsrProc, IsrProc, IsrProc, IsrProc, IsrProc, IsrProc, PageFaultProc, IsrProc,
 	IsrProc, IsrProc, IsrProc, IsrProc
 };
@@ -47,7 +47,7 @@ void (*AsmIrqCallTable[])() = {
 void (*ApiCallTable[])(DWORD *argv) = {
 	ApiPrintf, ApiGiveUp, ApiSleep, ApiCreateThread, ApiExitThread, ApiKillThread, ApiCreateProcess, ApiExitProcess,
 	ApiKillProcess, ApiRegKnlPort, ApiUnregKnlPort, ApiGetKpToThed, ApiRegIrq, ApiUnregIrq, ApiSendMsg, ApiRecvMsg,
-	ApiWaitMsg, ApiMapPhyAddr, ApiMapUserAddr, ApiFreeAddr
+	ApiMapPhyAddr, ApiMapUserAddr, ApiFreeAddr, ApiReadProcAddr, ApiWriteProcAddr, ApiUnmapProcAddr, ApiCnlmapProcAddr, ApiGetClock
 };
 
 /*中断处理初始化*/
@@ -55,7 +55,7 @@ void InitINTR()
 {
 	memcpy32(idt, IsrIdtTable, sizeof(IsrIdtTable) / sizeof(DWORD));	/*复制20个ISR的门描述符*/
 	SetGate(&idt[INTN_APICALL], KCODE_SEL, (DWORD)AsmApiCall, DESC_ATTR_P | DESC_ATTR_DPL3 | GATE_ATTR_T_TRAP);	/*系统调用*/
-	memset32(IrqPort, 0xFFFFFFFF, IRQ_LEN * sizeof(THREAD_ID) / sizeof(DWORD));	/*初始化Irq端口注册表*/
+	memset32(IrqPort, 0xFFFFFFFF, IRQ_LEN * sizeof(THREAD_ID) / sizeof(DWORD));	/*初始化IRQ端口注册表*/
 	/*开时钟和从片8259中断*/
 	SetGate(&idt[0x20 + IRQN_TIMER], KCODE_SEL, (DWORD)AsmIrq0, DESC_ATTR_P | DESC_ATTR_DPL0 | GATE_ATTR_T_INTR);
 	SetGate(&idt[0x20 + IRQN_SLAVE8259], KCODE_SEL, (DWORD)AsmIrq2, DESC_ATTR_P | DESC_ATTR_DPL0 | GATE_ATTR_T_INTR);
@@ -65,6 +65,14 @@ void InitINTR()
 /*注册IRQ信号的响应线程*/
 long RegIrq(DWORD IrqN)
 {
+	PROCESS_DESC *CurProc;
+	BYTE mask;
+
+	CurProc = CurPmd;
+	if (CurProc->attr & PROC_ATTR_APPS)
+		return ERROR_NOT_DRIVER;	/*驱动进程特权API*/
+	if (IrqN >= IRQ_LEN)
+		return ERROR_WRONG_IRQN;
 	cli();
 	if (idt[0x20 + IrqN].d1)
 	{
@@ -72,19 +80,15 @@ long RegIrq(DWORD IrqN)
 		return ERROR_IRQ_ISENABLED;
 	}
 	SetGate(&idt[0x20 + IrqN], KCODE_SEL, (DWORD)AsmIrqCallTable[IrqN], DESC_ATTR_P | DESC_ATTR_DPL0 | GATE_ATTR_T_INTR);
-	IrqPort[IrqN] = CurPmd->CurTmd->id;
+	IrqPort[IrqN] = CurProc->CurTmd->id;
 	if (IrqN < 8)
 	{
-		BYTE mask;
-
 		mask = inb(0x21);	/*主片*/
 		mask &= (~(1ul << IrqN));
 		outb(0x21, mask);
 	}
 	else
 	{
-		BYTE mask;
-
 		mask = inb(0xA1);	/*从片*/
 		mask &= (~(1ul << (IrqN & 7)));
 		outb(0xA1, mask);
@@ -96,29 +100,33 @@ long RegIrq(DWORD IrqN)
 /*注销IRQ信号的响应线程*/
 long UnregIrq(DWORD IrqN)
 {
+	PROCESS_DESC *CurProc;
+	BYTE mask;
+
+	CurProc = CurPmd;
+	if (CurProc->attr & PROC_ATTR_APPS)
+		return ERROR_NOT_DRIVER;	/*驱动进程特权API*/
+	if (IrqN >= IRQ_LEN)
+		return ERROR_WRONG_IRQN;
 	cli();
 	if (idt[0x20 + IrqN].d1 == 0)
 	{
 		sti();
 		return ERROR_IRQ_ISDISABLED;
 	}
-	if (IrqPort[IrqN].ProcID != CurPmd->CurTmd->id.ProcID)
+	if (IrqPort[IrqN].ProcID != CurProc->CurTmd->id.ProcID)
 	{
 		sti();
 		return ERROR_IRQ_WRONG_CURPROC;
 	}
 	if (IrqN < 8)
 	{
-		BYTE mask;
-
 		mask = inb(0x21);	/*主片*/
 		mask |= (1ul << IrqN);
 		outb(0x21, mask);
 	}
 	else
 	{
-		BYTE mask;
-
 		mask = inb(0xA1);	/*从片*/
 		mask |= (1ul << (IrqN & 7));
 		outb(0xA1, mask);
@@ -132,26 +140,27 @@ long UnregIrq(DWORD IrqN)
 /*注销线程的所有IRQ信号*/
 void UnregAllIrq()
 {
+	PROCESS_DESC *CurProc;
 	THREAD_ID ptid;
 	DWORD i;
+	BYTE mask;
 
-	ptid = CurPmd->CurTmd->id;
+	CurProc = CurPmd;
+	if (CurProc->attr & PROC_ATTR_APPS)
+		return;	/*驱动进程特权API*/
+	ptid = CurProc->CurTmd->id;
 	cli();
 	for (i = 0; i < IRQ_LEN; i++)
 		if (*(DWORD*)(&IrqPort[i]) == *(DWORD*)(&ptid))
 		{
 			if (i < 8)
 			{
-				BYTE mask;
-
 				mask = inb(0x21);	/*主片*/
 				mask |= (1ul << i);
 				outb(0x21, mask);
 			}
 			else
 			{
-				BYTE mask;
-
 				mask = inb(0xA1);	/*从片*/
 				mask |= (1ul << (i & 7));
 				outb(0xA1, mask);
@@ -162,14 +171,47 @@ void UnregAllIrq()
 	sti();
 }
 
-/*所有异常信号的总调函数*/
+/*不可恢复异常处理程序*/
 void IsrProc(DWORD edi, DWORD esi, DWORD ebp, DWORD esp, DWORD ebx, DWORD edx, DWORD ecx, DWORD eax, WORD gs, WORD fs, WORD es, WORD ds, DWORD IsrN, DWORD ErrCode, DWORD eip, WORD cs, DWORD eflags)
 {
 	DebugMsg("EAX=%X\tEBX=%X\tECX=%X\tEDX=%X\n", eax, ebx, ecx, edx);
 	DebugMsg("EBP=%X\tESI=%X\tEDI=%X\tESP=%X\tEIP=%X\n", ebp, esi, edi, esp, eip);
 	DebugMsg("CS=%X\tDS=%X\tES=%X\tFS=%X\tGS=%X\n", cs, ds, es, fs, gs);
-	DebugMsg("EFLAGS=%X\tISR=%X\tERR=%X\n", eflags, IsrN, ErrCode);
-	DeleteThed();
+	DebugMsg("PTID=%X\tEFLAGS=%X\tISR=%X\tERR=%X\n", *((DWORD*)&CurPmd->CurTmd->id), eflags, IsrN, ErrCode);
+	ThedExit();
+}
+
+/*浮点协处理器异常处理程序*/
+void FpuFaultProc(DWORD edi, DWORD esi, DWORD ebp, DWORD esp, DWORD ebx, DWORD edx, DWORD ecx, DWORD eax, WORD gs, WORD fs, WORD es, WORD ds, DWORD IsrN, DWORD ErrCode, DWORD eip, WORD cs, DWORD eflags)
+{
+	THREAD_DESC *CurThed;
+	I387 *CurI387;
+
+	CurThed = CurPmd->CurTmd;
+	CurI387 = CurThed->i387;
+	CurThed->attr &= (~THED_ATTR_APPS);	/*进入系统调用态*/
+	if (CurI387 == NULL)	/*线程首次执行协处理器指令*/
+	{
+		if ((CurI387 = (I387*)LockKmalloc(sizeof(I387))) == NULL)
+			ThedExit();
+	}
+	cli();
+	ClearTs();
+	if (LastI387 != CurI387)	/*使用协处理器的线程不变时不必切换*/
+	{
+		if (LastI387)
+			__asm__ ("fwait;fnsave %0"::"m"(LastI387));	/*保存协处理器寄存器*/
+		if (CurThed->i387)	/*协处理器已经可用*/
+			__asm__ ("frstor %0"::"m"(CurI387));	/*加载协处理器寄存器*/
+		else
+		{
+			__asm__ ("fninit");	/*初始化协处理器*/
+			CurThed->i387 = CurI387;
+		}
+		LastI387 = CurI387;
+	}
+	sti();
+	CurThed->attr |= THED_ATTR_APPS;	/*离开系统调用态*/
 }
 
 /*所有中断信号的总调函数*/
@@ -177,7 +219,6 @@ void IrqProc(DWORD edi, DWORD esi, DWORD ebp, DWORD esp, DWORD ebx, DWORD edx, D
 {
 	THREAD_DESC *CurThed;
 
-	CurThed = CurPmd ? CurPmd->CurTmd : NULL;
 	/*进入中断处理程序以前中断已经关闭*/
 	if (IrqN == 0)
 	{
@@ -187,11 +228,12 @@ void IrqProc(DWORD edi, DWORD esi, DWORD ebp, DWORD esp, DWORD ebx, DWORD edx, D
 		else
 		{
 			schedul();
+			CurThed = CurPmd ? CurPmd->CurTmd : NULL;
 			if (CurThed && (CurThed->attr & (THED_ATTR_APPS | THED_ATTR_KILLED)) == (THED_ATTR_APPS | THED_ATTR_KILLED))	/*线程在应用态下被杀死*/
 			{
 				CurThed->attr &= (~THED_ATTR_KILLED);
 				sti();
-				DeleteThed();
+				ThedExit();
 			}
 		}
 	}
@@ -200,6 +242,7 @@ void IrqProc(DWORD edi, DWORD esi, DWORD ebp, DWORD esp, DWORD ebx, DWORD edx, D
 		MESSAGE_DESC *msg;
 
 		sti();
+		CurThed = CurPmd ? CurPmd->CurTmd : NULL;
 		if (CurThed)
 			CurThed->attr &= (~THED_ATTR_APPS);	/*进入系统调用态*/
 		if ((msg = AllocMsg()) == NULL)	/*内存不足*/
@@ -209,7 +252,8 @@ void IrqProc(DWORD edi, DWORD esi, DWORD ebp, DWORD esp, DWORD ebx, DWORD edx, D
 			return;
 		}
 		msg->ptid = IrqPort[IrqN];
-		msg->data[0] = MSG_ATTR_IRQ | IrqN;
+		msg->data[0] = MSG_ATTR_IRQ;
+		msg->data[1] = IrqN;
 		if (SendMsg(msg) != NO_ERROR)
 			FreeMsg(msg);
 		if (CurThed)
@@ -222,7 +266,7 @@ void ApiCall(DWORD edi, DWORD esi, DWORD ebp, DWORD esp, DWORD ebx, DWORD edx, D
 {
 	THREAD_DESC *CurThed;
 
-	if (eax >= (APICALL_LEN << 16))
+	if (eax >= ((sizeof(ApiCallTable) / sizeof(void*)) << 16))
 	{
 		eax = ERROR_WRONG_APIN;
 		return;
@@ -263,39 +307,43 @@ void ApiGiveUp(DWORD *argv)
 /*睡眠*/
 void ApiSleep(DWORD *argv)
 {
-	SleepCs(argv[EBX_ID]);
+	if (argv[EBX_ID])
+		CliSleep(argv[EBX_ID]);
 	argv[EAX_ID] = NO_ERROR;
 }
 
 /*创建线程*/
 void ApiCreateThread(DWORD *argv)
 {
-	DWORD args[2];
+	DWORD data[3];
 
-	args[0] = argv[EBX_ID];
-	args[1] = argv[ECX_ID];
-	argv[EAX_ID] = CreateThed(args, (THREAD_ID*)&argv[EBX_ID]);
+	data[0] = argv[EBX_ID];
+	data[1] = argv[ECX_ID];
+	data[2] = argv[EDX_ID];
+	argv[EAX_ID] = CreateThed(data, (THREAD_ID*)&argv[EBX_ID]);
 }
 
 /*退出线程*/
 void ApiExitThread(DWORD *argv)
 {
-	DeleteThed();
+	ThedExit();
 }
 
 /*杀死线程*/
 void ApiKillThread(DWORD *argv)
 {
-	if (argv[EBX_ID] >= TMT_LEN)
-		argv[EAX_ID] = ERROR_WRONG_THEDID;
-	else
-		argv[EAX_ID] = KillThed(argv[EBX_ID]);
+	argv[EAX_ID] = KillThed(argv[EBX_ID]);
 }
 
 /*创建进程*/
 void ApiCreateProcess(DWORD *argv)
 {
-	argv[EAX_ID] = CreateProc(argv[EBX_ID] & (~EXEC_ARGS_BASESRV), &argv[ECX_ID], (THREAD_ID*)&argv[EBX_ID]);
+	DWORD data[3];
+
+	data[0] = argv[EBX_ID] & (~EXEC_ARGV_BASESRV);
+	data[1] = argv[ECX_ID];
+	data[2] = argv[EDX_ID];
+	argv[EAX_ID] = CreateProc(data, (THREAD_ID*)&argv[EBX_ID]);
 }
 
 /*退出进程*/
@@ -307,10 +355,7 @@ void ApiExitProcess(DWORD *argv)
 /*杀死进程*/
 void ApiKillProcess(DWORD *argv)
 {
-	if (argv[EBX_ID] >= PMT_LEN)
-		argv[EAX_ID] = ERROR_WRONG_PROCID;
-	else
-		argv[EAX_ID] = KillProc(argv[EBX_ID]);
+	argv[EAX_ID] = KillProc(argv[EBX_ID]);
 }
 
 /*注册内核端口对应线程*/
@@ -334,99 +379,167 @@ void ApiGetKpToThed(DWORD *argv)
 /*注册IRQ信号的响应线程*/
 void ApiRegIrq(DWORD *argv)
 {
-	if (CurPmd->attr & PROC_ATTR_APPS)
-		argv[EAX_ID] = ERROR_NOT_DRIVER;
-	else if (argv[EBX_ID] >= IRQ_LEN)
-		argv[EAX_ID] = ERROR_WRONG_IRQN;
-	else	/*驱动进程特权API*/
-		argv[EAX_ID] = RegIrq(argv[EBX_ID]);
+	argv[EAX_ID] = RegIrq(argv[EBX_ID]);
 }
 
 /*注销IRQ信号的响应线程*/
 void ApiUnregIrq(DWORD *argv)
 {
-	if (CurPmd->attr & PROC_ATTR_APPS)
-		argv[EAX_ID] = ERROR_NOT_DRIVER;
-	else if (argv[EBX_ID] >= IRQ_LEN)
-		argv[EAX_ID] = ERROR_WRONG_IRQN;
-	else	/*驱动进程特权API*/
-		argv[EAX_ID] = UnregIrq(argv[EBX_ID]);
+	argv[EAX_ID] = UnregIrq(argv[EBX_ID]);
 }
 
 /*发送消息*/
 void ApiSendMsg(DWORD *argv)
 {
 	MESSAGE_DESC *msg;
+	void *addr;
+	DWORD data[MSG_DATA_LEN];
 
-	if (((THREAD_ID*)&argv[EBX_ID])->ProcID >= PMT_LEN)
-		argv[EAX_ID] = ERROR_WRONG_PROCID;
-	else if (((THREAD_ID*)&argv[EBX_ID])->ThedID >= TMT_LEN)
-		argv[EAX_ID] = ERROR_WRONG_THEDID;
-	else if (argv[ECX_ID] < MSG_ATTR_PROC)
-		argv[EAX_ID] = ERROR_WRONG_APPMSG;
-	else if ((msg = AllocMsg()) == NULL)
-		argv[EAX_ID] = ERROR_HAVENO_MSGDESC;
-	else
+	addr = (void*)argv[ESI_ID];
+	if (addr < UADDR_OFF || addr > (void*)(0 - sizeof(data)))
 	{
-		msg->ptid = *((THREAD_ID*)&argv[EBX_ID]);
-		msg->data[0] = argv[ECX_ID];
-		msg->data[1] = argv[EDX_ID];
-		msg->data[2] = argv[ESI_ID];
-		msg->data[3] = argv[EDI_ID];
-		if ((argv[EAX_ID] = SendMsg(msg)) != NO_ERROR)
-			FreeMsg(msg);
+		argv[EAX_ID] = ERROR_WRONG_APPMSG;
+		return;
 	}
+	memcpy32(data, addr, MSG_DATA_LEN);	/*复制数据到内核空间*/
+	CurPmd->CurTmd->attr &= (~THED_ATTR_APPS);	/*防止访问用户内存时发生页异常,重新进入系统调用态*/
+	if (data[0] < MSG_ATTR_USER)
+	{
+		argv[EAX_ID] = ERROR_WRONG_APPMSG;
+		return;
+	}
+	if ((msg = AllocMsg()) == NULL)
+	{
+		argv[EAX_ID] = ERROR_HAVENO_MSGDESC;
+		return;
+	}
+	msg->ptid = *((THREAD_ID*)&argv[EBX_ID]);
+	memcpy32(msg->data, data, MSG_DATA_LEN);
+	if ((argv[EAX_ID] = SendMsg(msg)) != NO_ERROR)
+		FreeMsg(msg);
+	if (argv[EAX_ID] == NO_ERROR && argv[ECX_ID])	/*等待返回消息*/
+		if ((argv[EAX_ID] = WaitThedMsg(&msg, *((THREAD_ID*)&argv[EBX_ID]), argv[ECX_ID])) == NO_ERROR)
+		{
+			memcpy32(data, msg->data, MSG_DATA_LEN);
+			FreeMsg(msg);
+			memcpy32(addr, data, MSG_DATA_LEN);	/*复制数据到用户空间*/
+		}
 }
 
 /*接收消息*/
 void ApiRecvMsg(DWORD *argv)
 {
 	MESSAGE_DESC *msg;
+	void *addr;
+	DWORD data[MSG_DATA_LEN];
 
-	if ((argv[EAX_ID] = RecvMsg(&msg)) == NO_ERROR)
+	addr = (void*)argv[ESI_ID];
+	if (addr < UADDR_OFF || addr > (void*)(0 - sizeof(data)))
+		addr = NULL;
+	if ((argv[EAX_ID] = RecvMsg(&msg, argv[EBX_ID])) == NO_ERROR)
 	{
 		argv[EBX_ID] = *((DWORD*)&msg->ptid);
-		argv[ECX_ID] = msg->data[0];
-		argv[EDX_ID] = msg->data[1];
-		argv[ESI_ID] = msg->data[2];
-		argv[EDI_ID] = msg->data[3];
+		if (addr)
+			memcpy32(data, msg->data, MSG_DATA_LEN);
 		FreeMsg(msg);
-	}
-}
-
-/*阻塞并等待消息*/
-void ApiWaitMsg(DWORD *argv)
-{
-	MESSAGE_DESC *msg;
-
-	if ((argv[EAX_ID] = WaitMsg(&msg, argv[EBX_ID])) == NO_ERROR)
-	{
-		argv[EBX_ID] = *((DWORD*)&msg->ptid);
-		argv[ECX_ID] = msg->data[0];
-		argv[EDX_ID] = msg->data[1];
-		argv[ESI_ID] = msg->data[2];
-		argv[EDI_ID] = msg->data[3];
-		FreeMsg(msg);
+		if (addr)
+			memcpy32(addr, data, MSG_DATA_LEN);	/*复制数据到用户空间*/
 	}
 }
 
 /*映射物理地址*/
 void ApiMapPhyAddr(DWORD *argv)
 {
-	if (CurPmd->attr & PROC_ATTR_APPS)
-		argv[EAX_ID] = ERROR_NOT_DRIVER;
-	else	/*驱动进程特权API*/
-		argv[EAX_ID] = MapPhyAddr((void**)&argv[EBX_ID], argv[EBX_ID], argv[ECX_ID]);
+	argv[EAX_ID] = MapPhyAddr((void**)&argv[ESI_ID], argv[EBX_ID], argv[ECX_ID]);
 }
 
 /*映射用户地址*/
 void ApiMapUserAddr(DWORD *argv)
 {
-	argv[EAX_ID] = MapUserAddr((void**)&argv[EBX_ID], argv[EBX_ID]);
+	argv[EAX_ID] = MapUserAddr((void**)&argv[ESI_ID], argv[ECX_ID]);
 }
 
 /*回收用户地址块*/
 void ApiFreeAddr(DWORD *argv)
 {
-	argv[EAX_ID] = LockFreeUBlk(CurPmd, (void*)argv[EBX_ID]);
+	argv[EAX_ID] = UnmapAddr((void*)argv[ESI_ID]);
+}
+
+/*映射进程地址读取*/
+void ApiReadProcAddr(DWORD *argv)
+{
+	void *addr;
+	DWORD data[MSG_DATA_LEN];
+
+	addr = (void*)argv[ESI_ID];
+	if (addr < UADDR_OFF || addr > (void*)(0 - sizeof(data)))
+		addr = NULL;
+	if (addr)
+	{
+		memcpy32(data, addr, MSG_DATA_LEN - 3);	/*复制数据到内核空间*/
+		CurPmd->CurTmd->attr &= (~THED_ATTR_APPS);	/*防止访问用户内存时发生页异常,重新进入系统调用态*/
+	}
+	if ((argv[EAX_ID] = MapProcAddr((void*)argv[EDI_ID], argv[ECX_ID], *((THREAD_ID*)&argv[EBX_ID]), TRUE, TRUE, data, argv[EDX_ID])) == NO_ERROR)
+		if (addr)
+			memcpy32(addr, data, MSG_DATA_LEN);	/*复制数据到用户空间*/
+}
+
+/*映射进程地址写入*/
+void ApiWriteProcAddr(DWORD *argv)
+{
+	void *addr;
+	DWORD data[MSG_DATA_LEN];
+
+	addr = (void*)argv[ESI_ID];
+	if (addr < UADDR_OFF || addr > (void*)(0 - sizeof(data)))
+		addr = NULL;
+	if (addr)
+	{
+		memcpy32(data, addr, MSG_DATA_LEN - 3);	/*复制数据到内核空间*/
+		CurPmd->CurTmd->attr &= (~THED_ATTR_APPS);	/*防止访问用户内存时发生页异常,重新进入系统调用态*/
+	}
+	if ((argv[EAX_ID] = MapProcAddr((void*)argv[EDI_ID], argv[ECX_ID], *((THREAD_ID*)&argv[EBX_ID]), FALSE, TRUE, data, argv[EDX_ID])) == NO_ERROR)
+		if (addr)
+			memcpy32(addr, data, MSG_DATA_LEN);	/*复制数据到用户空间*/
+}
+
+/*撤销映射进程地址*/
+void ApiUnmapProcAddr(DWORD *argv)
+{
+	void *addr;
+	DWORD data[MSG_DATA_LEN - 2];
+
+	addr = (void*)argv[ESI_ID];
+	if (addr < UADDR_OFF || addr > (void*)(0 - sizeof(data)))
+		addr = NULL;
+	if (addr)
+	{
+		memcpy32(data, addr, MSG_DATA_LEN - 2);	/*复制数据到内核空间*/
+		CurPmd->CurTmd->attr &= (~THED_ATTR_APPS);	/*防止访问用户内存时发生页异常,重新进入系统调用态*/
+	}
+	argv[EAX_ID] = UnmapProcAddr((void*)argv[EDI_ID], data);
+}
+
+/*取消映射进程地址*/
+void ApiCnlmapProcAddr(DWORD *argv)
+{
+	void *addr;
+	DWORD data[MSG_DATA_LEN - 2];
+
+	addr = (void*)argv[ESI_ID];
+	if (addr < UADDR_OFF || addr > (void*)(0 - sizeof(data)))
+		addr = NULL;
+	if (addr)
+	{
+		memcpy32(data, addr, MSG_DATA_LEN - 2);	/*复制数据到内核空间*/
+		CurPmd->CurTmd->attr &= (~THED_ATTR_APPS);	/*防止访问用户内存时发生页异常,重新进入系统调用态*/
+	}
+	argv[EAX_ID] = CnlmapProcAddr((void*)argv[EDI_ID], data);
+}
+
+/*取得开机经过的时钟*/
+void ApiGetClock(DWORD *argv)
+{
+	argv[EBX_ID] = clock;
+	argv[EAX_ID] = NO_ERROR;
 }

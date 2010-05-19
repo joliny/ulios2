@@ -15,6 +15,7 @@ void InitPMT()
 	PmdCou = 0;
 	clock = 0;
 	SleepList = NULL;
+	LastI387 = NULL;
 }
 
 /*初始化内核进程*/
@@ -43,7 +44,7 @@ static void SwitchTS()
 }
 
 /*分配空进程ID*/
-static long AllocPid(PROCESS_DESC *proc)
+static inline long AllocPid(PROCESS_DESC *proc)
 {
 	if (FstPmd >= &pmt[PMT_LEN])
 		return ERROR_HAVENO_PROCID;	// 没有空进程ID
@@ -59,7 +60,7 @@ static long AllocPid(PROCESS_DESC *proc)
 }
 
 /*释放空进程ID*/
-static void FreePid(PROCESS_DESC **pmd)
+static inline void FreePid(PROCESS_DESC **pmd)
 {
 	*pmd = NULL;
 	if (FstPmd > pmd)
@@ -70,7 +71,7 @@ static void FreePid(PROCESS_DESC **pmd)
 }
 
 /*分配空线程ID*/
-static long AllocTid(PROCESS_DESC *proc, THREAD_DESC *thed)
+static inline long AllocTid(PROCESS_DESC *proc, THREAD_DESC *thed)
 {
 	if (proc->FstTmd >= &proc->tmt[TMT_LEN])
 		return ERROR_HAVENO_THEDID;	// 没有空线程ID
@@ -86,7 +87,7 @@ static long AllocTid(PROCESS_DESC *proc, THREAD_DESC *thed)
 }
 
 /*释放空线程ID*/
-static void FreeTid(PROCESS_DESC *proc, THREAD_DESC **tmd)
+static inline void FreeTid(PROCESS_DESC *proc, THREAD_DESC **tmd)
 {
 	*tmd = NULL;
 	if (proc->FstTmd > tmd)
@@ -97,30 +98,25 @@ static void FreeTid(PROCESS_DESC *proc, THREAD_DESC **tmd)
 }
 
 /*将延时线程插入延时阻塞链表*/
-static void InsertSleepList(THREAD_DESC *thed)
+static inline void InsertSleepList(THREAD_DESC *thed)
 {
 	THREAD_DESC *PreThed, *NxtThed;
 
-	for (PreThed = NxtThed = SleepList; NxtThed; NxtThed = (PreThed = NxtThed)->nxt)
+	for (PreThed = NULL, NxtThed = SleepList; NxtThed; NxtThed = (PreThed = NxtThed)->nxt)
 		if (thed->WakeupClock < NxtThed->WakeupClock)	/*进行排序插入*/
 			break;
-	if (PreThed != SleepList)
-	{
-		thed->pre = PreThed;
+	thed->pre = PreThed;
+	if (PreThed)
 		PreThed->nxt = thed;
-	}
 	else
-	{
-		thed->pre = NULL;
 		SleepList = thed;
-	}
 	thed->nxt = NxtThed;
 	if (NxtThed)
 		NxtThed->pre = thed;
 }
 
 /*将延时线程从延时阻塞链表头中删除*/
-static void DeleteSleepList(THREAD_DESC *thed)
+static inline void DeleteSleepList(THREAD_DESC *thed)
 {
 	THREAD_DESC *PreThed, *NxtThed;
 
@@ -132,21 +128,6 @@ static void DeleteSleepList(THREAD_DESC *thed)
 		SleepList = NxtThed;
 	if (NxtThed)
 		NxtThed->pre = PreThed;
-}
-
-/*延时cs厘秒*/
-void SleepCs(DWORD cs)
-{
-	if (cs)
-	{
-		THREAD_DESC *CurThed;
-
-		CurThed = CurPmd->CurTmd;
-		CurThed->WakeupClock = clock + cs;
-		cli();
-		sleep(TRUE);
-		sti();
-	}
 }
 
 /*线程调度,调用前关中断*/
@@ -168,7 +149,7 @@ void schedul()
 	}
 }
 
-/*唤醒线程,调用前关中断,线程必须有效且阻塞,不允许唤醒内核任务*/
+/*唤醒线程*/
 void wakeup(THREAD_DESC *thed)
 {
 	PROCESS_DESC *CurProc, *NewProc;
@@ -215,8 +196,8 @@ void wakeup(THREAD_DESC *thed)
 	SwitchTS();
 }
 
-/*阻塞线程,调用前关中断,线程必须有效且就绪,不允许阻塞内核任务*/
-void sleep(BOOL isWaitTime)
+/*阻塞线程*/
+void sleep(DWORD cs)
 {
 	PROCESS_DESC *CurProc;
 	THREAD_DESC *CurThed;
@@ -250,8 +231,9 @@ void sleep(BOOL isWaitTime)
 		CurProc->CurTmd = NxtThed;
 	}
 	CurThed->attr |= THED_ATTR_SLEEP;	/*阻塞线程*/
-	if (isWaitTime)	/*因延时而阻塞*/
+	if (cs != INVALID)	/*因延时而阻塞*/
 	{
+		CurThed->WakeupClock = clock + cs;
 		CurThed->attr |= THED_ATTR_WAITTIME;
 		InsertSleepList(CurThed);
 	}
@@ -260,12 +242,12 @@ void sleep(BOOL isWaitTime)
 	{
 		CurThed->attr &= (~THED_ATTR_KILLED);
 		sti();
-		DeleteThed();
+		ThedExit();
 	}
 }
 
 /*创建线程*/
-long CreateThed(const DWORD *args, THREAD_ID *ptid)
+long CreateThed(const DWORD *argv, THREAD_ID *ptid)
 {
 	PROCESS_DESC *CurProc;
 	THREAD_DESC *CurThed, *NewThed, *NxtThed;
@@ -277,13 +259,14 @@ long CreateThed(const DWORD *args, THREAD_ID *ptid)
 	memset32(NewThed, 0, sizeof(THREAD_DESC) / sizeof(DWORD));
 	NewThed->par = CurThed->id.ThedID;
 	NewThed->id.ProcID = CurThed->id.ProcID;
+	*(DWORD*)(&NewThed->WaitId) = INVALID;
 	NewThed->tss.cr3 = CurThed->tss.cr3;
 	NewThed->tss.eip = ThedStart;
 	NewThed->tss.esp = (DWORD)NewThed + sizeof(THREAD_DESC);
 	NewThed->tss.cs = KCODE_SEL;
 	NewThed->tss.gs = NewThed->tss.fs = NewThed->tss.ds = NewThed->tss.ss = NewThed->tss.es = KDATA_SEL;
 	NewThed->tss.io = sizeof(TSS);
-	memcpy32(NewThed->kstk, args, 2);	/*复制参数*/
+	memcpy32(NewThed->kstk, argv, 3);	/*复制参数*/
 	cli();
 	if (CurProc->attr & PROC_ATTR_DEL)	/*正在被删除的进程不创建线程*/
 	{
@@ -303,8 +286,7 @@ long CreateThed(const DWORD *args, THREAD_ID *ptid)
 	CurThed->nxt = NewThed;
 	NxtThed->pre = NewThed;
 	sti();
-	if (ptid)
-		*ptid = NewThed->id;
+	*ptid = NewThed->id;
 	return NO_ERROR;
 }
 
@@ -313,41 +295,30 @@ void DeleteThed()
 {
 	PROCESS_DESC *CurProc;
 	THREAD_DESC *CurThed;
-	EXEC_DESC *CurExec;
 	THREAD_DESC **Thedi;
-	WORD CurTid;
+	DWORD ptid;
 
 	CurProc = CurPmd;
 	CurThed = CurProc->CurTmd;
-	CurExec = CurProc->exec;
-	CurThed->attr |= THED_ATTR_DEL;	/*标记为正在被删除*/
-	UnregAllIrq();	/*清除线程资源*/
-	UnregAllKnlPort();
-	FreeAllMsg();
-	LockFreeUFData(CurProc, CurThed->ustk, CurThed->UstkSiz);
-	clilock(CurProc->Page_l || CurExec->Page_l || Kmalloc_l || AllocPage_l);
-	CurTid = CurThed->id.ThedID;
+	clilock(Kmalloc_l || AllocPage_l);
+	ptid = CurThed->id.ThedID;
 	kfree(CurThed, sizeof(THREAD_DESC));
-	FreeTid(CurProc, &CurProc->tmt[CurTid]);
+	FreeTid(CurProc, &CurProc->tmt[ptid]);
 	for (Thedi = CurProc->tmt; Thedi < CurProc->EndTmd; Thedi++)	/*调整子线程的父线程ID*/
-		if (*Thedi && (*Thedi)->par == CurTid)
+		if (*Thedi && (*Thedi)->par == ptid)
 			(*Thedi)->par = CurThed->par;
 	if (CurThed->nxt == CurThed)	/*只剩当前一个就绪线程,需要阻塞进程*/
 	{
 		if (CurProc->TmdCou == 0)	/*只剩当前一个线程,清除进程资源*/
 		{
 			PROCESS_DESC **Proci;
-			WORD CurPid;
 
-			kfree(CurExec, sizeof(EXEC_DESC));
-			FreeExid(&exmt[CurExec->id]);
-			CurPid = CurThed->id.ProcID;
-			pddt[CurPid] = 0;
-			FreePage(CurThed->tss.cr3);
+			FreePage(pt[(PT_ID << 10) | PT_ID]);
+			ptid = CurThed->id.ProcID;
 			kfree(CurProc, sizeof(PROCESS_DESC));
-			FreePid(&pmt[CurPid]);
+			FreePid(&pmt[ptid]);
 			for (Proci = pmt; Proci < EndPmd; Proci++)	/*调整子进程的父进程ID*/
-				if (*Proci && (*Proci)->par == CurPid)
+				if (*Proci && (*Proci)->par == ptid)
 					(*Proci)->par = CurProc->par;
 		}
 		if (CurProc->nxt == CurProc)	/*只剩当前一个就绪进程,切换到内核任务*/
@@ -384,6 +355,8 @@ long KillThed(WORD ThedID)
 	THREAD_DESC *CurThed;
 	THREAD_DESC *DstThed;
 
+	if (ThedID >= TMT_LEN)
+		return ERROR_WRONG_THEDID;
 	CurProc = CurPmd;
 	CurThed = CurProc->CurTmd;
 	cli();
@@ -401,12 +374,15 @@ long KillThed(WORD ThedID)
 }
 
 /*创建进程*/
-long CreateProc(DWORD attr, const DWORD *args, THREAD_ID *ptid)
+long CreateProc(const DWORD *argv, THREAD_ID *ptid)
 {
 	PROCESS_DESC *CurProc, *NewProc;
 	THREAD_DESC *NewThed;
 	DWORD NewPdt, pdti;
 
+	CurProc = CurPmd;
+	if (CurProc && (CurProc->attr & PROC_ATTR_APPS) && (argv[0] & EXEC_ARGV_DRIVER))	/*应用进程无权启动驱动进程*/
+		return ERROR_NOT_DRIVER;
 	if ((NewProc = (PROCESS_DESC*)LockKmalloc(sizeof(PROCESS_DESC))) == NULL)
 		return ERROR_HAVENO_KMEM;
 	if ((NewThed = (THREAD_DESC*)LockKmalloc(sizeof(THREAD_DESC))) == NULL)
@@ -420,9 +396,8 @@ long CreateProc(DWORD attr, const DWORD *args, THREAD_ID *ptid)
 		LockKfree(NewProc, sizeof(PROCESS_DESC));
 		return ERROR_HAVENO_PMEM;
 	}
-	CurProc = CurPmd;
 	memset32(NewProc, 0, sizeof(PROCESS_DESC) / sizeof(DWORD));
-	NewProc->par = CurProc->CurTmd->id.ProcID;
+	NewProc->par = CurProc ? CurProc->CurTmd->id.ProcID : INVALID;
 	NewProc->MemSiz = PAGE_SIZE;	/*页目录表占用*/
 	NewProc->tmt[0] = NewThed;
 	NewProc->EndTmd = NewProc->FstTmd = &NewProc->tmt[1];
@@ -431,18 +406,15 @@ long CreateProc(DWORD attr, const DWORD *args, THREAD_ID *ptid)
 	memset32(NewThed, 0, sizeof(THREAD_DESC) / sizeof(DWORD));
 	NewThed->pre = NewThed;
 	NewThed->nxt = NewThed;
-	NewThed->par = INVWID;
+	NewThed->par = INVALID;
+	*(DWORD*)(&NewThed->WaitId) = INVALID;
 	NewThed->tss.cr3 = NewPdt;
 	NewThed->tss.eip = ProcStart;
 	NewThed->tss.esp = (DWORD)NewThed + sizeof(THREAD_DESC);
 	NewThed->tss.cs = KCODE_SEL;
 	NewThed->tss.gs = NewThed->tss.fs = NewThed->tss.ds = NewThed->tss.ss = NewThed->tss.es = KDATA_SEL;
 	NewThed->tss.io = sizeof(TSS);
-	NewThed->kstk[0] = attr;	/*复制参数*/
-	if (attr & EXEC_ARGS_BASESRV)
-		memcpy32(&NewThed->kstk[1], args, sizeof(PHYBLK_DESC) / sizeof(DWORD));
-	else
-		NewThed->kstk[1] = args[0];
+	memcpy32(NewThed->kstk, argv, 3);	/*复制参数*/
 	cli();
 	if (AllocPid(NewProc) != NO_ERROR)
 	{
@@ -452,13 +424,13 @@ long CreateProc(DWORD attr, const DWORD *args, THREAD_ID *ptid)
 		LockKfree(NewProc, sizeof(PROCESS_DESC));
 		return ERROR_HAVENO_PROCID;
 	}
-	CurProc->MemSiz -= PAGE_SIZE;	/*减去AllocPage中多加于当前进程的一页内存*/
 	pdti = NewThed->id.ProcID;
-	pddt[pdti] = PAGE_ATTR_P | PAGE_ATTR_W | PAGE_ATTR_A | PAGE_ATTR_D | PAGE_ATTR_G | NewPdt;	/*映射新进程的页目录表*/
+	NewPdt |= PAGE_ATTR_P | PAGE_ATTR_U;
+	pddt[pdti] = NewPdt;	/*映射新进程的页目录表*/
 	pdti <<= 10;
 	memset32(&pdt[pdti], 0, 0x400);
 	memcpy32(&pdt[pdti], kpdt, 4);	/*复制页目录表*/
-	pdt[pdti | PT_ID] = PAGE_ATTR_P | NewPdt;	/*映射新进程的页表*/
+	pdt[pdti | PT_ID] = NewPdt;	/*映射新进程的页表*/
 	if (CurProc)	/*有就绪进程,插入当前进程后*/
 	{
 		PROCESS_DESC *NxtProc;
@@ -477,8 +449,7 @@ long CreateProc(DWORD attr, const DWORD *args, THREAD_ID *ptid)
 		SwitchTS();
 	}
 	sti();
-	if (ptid)
-		*ptid = NewThed->id;
+	*ptid = NewThed->id;
 	return NO_ERROR;
 }
 
@@ -506,7 +477,7 @@ void DeleteProc()
 		}
 	}
 	sti();
-	DeleteThed();
+	ThedExit();
 }
 
 /*杀死进程*/
@@ -516,6 +487,8 @@ long KillProc(WORD ProcID)
 	PROCESS_DESC *DstProc;
 	THREAD_DESC **Thedi;
 
+	if (ProcID >= PMT_LEN)
+		return ERROR_WRONG_PROCID;
 	CurProc = CurPmd;
 	cli();
 	DstProc = pmt[ProcID];
@@ -547,60 +520,42 @@ long KillProc(WORD ProcID)
 }
 
 /*分配用户地址块*/
-void *LockAllocUBlk(PROCESS_DESC *proc, DWORD siz, DWORD ptid)
+BLK_DESC *AllocUBlk(PROCESS_DESC *proc, DWORD siz)
 {
-	void *addr;
+	BLK_DESC *blk;
 
-	lock(&proc->Ufdmt_l);
 	if (proc->FstUBlk >= &proc->ublkt[UBLKT_LEN])
-	{
-		ulock(&proc->Ufdmt_l);
 		return NULL;
-	}
-	if ((addr = alloc(proc->ufdmt, siz)) == NULL)
-	{
-		ulock(&proc->Ufdmt_l);
+	blk = proc->FstUBlk;
+	if ((blk->addr = alloc(proc->ufdmt, siz)) == NULL)
 		return NULL;
-	}
-	proc->FstUBlk->addr = addr;
-	proc->FstUBlk->siz = siz;
-	proc->FstUBlk->ptid = ptid;
+	blk->siz = siz;
 	do
 		proc->FstUBlk++;
 	while (proc->FstUBlk < &proc->ublkt[UBLKT_LEN] && proc->FstUBlk->siz);
 	if (proc->EndUBlk < proc->FstUBlk)
 		proc->EndUBlk = proc->FstUBlk;
-	ulock(&proc->Ufdmt_l);
-	return addr;
+	return blk;
+}
+
+/*搜索用户地址块*/
+BLK_DESC *FindUBlk(PROCESS_DESC *proc, void *addr)
+{
+	BLK_DESC *blk;
+
+	for (blk = proc->ublkt; blk < proc->EndUBlk; blk++)
+		if (blk->addr == addr)
+			return blk;
+	return NULL;
 }
 
 /*回收用户地址块*/
-long LockFreeUBlk(PROCESS_DESC *proc, void *addr)
+void FreeUBlk(PROCESS_DESC *proc, BLK_DESC *blk)
 {
-	BLK_DESC *CurBlk;
-
-	*((DWORD*)&addr) &= 0xFFFFF000;
-	lock(&proc->Ufdmt_l);
-	for (CurBlk = proc->ublkt; CurBlk < proc->EndUBlk; CurBlk++)
-		if (CurBlk->addr == addr)
-		{
-			DWORD siz, ptid;
-
-			siz = CurBlk->siz;
-			ptid = CurBlk->ptid;
-			free(proc->ufdmt, addr, siz);
-			CurBlk->siz = 0;
-			if (proc->FstUBlk > CurBlk)
-				proc->FstUBlk = CurBlk;
-			while (proc->EndUBlk > proc->ublkt && (proc->EndUBlk - 1)->siz == 0)
-				proc->EndUBlk--;
-			ulock(&proc->Ufdmt_l);
-			if ((ptid & BLK_PTID_SPECIAL) != BLK_PTID_SPECIAL)	/*不是特殊PTID*/
-				UnmapProcAddr(addr, siz, *((THREAD_ID*)&ptid));
-			else
-				UnmapAddr(addr, siz, ptid);
-			return NO_ERROR;
-		}
-	ulock(&proc->Ufdmt_l);
-	return ERROR_HAVENO_LINEADDR;
+	free(proc->ufdmt, blk->addr, blk->siz);
+	blk->siz = 0;
+	if (proc->FstUBlk > blk)
+		proc->FstUBlk = blk;
+	while (proc->EndUBlk > proc->ublkt && (proc->EndUBlk - 1)->siz == 0)
+		proc->EndUBlk--;
 }

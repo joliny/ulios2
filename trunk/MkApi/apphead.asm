@@ -5,7 +5,7 @@
 
 [BITS 32]
 global _start
-extern main
+extern _main
 _start:		;初始化段寄存器
 	mov	ax,	ss	;设置数据段选择子
 	mov	ds,	ax
@@ -13,6 +13,7 @@ _start:		;初始化段寄存器
 	mov	fs,	ax
 	mov	gs,	ax
 
-	call	main
+	call	_main
+	mov	ebx,	eax
 	mov	eax,	0x070000	;退出进程
 	int	0xF0
