@@ -52,7 +52,7 @@ BYTE pg0[PG_LEN];			/*当前页副本4MB*/
 /*初始化内核变量*/
 void InitKnlVal()
 {
-	memset32(kpt, 0xFFFFFFFF, sizeof(kpt) / sizeof(DWORD));	/*初始化内核端口注册表*/
+	memset32(kpt, INVALID, sizeof(kpt) / sizeof(DWORD));	/*初始化内核端口注册表*/
 	memset32(KnlValue, 0, sizeof(KnlValue) / sizeof(DWORD));	/*清空零散变量*/
 }
 
