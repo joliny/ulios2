@@ -146,6 +146,10 @@ SOURCE=.\driver\Makefile
 
 SOURCE=.\driver\time.c
 # End Source File
+# Begin Source File
+
+SOURCE=.\driver\vesa.c
+# End Source File
 # End Group
 # Begin Group "fs"
 
