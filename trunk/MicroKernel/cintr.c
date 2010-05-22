@@ -45,7 +45,7 @@ void (*AsmIrqCallTable[])() = {
 
 /*C系统调用表*/
 void (*ApiCallTable[])(DWORD *argv) = {
-	ApiPrintf, ApiGiveUp, ApiSleep, ApiCreateThread, ApiExitThread, ApiKillThread, ApiCreateProcess, ApiExitProcess,
+	ApiGetPtid, ApiGiveUp, ApiSleep, ApiCreateThread, ApiExitThread, ApiKillThread, ApiCreateProcess, ApiExitProcess,
 	ApiKillProcess, ApiRegKnlPort, ApiUnregKnlPort, ApiGetKpToThed, ApiRegIrq, ApiUnregIrq, ApiSendMsg, ApiRecvMsg,
 	ApiMapPhyAddr, ApiMapUserAddr, ApiFreeAddr, ApiReadProcAddr, ApiWriteProcAddr, ApiUnmapProcAddr, ApiCnlmapProcAddr, ApiGetClock
 };
@@ -174,10 +174,6 @@ void UnregAllIrq()
 /*不可恢复异常处理程序*/
 void IsrProc(DWORD edi, DWORD esi, DWORD ebp, DWORD esp, DWORD ebx, DWORD edx, DWORD ecx, DWORD eax, WORD gs, WORD fs, WORD es, WORD ds, DWORD IsrN, DWORD ErrCode, DWORD eip, WORD cs, DWORD eflags)
 {
-	DebugMsg("EAX=%X\tEBX=%X\tECX=%X\tEDX=%X\n", eax, ebx, ecx, edx);
-	DebugMsg("EBP=%X\tESI=%X\tEDI=%X\tESP=%X\tEIP=%X\n", ebp, esi, edi, esp, eip);
-	DebugMsg("CS=%X\tDS=%X\tES=%X\tFS=%X\tGS=%X\n", cs, ds, es, fs, gs);
-	DebugMsg("PTID=%X\tEFLAGS=%X\tISR=%X\tERR=%X\n", *((DWORD*)&CurPmd->CurTmd->id), eflags, IsrN, ErrCode);
 	ThedExit();
 }
 
@@ -287,12 +283,11 @@ void ApiCall(DWORD edi, DWORD esi, DWORD ebp, DWORD esp, DWORD ebx, DWORD edx, D
 #define ECX_ID	6
 #define EAX_ID	7
 
-/*调试输出*/
-void ApiPrintf(DWORD *argv)
+/*取得当前线程ID*/
+void ApiGetPtid(DWORD *argv)
 {
-	Print((const char*)argv[ESI_ID], argv[EBX_ID]);
+	argv[EBX_ID] = *(DWORD*)(&CurPmd->CurTmd->id);
 	argv[EAX_ID] = NO_ERROR;
-//	argv[EBX_ID] = *(DWORD*)(&CurPmd->CurTmd->id);
 }
 
 /*主动放弃处理机*/

@@ -82,8 +82,8 @@ void ApiCall(DWORD edi, DWORD esi, DWORD ebp, DWORD esp, DWORD ebx, DWORD edx, D
 
 /*以下为API接口函数*/
 
-/*调试输出*/
-void ApiPrintf(DWORD *argv);
+/*取得当前线程ID*/
+void ApiGetPtid(DWORD *argv);
 
 /*主动放弃处理机*/
 void ApiGiveUp(DWORD *argv);

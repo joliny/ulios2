@@ -5,11 +5,34 @@
 */
 
 #include "../driver/basesrv.h"
+#include "../fs/fsapi.h"
+
+char *itoa(char *buf, DWORD n)
+{
+	char *p, *q;
+
+	p = q = buf;
+	do
+	{
+		*p++ = n % 10 + '0';
+		n /= 10;
+	} while (n);
+	buf = p;	/*确定字符串尾部*/
+	*p-- = 0;
+	while (p > q)	/*翻转字符串*/
+	{
+		n = *q;
+		*q++ = *p;
+		*p-- = n;
+	}
+	return buf;
+}
 
 int main()
 {
 	THREAD_ID VesaPtid, ptid;
-	long res;
+	long res, i, j;
+	DWORD bmp[64 * 64];
 
 	if ((res = KGetKpToThed(SRV_KBDMUS_PORT, &ptid)) != NO_ERROR)
 		return res;
@@ -17,6 +40,25 @@ int main()
 		return res;
 	if ((res = KGetKpToThed(SRV_VESA_PORT, &VesaPtid)) != NO_ERROR)
 		return res;
+	if ((res = KGetKpToThed(SRV_FS_PORT, &ptid)) != NO_ERROR)
+		return res;
+	if ((res = FSopen(ptid, (const BYTE*)"/0/ulios/uli2k.bmp", 0)) < 0)	/*打开BMP文件*/
+		return res;
+	FSseek(ptid, res, 54, FS_SEEK_SET);
+	for (j = 63; j >= 0; j--)
+	{
+		if (FSread(ptid, res, bmp + 64 * j, 64 * 3) <= 0)	/*开始读取BMP文件*/
+			return -1;
+		for (i = 63; i >= 0; i--)
+		{
+			DWORD s = 64 * j * 4 + i * 3, d = 64 * j * 4 + i * 4;
+			((BYTE*)bmp)[d + 3] = 0;
+			((BYTE*)bmp)[d + 2] = ((BYTE*)bmp)[s + 2];
+			((BYTE*)bmp)[d + 1] = ((BYTE*)bmp)[s + 1];
+			((BYTE*)bmp)[d] = ((BYTE*)bmp)[s];
+		}
+	}
+	FSclose(ptid, res);
 
 	for (;;)
 	{
@@ -26,6 +68,19 @@ int main()
 			break;
 		if (data[0] == MSG_ATTR_KBD)
 		{
+			WORD mode[VESA_MAX_MODE];
+			char str[16];
+			DWORD ModeCou, i;
+
+			ModeCou = VSGetMode(VesaPtid, mode);
+			itoa(str, ModeCou);
+			VSDrawStr(VesaPtid, 120, 0, str, 0xFF0000);
+			for (i = 0; i < ModeCou; i++)
+			{
+				itoa(str, mode[i]);
+				VSDrawStr(VesaPtid, 0, i * 12, str, 0xFF0000);
+			}
+			VSPutImage(VesaPtid, 400, 300, bmp, 64, 64);
 /*			if (data[1] & KBD_STATE_LSHIFT)
 				KPrintf("LSHIFT\t", 0);
 			if (data[1] & KBD_STATE_RSHIFT)
@@ -73,7 +128,7 @@ int main()
 				col = 0xFF0000;
 			else
 				col = 0xFFFFFF;
-			VSDrawStr(VesaPtid, data[2], data[3], "老婆老婆我爱你，就像老鼠爱大米", col);
+			VSPutImage(VesaPtid, data[2], data[3], bmp, 64, 64);
 		}
 	}
 	return NO_ERROR;

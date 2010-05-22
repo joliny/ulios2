@@ -10,7 +10,7 @@
 #include "ulidef.h"
 
 #define MAPMT_LEN			0x1000	/*地址映射管理表长度*/
-#define PROC_MAP_LEN		0x80	/*进程中地址映射链表长度*/
+#define PROC_MAP_LEN		0x100	/*进程中地址映射链表长度*/
 typedef struct _MAPBLK_DESC
 {
 	void *addr;					/*映射进程起始地址*/

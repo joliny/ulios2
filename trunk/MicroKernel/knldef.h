@@ -13,7 +13,6 @@
 #include "kalloc.h"
 #include "bootdata.h"
 #include "cintr.h"
-#include "debug.h"
 #include "exec.h"
 #include "ipc.h"
 #include "page.h"

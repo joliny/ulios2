@@ -207,10 +207,6 @@ SOURCE=.\MicroKernel\cintr.h
 # End Source File
 # Begin Source File
 
-SOURCE=.\MicroKernel\debug.h
-# End Source File
-# Begin Source File
-
 SOURCE=.\MicroKernel\error.h
 # End Source File
 # Begin Source File
@@ -252,10 +248,6 @@ SOURCE=.\MicroKernel\x86cpu.h
 # Begin Source File
 
 SOURCE=.\MicroKernel\cintr.c
-# End Source File
-# Begin Source File
-
-SOURCE=.\MicroKernel\debug.c
 # End Source File
 # Begin Source File
 

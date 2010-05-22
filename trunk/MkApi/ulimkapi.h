@@ -186,11 +186,11 @@ static inline void SetUserSeg()
 
 /**********系统调用接口**********/
 
-/*调试输出*/
-static inline long KPrintf(char *str, DWORD num)
+/*取得当前线程ID*/
+static inline long KGetPtid(THREAD_ID *ptid)
 {
 	register long res;
-	__asm__ __volatile__("int $0xF0": "=a"(res): "0"(0x000000), "b"(num), "S"(str));
+	__asm__ __volatile__("int $0xF0": "=a"(res), "=b"(*ptid): "0"(0x000000));
 	return res;
 }
 
