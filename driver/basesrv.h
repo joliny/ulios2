@@ -159,18 +159,45 @@ static inline long KMSetRecv(THREAD_ID ptid)
 
 /**********VESA显卡驱动服务相关**********/
 #define SRV_VESA_PORT	4	/*VESA显卡服务端口*/
+#define VESA_MAX_MODE	512	/*显示模式列表最大数量*/
 
-#define VESA_API_PUTPIXEL	0	/*画点功能号*/
-#define VESA_API_GETPIXEL	1	/*取点功能号*/
-#define VESA_API_PUTIMAGE	2	/*贴图功能号*/
-#define VESA_API_GETIMAGE	3	/*截图功能号*/
-#define VESA_API_FILLRECT	4	/*填充矩形功能号*/
-#define VESA_API_DRAWLINE	5	/*画线功能号*/
-#define VESA_API_CIRCLE		6	/*画圆功能号*/
-#define VESA_API_DRAWSTR	7	/*输出字符串功能号*/
+#define VESA_API_CURMODE	0	/*取得当前显示模式功能号*/
+#define VESA_API_GETMODE	1	/*取得模式列表功能号*/
+#define VESA_API_PUTPIXEL	2	/*画点功能号*/
+#define VESA_API_GETPIXEL	3	/*取点功能号*/
+#define VESA_API_PUTIMAGE	4	/*贴图功能号*/
+#define VESA_API_GETIMAGE	5	/*截图功能号*/
+#define VESA_API_FILLRECT	6	/*填充矩形功能号*/
+#define VESA_API_DRAWLINE	7	/*画线功能号*/
+#define VESA_API_CIRCLE		8	/*画圆功能号*/
+#define VESA_API_DRAWSTR	9	/*输出字符串功能号*/
 
 #define VESA_ERR_LOCATION	-1280	/*坐标错误*/
 #define VESA_ERR_SIZE		-1281	/*尺寸错误*/
+#define VESA_ERR_ARGS		-1282	/*参数错误*/
+
+/*取得当前显示模式*/
+static inline long VSCurMode(THREAD_ID ptid)
+{
+	DWORD data[MSG_DATA_LEN];
+	data[0] = MSG_ATTR_USER;
+	data[3] = VESA_API_CURMODE;
+	if ((data[0] = KSendMsg(ptid, data, SRV_OUT_TIME)) != NO_ERROR)
+		return data[0];
+	return data[1];
+}
+
+/*取得模式列表*/
+static inline long VSGetMode(THREAD_ID ptid, WORD mode[VESA_MAX_MODE])
+{
+	DWORD data[MSG_DATA_LEN];
+	data[0] = VESA_API_GETMODE;
+	if ((data[0] = KReadProcAddr(mode, VESA_MAX_MODE * sizeof(WORD), ptid, data, SRV_OUT_TIME)) != NO_ERROR)
+		return data[0];
+	if (data[2] != NO_ERROR)
+		return data[2];
+	return data[3];
+}
 
 /*画点*/
 static inline long VSPutPixel(THREAD_ID ptid, long x, long y, long c)
@@ -269,7 +296,7 @@ static inline long VSCircle(THREAD_ID ptid, long cx, long cy, long r, long c)
 }
 
 /*输出字符串*/
-static inline long VSDrawStr(THREAD_ID ptid, long x, long y, BYTE *str, DWORD c)
+static inline long VSDrawStr(THREAD_ID ptid, long x, long y, const BYTE *str, DWORD c)
 {
 	DWORD data[MSG_DATA_LEN];
 	BYTE buf[1024];

@@ -21,8 +21,8 @@ DASMFLAGS	= -u -o $(ENTRYPOINT) -e $(ENTRYOFFSET)
 
 # This Program
 KERNELBIN	= ../out/ULIOS/uliknl.bin
-HEADS		= bootdata.h cintr.h debug.h error.h exec.h ipc.h kalloc.h knldef.h page.h task.h ulidef.h x86cpu.h
-OBJS		= ../objs/head.o ../objs/intr.o ../objs/cintr.o ../objs/debug.o ../objs/exec.o ../objs/global.o ../objs/ipc.o ../objs/kalloc.o ../objs/page.o ../objs/task.o ../objs/ulios.o
+HEADS		= bootdata.h cintr.h error.h exec.h ipc.h kalloc.h knldef.h page.h task.h ulidef.h x86cpu.h
+OBJS		= ../objs/head.o ../objs/intr.o ../objs/cintr.o ../objs/exec.o ../objs/global.o ../objs/ipc.o ../objs/kalloc.o ../objs/page.o ../objs/task.o ../objs/ulios.o
 
 # All Phony Targets
 .PHONY : all redo run clean
@@ -49,9 +49,6 @@ $(KERNELBIN) : $(OBJS) $(LDFILE)
 	$(ASM) $(ASMFLAGS) -o $@ $<
 
 ../objs/cintr.o : cintr.c $(HEADS)
-	$(CC) $(CFLAGS) -o $@ $<
-
-../objs/debug.o : debug.c $(HEADS)
 	$(CC) $(CFLAGS) -o $@ $<
 
 ../objs/exec.o : exec.c $(HEADS)

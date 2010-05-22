@@ -64,7 +64,6 @@ long InitMap()
 		return ERROR_HAVENO_KMEM;
 	memset32(mapmt, 0, MAPMT_LEN * sizeof(MAPBLK_DESC) / sizeof(DWORD));
 	FstMap = mapmt;
-
 	return NO_ERROR;
 }
 
@@ -166,6 +165,8 @@ long FillPage(EXEC_DESC *exec, void *addr, DWORD ErrCode)
 	CurPg0 = &pt0[(DWORD)addr >> 12];
 	CurPt = &pt[(DWORD)CurPg >> 12];
 	CurPt0 = &pt[(DWORD)CurPg0 >> 12];
+	if (ErrCode & PAGE_ATTR_W && *CurPt & PAGE_ATTR_ROMAP)	/*页表为映射只读*/
+		return ERROR_INVALID_MAPADDR;
 	if (!(ErrCode & PAGE_ATTR_P) && !(*CurPt & PAGE_ATTR_P))	/*页表不存在*/
 	{
 		if (*CurPt0 & PAGE_ATTR_P)	/*副本中存在*/
@@ -178,7 +179,7 @@ long FillPage(EXEC_DESC *exec, void *addr, DWORD ErrCode)
 			if ((PtAddr = LockAllocPage()) == 0)	/*申请新页表*/
 				return ERROR_HAVENO_PMEM;
 			PtAddr |= PAGE_ATTR_P | PAGE_ATTR_U;	/*设为只读*/
-			*CurPt = PtAddr;	/*修改页目录表*/
+			*CurPt |= PtAddr;	/*修改页目录表*/
 			memset32((void*)((DWORD)CurPg & 0xFFFFF000), 0, 0x400);	/*清空页表*/
 			fst = (void*)((DWORD)addr & 0xFFC00000);	/*计算缺页地址所在页表的覆盖区*/
 			end = (void*)((DWORD)fst + PAGE_SIZE * 0x400);
@@ -205,6 +206,8 @@ long FillPage(EXEC_DESC *exec, void *addr, DWORD ErrCode)
 			RefreshTlb();
 		}
 	}
+	if (ErrCode & PAGE_ATTR_W && *CurPg & PAGE_ATTR_ROMAP)	/*页为映射只读*/
+		return ERROR_INVALID_MAPADDR;
 	if (!(ErrCode & PAGE_ATTR_P) && !(*CurPg & PAGE_ATTR_P))	/*页不存在*/
 	{
 		if (*CurPt0 & PAGE_ATTR_P && *CurPg0 & PAGE_ATTR_P)	/*副本页表和副本页存在*/
@@ -217,7 +220,7 @@ long FillPage(EXEC_DESC *exec, void *addr, DWORD ErrCode)
 			if ((PgAddr = LockAllocPage()) == 0)	/*申请新页*/
 				return ERROR_HAVENO_PMEM;
 			PgAddr |= PAGE_ATTR_P | PAGE_ATTR_U;	/*设为只读*/
-			*CurPg = PgAddr;	/*修改页表*/
+			*CurPg |= PgAddr;	/*修改页表*/
 			memset32((void*)((DWORD)addr & 0xFFFFF000), 0, 0x400);	/*清空页*/
 			fst = (void*)((DWORD)addr & 0xFFFFF000);	/*计算缺页地址所在页的覆盖区*/
 			end = (void*)((DWORD)fst + PAGE_SIZE);
@@ -236,7 +239,6 @@ long FillPage(EXEC_DESC *exec, void *addr, DWORD ErrCode)
 				if (data[2] != NO_ERROR)
 					return data[2];
 				*CurPg0 = *CurPg = PgAddr;	/*读取页时页被设为可写,恢复页属性*/
-				*CurPt0 &= (~PAGE_ATTR_W);
 			}
 			if (exec->DataOff < exec->DataEnd && exec->DataOff < end && exec->DataEnd > fst)	/*数据段与缺页覆盖区有重合*/
 			{
@@ -253,7 +255,6 @@ long FillPage(EXEC_DESC *exec, void *addr, DWORD ErrCode)
 				if (data[2] != NO_ERROR)
 					return data[2];
 				*CurPg0 = *CurPg = PgAddr;	/*读取页时页被设为可写,恢复页属性*/
-				*CurPt0 &= (~PAGE_ATTR_W);
 			}
 		}
 	}
@@ -625,21 +626,46 @@ long MapProcAddr(void *addr, DWORD siz, THREAD_ID ptid, BOOL isWrite, BOOL isChk
 	ClearPage(FstPg2, &pt2[((DWORD)MapAddr + siz) >> 12], TRUE);
 	while (FstPg < EndPg)	/*修改页表,映射地址*/
 	{
-		if (pt[(DWORD)FstPg >> 12] & PAGE_ATTR_P)	/*源页表存在*/
+		DWORD PtAddr;	/*页表的物理地址*/
+
+		if ((PtAddr = pt[(DWORD)FstPg >> 12]) & PAGE_ATTR_ROMAP && isWrite)	/*源页表映射为只读*/
+		{
+			ClearPage(&pt2[(DWORD)MapAddr >> 12], FstPg2, FALSE);
+			ulock(&pt[(PT_ID << 10) | PT2_ID]);	/*解除关系进程页表的映射*/
+			ulock(&DstProc->Page_l);
+			FreeMap(map);
+			LockFreeUFData(DstProc, MapAddr, siz);
+			clisub(&DstProc->Map_l);
+			return ERROR_INVALID_MAPADDR;
+		}
+		if (PtAddr & PAGE_ATTR_P)	/*源页表存在*/
 		{
 			do
 			{
 				DWORD PgAddr;	/*页的物理地址*/
 
-				if ((PgAddr = *FstPg) & PAGE_ATTR_P)	/*源页存在*/
+				if ((PgAddr = *FstPg) & PAGE_ATTR_ROMAP && isWrite)	/*源页映射为只读*/
 				{
-					if (!(pt[(DWORD)FstPg2 >> 12] & PAGE_ATTR_P))	/*目的页表不存在*/
+					ClearPage(&pt2[(DWORD)MapAddr >> 12], FstPg2, FALSE);
+					ulock(&pt[(PT_ID << 10) | PT2_ID]);	/*解除关系进程页表的映射*/
+					ulock(&DstProc->Page_l);
+					FreeMap(map);
+					LockFreeUFData(DstProc, MapAddr, siz);
+					clisub(&DstProc->Map_l);
+					return ERROR_INVALID_MAPADDR;
+				}
+				if (PgAddr & PAGE_ATTR_P)	/*源页存在*/
+				{
+					PAGE_DESC *CurPt2;
+
+					CurPt2 = &pt[(DWORD)FstPg2 >> 12];
+					if (!(*CurPt2 & PAGE_ATTR_P))	/*目的页表不存在*/
 					{
 						DWORD PtAddr;	/*页表的物理地址*/
 
 						if ((PtAddr = LockAllocPage()) == 0)	/*申请目的页表*/
 						{
-							ClearPage(&pt2[(DWORD)MapAddr >> 12], FstPg2, TRUE);
+							ClearPage(&pt2[(DWORD)MapAddr >> 12], FstPg2, FALSE);
 							ulock(&pt[(PT_ID << 10) | PT2_ID]);	/*解除关系进程页表的映射*/
 							ulock(&DstProc->Page_l);
 							FreeMap(map);
@@ -647,16 +673,20 @@ long MapProcAddr(void *addr, DWORD siz, THREAD_ID ptid, BOOL isWrite, BOOL isChk
 							clisub(&DstProc->Map_l);
 							return ERROR_HAVENO_PMEM;
 						}
-						pt[(DWORD)FstPg2 >> 12] = PAGE_ATTR_P | PAGE_ATTR_U | PtAddr;	/*开启用户权限*/
+						*CurPt2 = PAGE_ATTR_P | PAGE_ATTR_U | PtAddr;	/*开启用户权限*/
 						memset32((void*)((DWORD)FstPg2 & 0xFFFFF000), 0, 0x400);	/*清空页表*/
 					}
 					if (isWrite)
 					{
-						pt[(DWORD)FstPg2 >> 12] |= PAGE_ATTR_W;	/*开启写权限*/
+						*CurPt2 |= PAGE_ATTR_W;	/*开启写权限*/
 						*FstPg2 = PgAddr | PAGE_ATTR_W;
 					}
 					else
-						*FstPg2 = PgAddr & (~PAGE_ATTR_W);	/*关闭写权限*/
+					{
+						if (((DWORD)CurPt2 << 20) >= (DWORD)MapAddr && ((DWORD)(CurPt2 + 1) << 20) <= (DWORD)MapAddr + siz)	/*页表覆盖区全部位于映射空间内*/
+							*CurPt2 |= PAGE_ATTR_ROMAP;	/*页表设置为映射只读*/
+						*FstPg2 = (PgAddr & (~PAGE_ATTR_W)) | PAGE_ATTR_ROMAP;	/*关闭写权限,设置为映射只读*/
+					}
 				}
 			} while (((DWORD)(++FstPg2, ++FstPg) & 0xFFF) && FstPg < EndPg);
 		}
@@ -751,7 +781,7 @@ long UnmapProcAddr(void *addr, const DWORD *argv)
 					else
 					{
 						LockFreePage(PgAddr);	/*释放物理页*/
-						*FstPg2 = 0;
+						*FstPg2 &= PAGE_ATTR_AVL;
 					}
 				}
 			} while (((DWORD)(++FstPg, ++FstPg2) & 0xFFF) && FstPg < EndPg);
@@ -764,7 +794,7 @@ long UnmapProcAddr(void *addr, const DWORD *argv)
 				if (*FstPg2 & PAGE_ATTR_P)
 					goto skip;
 			LockFreePage(PtAddr);	/*释放页表*/
-			pt[(DWORD)TFstPg >> 12] = 0;
+			pt[(DWORD)TFstPg >> 12] &= PAGE_ATTR_AVL;
 skip:		continue;
 		}
 		else	/*整个页目录表项空*/
@@ -797,11 +827,11 @@ skip:		continue;
 							res = ERROR_HAVENO_PMEM;
 							goto skip2;
 						}
-						pt[(DWORD)FstPg2 >> 12] = PAGE_ATTR_P | PAGE_ATTR_U | PtAddr;	/*开启用户权限*/
+						pt[(DWORD)FstPg2 >> 12] |= PAGE_ATTR_P | PAGE_ATTR_U | PtAddr;	/*开启用户权限*/
 						memset32((void*)((DWORD)FstPg2 & 0xFFFFF000), 0, 0x400);	/*清空页表*/
 					}
 					pt[(DWORD)FstPg2 >> 12] |= PAGE_ATTR_W;	/*开启写权限*/
-					*FstPg2 = PgAddr | PAGE_ATTR_W;
+					*FstPg2 |= (PgAddr & (~PAGE_ATTR_AVL)) | PAGE_ATTR_W;
 				}
 			} while (((DWORD)(++FstPg2, ++FstPg) & 0xFFF) && FstPg < EndPg);
 		}
