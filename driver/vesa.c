@@ -575,9 +575,12 @@ int main()
 		{
 			switch (data[3])
 			{
-			case VESA_API_CURMODE:
+			case VESA_API_GETINFO:
 				data[0] = MSG_ATTR_USER;
 				data[1] = CurMode;
+				data[2] = width;
+				data[3] = height;
+				data[4] = PixBits;
 				KSendMsg(ptid, data, 0);
 				break;
 			case VESA_API_PUTPIXEL:

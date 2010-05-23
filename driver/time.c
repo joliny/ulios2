@@ -90,7 +90,7 @@ long Tm2Sec(DWORD *sec, const TM *tm)
 int main()
 {
 	TM tm;
-	DWORD bootsec, clk;	/*启动时的1970秒数*/
+	DWORD bootsec, clk, RandSeed;	/*启动时的1970秒数*/
 	long res;	/*返回结果*/
 
 	if ((res = KRegKnlPort(SRV_TIME_PORT)) != NO_ERROR)	/*注册服务端口号*/
@@ -118,6 +118,7 @@ int main()
 		tm.yer += 1900;
 	if ((res = Tm2Sec(&bootsec, &tm)) != NO_ERROR)
 		return res;
+	RandSeed = bootsec;
 	bootsec -= clk / 100;
 	for (;;)
 	{
@@ -149,6 +150,10 @@ int main()
 			case TIME_API_LOCALTIME:	/*秒转换为TM结构*/
 				Sec2Tm(data[2], (TM*)&data[1]);
 				((TM*)&data[1])->mil = 0;
+				KSendMsg(ptid, data, 0);
+				break;
+			case TIME_API_GETRAND:	/*取得随机数*/
+				data[1] = RandSeed = RandSeed * 1103515245 + 12345;
 				KSendMsg(ptid, data, 0);
 				break;
 			}

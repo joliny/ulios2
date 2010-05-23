@@ -30,24 +30,19 @@ char *itoa(char *buf, DWORD n)
 
 int main()
 {
-	THREAD_ID VesaPtid, ptid;
+	THREAD_ID FsPtid, VesaPtid;
 	long res, i, j;
 	DWORD bmp[64 * 64];
 
-	if ((res = KGetKpToThed(SRV_KBDMUS_PORT, &ptid)) != NO_ERROR)
+	if ((res = KGetKpToThed(SRV_FS_PORT, &FsPtid)) != NO_ERROR)
 		return res;
-	if ((res = KMSetRecv(ptid)) != NO_ERROR)
+	FSChDir(FsPtid, (const BYTE*)"/0/ulios");
+	if ((res = FSopen(FsPtid, (const BYTE*)"uli2k.bmp", 0)) < 0)	/*打开BMP文件*/
 		return res;
-	if ((res = KGetKpToThed(SRV_VESA_PORT, &VesaPtid)) != NO_ERROR)
-		return res;
-	if ((res = KGetKpToThed(SRV_FS_PORT, &ptid)) != NO_ERROR)
-		return res;
-	if ((res = FSopen(ptid, (const BYTE*)"/0/ulios/uli2k.bmp", 0)) < 0)	/*打开BMP文件*/
-		return res;
-	FSseek(ptid, res, 54, FS_SEEK_SET);
+	FSseek(FsPtid, res, 54, FS_SEEK_SET);
 	for (j = 63; j >= 0; j--)
 	{
-		if (FSread(ptid, res, bmp + 64 * j, 64 * 3) <= 0)	/*开始读取BMP文件*/
+		if (FSread(FsPtid, res, bmp + 64 * j, 64 * 3) <= 0)	/*开始读取BMP文件*/
 			return -1;
 		for (i = 63; i >= 0; i--)
 		{
@@ -58,10 +53,16 @@ int main()
 			((BYTE*)bmp)[d] = ((BYTE*)bmp)[s];
 		}
 	}
-	FSclose(ptid, res);
-
+	FSclose(FsPtid, res);
+	if ((res = KGetKpToThed(SRV_KBDMUS_PORT, &VesaPtid)) != NO_ERROR)
+		return res;
+	if ((res = KMSetRecv(VesaPtid)) != NO_ERROR)
+		return res;
+	if ((res = KGetKpToThed(SRV_VESA_PORT, &VesaPtid)) != NO_ERROR)
+		return res;
 	for (;;)
 	{
+		THREAD_ID ptid;
 		DWORD data[MSG_DATA_LEN];
 
 		if ((res = KRecvMsg(&ptid, data, INVALID)) != NO_ERROR)
@@ -74,13 +75,15 @@ int main()
 
 			ModeCou = VSGetMode(VesaPtid, mode);
 			itoa(str, ModeCou);
-			VSDrawStr(VesaPtid, 120, 0, str, 0xFF0000);
+			VSDrawStr(VesaPtid, 120, 0, (const BYTE*)str, 0xFF0000);
 			for (i = 0; i < ModeCou; i++)
 			{
 				itoa(str, mode[i]);
-				VSDrawStr(VesaPtid, 0, i * 12, str, 0xFF0000);
+				VSDrawStr(VesaPtid, 0, i * 12, (const BYTE*)str, 0xFF0000);
 			}
-			VSPutImage(VesaPtid, 400, 300, bmp, 64, 64);
+			i = FSGetExid(FsPtid, (const BYTE*)"pro.bin");
+			KCreateProcess(0, i, INVALID, (THREAD_ID*)&ModeCou);
+
 /*			if (data[1] & KBD_STATE_LSHIFT)
 				KPrintf("LSHIFT\t", 0);
 			if (data[1] & KBD_STATE_RSHIFT)
