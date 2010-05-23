@@ -53,6 +53,7 @@ static inline long HDWriteSector(THREAD_ID ptid, DWORD drv, DWORD sec, BYTE cou,
 #define TIME_API_CURTIME		1	/*取得当前时间功能号*/
 #define TIME_API_MKTIME			2	/*TM结构转换为秒功能号*/
 #define TIME_API_LOCALTIME		3	/*秒转换为TM结构功能号*/
+#define TIME_API_GETRAND		4	/*取得随机数功能号*/
 
 #define TIME_ERR_WRONG_TM		-768	/*非法TM结构*/
 
@@ -119,6 +120,17 @@ static inline long TMLocalTime(THREAD_ID ptid, DWORD sec, TM *tm)
 	return NO_ERROR;
 }
 
+/*取得随机数*/
+static inline long TMGetRand(THREAD_ID ptid)
+{
+	DWORD data[MSG_DATA_LEN];
+	data[0] = MSG_ATTR_USER;
+	data[1] = TIME_API_GETRAND;
+	if ((data[0] = KSendMsg(ptid, data, SRV_OUT_TIME)) != NO_ERROR)
+		return data[0];
+	return data[1];
+}
+
 /**********键盘鼠标服务相关**********/
 #define SRV_KBDMUS_PORT	3	/*键盘鼠标服务端口*/
 
@@ -161,7 +173,7 @@ static inline long KMSetRecv(THREAD_ID ptid)
 #define SRV_VESA_PORT	4	/*VESA显卡服务端口*/
 #define VESA_MAX_MODE	512	/*显示模式列表最大数量*/
 
-#define VESA_API_CURMODE	0	/*取得当前显示模式功能号*/
+#define VESA_API_GETINFO	0	/*取得显示信息功能号*/
 #define VESA_API_GETMODE	1	/*取得模式列表功能号*/
 #define VESA_API_PUTPIXEL	2	/*画点功能号*/
 #define VESA_API_GETPIXEL	3	/*取点功能号*/
@@ -176,15 +188,16 @@ static inline long KMSetRecv(THREAD_ID ptid)
 #define VESA_ERR_SIZE		-1281	/*尺寸错误*/
 #define VESA_ERR_ARGS		-1282	/*参数错误*/
 
-/*取得当前显示模式*/
-static inline long VSCurMode(THREAD_ID ptid)
+/*取得显示信息*/
+static inline long VSGetInfo(THREAD_ID ptid, DWORD info[4])
 {
 	DWORD data[MSG_DATA_LEN];
 	data[0] = MSG_ATTR_USER;
-	data[3] = VESA_API_CURMODE;
+	data[3] = VESA_API_GETINFO;
 	if ((data[0] = KSendMsg(ptid, data, SRV_OUT_TIME)) != NO_ERROR)
 		return data[0];
-	return data[1];
+	memcpy32(info, &data[1], 4);
+	return NO_ERROR;
 }
 
 /*取得模式列表*/

@@ -238,6 +238,11 @@ int Fat32Setup(PART_INF *part)
 	printf("Writing... boot sector\n");
 	if (RwSector(part->drv, TRUE, part->fst, 1, FAR2LINE((DWORD)((void far *)&boot))) != NO_ERROR)
 		return ERROR_DISK;
+	printf("Writing... f32boot.sec\n");
+	if ((f = fopen("F32BOOT.SEC", "wb")) == NULL)
+		return ERROR_FILE;
+	fwrite(&boot, sizeof(FAT32_BOOTSEC), 1, f);
+	fclose(f);
 
 	return NO_ERROR;
 }
@@ -279,6 +284,11 @@ int UlifsSetup(PART_INF *part)
 	printf("Writing... boot sector\n");
 	if (RwSector(part->drv, TRUE, part->fst, 1, FAR2LINE((DWORD)((void far *)&boot))) != NO_ERROR)
 		return ERROR_DISK;
+	printf("Writing... uliboot.sec\n");
+	if ((f = fopen("ULIBOOT.SEC", "wb")) == NULL)
+		return ERROR_FILE;
+	fwrite(&boot, sizeof(ULIFS_BOOTSEC), 1, f);
+	fclose(f);
 
 	return NO_ERROR;
 }
