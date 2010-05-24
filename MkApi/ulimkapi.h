@@ -233,10 +233,10 @@ static inline long KKillThread(DWORD ThreadID)
 }
 
 /*创建进程*/
-static inline long KCreateProcess(DWORD attr, DWORD FileID, DWORD CentiSeconds, THREAD_ID *ptid)
+static inline long KCreateProcess(DWORD attr, DWORD FileID, const BYTE *args, THREAD_ID *ptid)
 {
 	register long res;
-	__asm__ __volatile__("int $0xF0": "=a"(res), "=b"(*ptid): "0"(0x060000), "1"(attr), "c"(FileID), "d"(CentiSeconds));
+	__asm__ __volatile__("int $0xF0": "=a"(res), "=b"(*ptid): "0"(0x060000), "1"(attr), "c"(FileID), "S"(args));
 	return res;
 }
 
@@ -271,7 +271,7 @@ static inline long KUnregKnlPort(DWORD KnlPort)
 }
 
 /*取得内核端口对应线程*/
-static inline long KGetKpToThed(DWORD KnlPort, THREAD_ID *ptid)
+static inline long KGetKptThed(DWORD KnlPort, THREAD_ID *ptid)
 {
 	register long res;
 	__asm__ __volatile__("int $0xF0": "=a"(res), "=b"(*ptid): "0"(0x0B0000), "1"(KnlPort));

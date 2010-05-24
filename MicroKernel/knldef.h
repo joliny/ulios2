@@ -131,7 +131,7 @@ long RegKnlPort(DWORD PortN);
 long UnregKnlPort(DWORD PortN);
 
 /*取得内核端口对应线程*/
-long GetKpToThed(DWORD PortN, THREAD_ID *ptid);
+long GetKptThed(DWORD PortN, THREAD_ID *ptid);
 
 /*注销线程的所有内核端口*/
 long UnregAllKnlPort();

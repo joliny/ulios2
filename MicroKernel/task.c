@@ -414,7 +414,14 @@ long CreateProc(const DWORD *argv, THREAD_ID *ptid)
 	NewThed->tss.cs = KCODE_SEL;
 	NewThed->tss.gs = NewThed->tss.fs = NewThed->tss.ds = NewThed->tss.ss = NewThed->tss.es = KDATA_SEL;
 	NewThed->tss.io = sizeof(TSS);
-	memcpy32(NewThed->kstk, argv, 3);	/*复制参数*/
+	if (argv[0] & EXEC_ARGV_BASESRV)
+		memcpy32(NewThed->kstk, argv, 3);	/*复制参数*/
+	else
+	{
+		memcpy32(NewThed->kstk, argv, 2);	/*复制参数*/
+		if (argv[2])
+			strcpy((BYTE*)&NewThed->kstk[2], (const BYTE*)argv[2]);
+	}
 	cli();
 	if (AllocPid(NewProc) != NO_ERROR)
 	{
@@ -425,7 +432,7 @@ long CreateProc(const DWORD *argv, THREAD_ID *ptid)
 		return ERROR_HAVENO_PROCID;
 	}
 	pdti = NewThed->id.ProcID;
-	NewPdt |= PAGE_ATTR_P | PAGE_ATTR_U;
+	NewPdt |= PAGE_ATTR_P;
 	pddt[pdti] = NewPdt;	/*映射新进程的页目录表*/
 	pdti <<= 10;
 	memset32(&pdt[pdti], 0, 0x400);

@@ -54,9 +54,9 @@ long InitFS()
 
 	if ((res = KRegKnlPort(SRV_FS_PORT)) != NO_ERROR)	/*注册服务端口*/
 		return res;
-	if ((res = KGetKpToThed(SRV_ATHD_PORT, &AthdPtid)) != NO_ERROR)	/*取得磁盘驱动服务线程*/
+	if ((res = KGetKptThed(SRV_ATHD_PORT, &AthdPtid)) != NO_ERROR)	/*取得磁盘驱动服务线程*/
 		return res;
-	if ((res = KGetKpToThed(SRV_TIME_PORT, &TimePtid)) != NO_ERROR)	/*取得时钟驱动服务线程*/
+	if ((res = KGetKptThed(SRV_TIME_PORT, &TimePtid)) != NO_ERROR)	/*取得时钟驱动服务线程*/
 		return res;
 	if ((res = KMapUserAddr(&cache, BLK_SIZ * BMT_LEN + FDAT_SIZ)) != NO_ERROR)	/*申请高速缓冲和自由内存空间*/
 		return res;

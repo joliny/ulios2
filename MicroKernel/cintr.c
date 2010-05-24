@@ -333,11 +333,28 @@ void ApiKillThread(DWORD *argv)
 /*创建进程*/
 void ApiCreateProcess(DWORD *argv)
 {
+	BYTE *addr;
 	DWORD data[3];
 
+	addr = (BYTE*)argv[ESI_ID];
+	if (addr >= UADDR_OFF && addr <= (BYTE*)(0 - PROC_ARGS_SIZE))
+	{
+		DWORD siz;
+
+		for (siz = 0; *addr; addr++)
+			if (++siz >= PROC_ARGS_SIZE)
+			{
+				argv[EAX_ID] = ERROR_WRONG_APPMSG;
+				return;
+			}
+		CurPmd->CurTmd->attr &= (~THED_ATTR_APPS);	/*防止访问用户内存时发生页异常,重新进入系统调用态*/
+		addr = (BYTE*)argv[ESI_ID];
+	}
+	else
+		addr = NULL;
 	data[0] = argv[EBX_ID] & (~EXEC_ARGV_BASESRV);
 	data[1] = argv[ECX_ID];
-	data[2] = argv[EDX_ID];
+	data[2] = (DWORD)addr;
 	argv[EAX_ID] = CreateProc(data, (THREAD_ID*)&argv[EBX_ID]);
 }
 
@@ -368,7 +385,7 @@ void ApiUnregKnlPort(DWORD *argv)
 /*取得内核端口对应线程*/
 void ApiGetKpToThed(DWORD *argv)
 {
-	argv[EAX_ID] = GetKpToThed(argv[EBX_ID], (THREAD_ID*)&argv[EBX_ID]);
+	argv[EAX_ID] = GetKptThed(argv[EBX_ID], (THREAD_ID*)&argv[EBX_ID]);
 }
 
 /*注册IRQ信号的响应线程*/

@@ -40,6 +40,22 @@ static inline void memcpy32(void *dest, const void *src, DWORD n)
 	__asm__ __volatile__("cld;rep movsl": "=&D"(_dest), "=&S"(_src), "=&c"(_n): "0"(dest), "1"(src), "2"(n): "flags", "memory");
 }
 
+/*×Ö·û´®¸´ÖÆ*/
+static inline void strcpy(BYTE *dest, const BYTE *src)
+{
+	BYTE *_dest;
+	const BYTE *_src;
+	__asm__ __volatile__
+	(
+		"cld\n"
+		"1:\tlodsb\n"
+		"stosb\n"
+		"testb %%al, %%al\n"
+		"jne 1b"
+		: "=&D"(_dest), "=&S"(_src): "0"(dest), "1"(src): "flags", "al", "memory"
+	);
+}
+
 /*¹ØÖÐ¶Ï*/
 static inline void cli()
 {
