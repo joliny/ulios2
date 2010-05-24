@@ -61,10 +61,10 @@ void ThedStart()
 	if ((CurThed->ustk = LockAllocUFData(CurProc, UstkSiz)) == NULL)
 		DeleteThed();
 	CurThed->UstkSiz = UstkSiz;
-	*(DWORD*)(CurThed->ustk + UstkSiz - sizeof(DWORD)) = CurThed->kstk[2];	/*复制子线程参数到用户堆栈*/
 	CurThed->attr |= THED_ATTR_APPS;
 	CurThed->tss.stk[0].esp = (DWORD)CurThed + sizeof(THREAD_DESC);
 	CurThed->tss.stk[0].ss = KDATA_SEL;
+	*(DWORD*)(CurThed->ustk + UstkSiz - sizeof(DWORD)) = CurThed->kstk[2];	/*复制子线程参数到用户堆栈*/
 	__asm__
 	(
 		"pushl %0\n"		/*ss3*/
@@ -104,7 +104,7 @@ void ProcStart()
 		CurSrv = (PHYBLK_DESC*)&CurThed->kstk[1];
 		NewExec->entry = NewExec->CodeOff = BASESRV_OFF;
 		NewExec->DataEnd = NewExec->DataOff = NewExec->CodeEnd = BASESRV_OFF + CurSrv->siz;
-		NewPdt |= PAGE_ATTR_P | PAGE_ATTR_U;
+		NewPdt |= PAGE_ATTR_P;
 		pt[(PT_ID << 10) | PT0_ID] = pddt0[CurThed->id.ProcID] = NewPdt;	/*映射页目录表副本*/
 		memset32(&pt[PT0_ID << 10], 0, 0x400);
 		pt[(PT0_ID << 10) | PT_ID] = NewPdt;	/*映射页目录表副本自身*/
@@ -147,7 +147,7 @@ void ProcStart()
 			FreeMsg(msg);
 			DeleteThed();
 		}
-		if (WaitThedMsg(&msg, kpt[FS_KPORT], CurThed->kstk[2]) != NO_ERROR)
+		if (WaitThedMsg(&msg, kpt[FS_KPORT], INVALID) != NO_ERROR)
 			DeleteThed();
 		if (msg->data[1] < (DWORD)UADDR_OFF)	/*可执行体信息有误*/
 		{
@@ -186,7 +186,7 @@ void ProcStart()
 				FreeMsg(msg);
 			DeleteThed();
 		}
-		NewPdt |= PAGE_ATTR_P | PAGE_ATTR_U;
+		NewPdt |= PAGE_ATTR_P;
 		pt[(PT_ID << 10) | PT0_ID] = pddt0[CurThed->id.ProcID] = NewPdt;	/*映射页目录表副本*/
 		memset32(&pt[PT0_ID << 10], 0, 0x400);
 		pt[(PT0_ID << 10) | PT_ID] = NewPdt;	/*映射页目录表副本自身*/
@@ -212,6 +212,8 @@ strset:	FreeMsg(msg);
 	CurThed->attr |= THED_ATTR_APPS;
 	CurThed->tss.stk[0].esp = (DWORD)CurThed + sizeof(THREAD_DESC);
 	CurThed->tss.stk[0].ss = KDATA_SEL;
+	*(DWORD*)(CurThed->ustk + CurThed->UstkSiz - PROC_ARGS_SIZE - sizeof(DWORD)) = (DWORD)CurThed->ustk + CurThed->UstkSiz - PROC_ARGS_SIZE;
+	strcpy((BYTE*)(CurThed->ustk + CurThed->UstkSiz - PROC_ARGS_SIZE), (const BYTE*)&CurThed->kstk[2]);	/*复制参数到用户堆栈*/
 	__asm__
 	(
 		"pushl %0\n"		/*ss3*/
@@ -220,7 +222,7 @@ strset:	FreeMsg(msg);
 		"pushl %3\n"		/*cs*/
 		"pushl %4\n"		/*eip*/
 		"iret"				/*进入用户态*/
-		::"i"(UDATA_SEL), "r"(CurThed->ustk + CurThed->UstkSiz), "r"((CurProc->attr & PROC_ATTR_APPS) ? EFLAGS_IF : (EFLAGS_IF | EFLAGS_IOPL)), "i"(UCODE_SEL), "m"(NewExec->entry)
+		::"i"(UDATA_SEL), "r"(CurThed->ustk + CurThed->UstkSiz - PROC_ARGS_SIZE - sizeof(DWORD)), "r"((CurProc->attr & PROC_ATTR_APPS) ? EFLAGS_IF : (EFLAGS_IF | EFLAGS_IOPL)), "i"(UCODE_SEL), "m"(NewExec->entry)
 	);
 }
 

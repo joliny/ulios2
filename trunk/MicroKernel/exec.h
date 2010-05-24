@@ -11,6 +11,7 @@
 
 #define EXEC_ARGV_BASESRV	0x00000001	/*0:文件进程1:基础服务*/
 #define EXEC_ARGV_DRIVER	0x00000002	/*0:应用进程1:驱动进程*/
+#define PROC_ARGS_SIZE		0x200		/*进程参数最大字节数*/
 #define FS_KPORT			0			/*文件系统线程端口*/
 #define FS_API_GETEXEC		0			/*请求文件系统取得可执行文件信息功能号*/
 #define FS_API_READPAGE		1			/*请求文件系统读取可执行文件页功能号*/

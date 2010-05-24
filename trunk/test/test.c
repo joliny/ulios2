@@ -34,7 +34,7 @@ int main()
 	long res, i, j;
 	DWORD bmp[64 * 64];
 
-	if ((res = KGetKpToThed(SRV_FS_PORT, &FsPtid)) != NO_ERROR)
+	if ((res = KGetKptThed(SRV_FS_PORT, &FsPtid)) != NO_ERROR)
 		return res;
 	FSChDir(FsPtid, (const BYTE*)"/0/ulios");
 	if ((res = FSopen(FsPtid, (const BYTE*)"uli2k.bmp", 0)) < 0)	/*打开BMP文件*/
@@ -54,11 +54,11 @@ int main()
 		}
 	}
 	FSclose(FsPtid, res);
-	if ((res = KGetKpToThed(SRV_KBDMUS_PORT, &VesaPtid)) != NO_ERROR)
+	if ((res = KGetKptThed(SRV_KBDMUS_PORT, &VesaPtid)) != NO_ERROR)
 		return res;
 	if ((res = KMSetRecv(VesaPtid)) != NO_ERROR)
 		return res;
-	if ((res = KGetKpToThed(SRV_VESA_PORT, &VesaPtid)) != NO_ERROR)
+	if ((res = KGetKptThed(SRV_VESA_PORT, &VesaPtid)) != NO_ERROR)
 		return res;
 	for (;;)
 	{
@@ -82,7 +82,7 @@ int main()
 				VSDrawStr(VesaPtid, 0, i * 12, (const BYTE*)str, 0xFF0000);
 			}
 			i = FSGetExid(FsPtid, (const BYTE*)"pro.bin");
-			KCreateProcess(0, i, INVALID, (THREAD_ID*)&ModeCou);
+			KCreateProcess(0, i, "老婆", (THREAD_ID*)&ModeCou);
 
 /*			if (data[1] & KBD_STATE_LSHIFT)
 				KPrintf("LSHIFT\t", 0);

@@ -112,7 +112,7 @@ long UnregKnlPort(DWORD PortN)
 }
 
 /*取得内核端口对应线程*/
-long GetKpToThed(DWORD PortN, THREAD_ID *ptid)
+long GetKptThed(DWORD PortN, THREAD_ID *ptid)
 {
 	if (PortN >= KPT_LEN)
 		return ERROR_WRONG_KPTN;
