@@ -242,7 +242,7 @@ void sleep(DWORD cs)
 	{
 		CurThed->attr &= (~THED_ATTR_KILLED);
 		sti();
-		ThedExit();
+		ThedExit(ERROR_THED_KILLED);
 	}
 }
 
@@ -461,7 +461,7 @@ long CreateProc(const DWORD *argv, THREAD_ID *ptid)
 }
 
 /*删除进程*/
-void DeleteProc()
+void DeleteProc(DWORD ExitCode)
 {
 	PROCESS_DESC *CurProc;
 	THREAD_DESC **Thedi;
@@ -484,7 +484,7 @@ void DeleteProc()
 		}
 	}
 	sti();
-	ThedExit();
+	ThedExit(ExitCode);
 }
 
 /*杀死进程*/

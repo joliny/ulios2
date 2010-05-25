@@ -96,7 +96,7 @@ long KillThed(WORD ThedID);
 long CreateProc(const DWORD *argv, THREAD_ID *ptid);
 
 /*删除进程*/
-void DeleteProc();
+void DeleteProc(DWORD ExitCode);
 
 /*杀死进程*/
 long KillProc(WORD ProcID);

@@ -174,7 +174,19 @@ void UnregAllIrq()
 /*不可恢复异常处理程序*/
 void IsrProc(DWORD edi, DWORD esi, DWORD ebp, DWORD esp, DWORD ebx, DWORD edx, DWORD ecx, DWORD eax, WORD gs, WORD fs, WORD es, WORD ds, DWORD IsrN, DWORD ErrCode, DWORD eip, WORD cs, DWORD eflags)
 {
-	ThedExit();
+	MESSAGE_DESC *msg;
+
+	if ((msg = AllocMsg()) != NULL)	/*通知报告服务器陷阱消息*/
+	{
+		msg->ptid = kpt[REP_KPORT];
+		msg->data[0] = MSG_ATTR_ISR;
+		msg->data[1] = IsrN;
+		msg->data[2] = ErrCode;
+		msg->data[3] = eip;
+		if (SendMsg(msg) != NO_ERROR)
+			FreeMsg(msg);
+	}
+	ThedExit(ERROR_PROC_EXCEP);
 }
 
 /*浮点协处理器异常处理程序*/
@@ -189,7 +201,7 @@ void FpuFaultProc(DWORD edi, DWORD esi, DWORD ebp, DWORD esp, DWORD ebx, DWORD e
 	if (CurI387 == NULL)	/*线程首次执行协处理器指令*/
 	{
 		if ((CurI387 = (I387*)LockKmalloc(sizeof(I387))) == NULL)
-			ThedExit();
+			ThedExit(ERROR_HAVENO_KMEM);
 	}
 	cli();
 	ClearTs();
@@ -229,7 +241,7 @@ void IrqProc(DWORD edi, DWORD esi, DWORD ebp, DWORD esp, DWORD ebx, DWORD edx, D
 			{
 				CurThed->attr &= (~THED_ATTR_KILLED);
 				sti();
-				ThedExit();
+				ThedExit(ERROR_THED_KILLED);
 			}
 		}
 	}
@@ -321,7 +333,7 @@ void ApiCreateThread(DWORD *argv)
 /*退出线程*/
 void ApiExitThread(DWORD *argv)
 {
-	ThedExit();
+	ThedExit(argv[EBX_ID]);
 }
 
 /*杀死线程*/
@@ -337,7 +349,7 @@ void ApiCreateProcess(DWORD *argv)
 	DWORD data[3];
 
 	addr = (BYTE*)argv[ESI_ID];
-	if (addr >= UADDR_OFF && addr <= (BYTE*)(0 - PROC_ARGS_SIZE))
+	if (addr >= (BYTE*)UADDR_OFF && addr <= (BYTE*)(0 - PROC_ARGS_SIZE))
 	{
 		DWORD siz;
 
@@ -361,7 +373,7 @@ void ApiCreateProcess(DWORD *argv)
 /*退出进程*/
 void ApiExitProcess(DWORD *argv)
 {
-	DeleteProc();
+	DeleteProc(argv[EBX_ID]);
 }
 
 /*杀死进程*/

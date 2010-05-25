@@ -42,8 +42,8 @@ clean :
 ../out/ULIOS/pro.bin : ../objs/pro.o $(HEADOBJ) $(LDFILE)
 	$(LD) $(LDFLAGS) -o $@ $(HEADOBJ) ../objs/pro.o
 
-../objs/apphead.o : ../MkApi/apphead.asm
-	$(ASM) $(ASMFLAGS) -o $@ $<
+../objs/apphead.o : ../MkApi/apphead.c
+	$(CC) $(CFLAGS) -o $@ $<
 
 ../objs/test.o : test.c $(HEADS)
 	$(CC) $(CFLAGS) -o $@ $<

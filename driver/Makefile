@@ -48,8 +48,8 @@ clean :
 ../out/ULIOS/vesa.bin : ../objs/vesa.o $(HEADOBJ) $(LDFILE)
 	$(LD) $(LDFLAGS) -o $@ $(HEADOBJ) ../objs/vesa.o
 
-../objs/apphead.o : ../MkApi/apphead.asm
-	$(ASM) $(ASMFLAGS) -o $@ $<
+../objs/apphead.o : ../MkApi/apphead.c
+	$(CC) $(CFLAGS) -o $@ $<
 
 ../objs/athd.o : athd.c $(HEADS)
 	$(CC) $(CFLAGS) -o $@ $<

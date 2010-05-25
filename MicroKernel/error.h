@@ -37,5 +37,7 @@
 #define ERROR_INVALID_MAPSIZE		-23	/*非法的映射大小*/
 
 #define ERROR_OUT_OF_TIME			-24	/*超时错误*/
+#define ERROR_PROC_EXCEP			-25	/*程序异常*/
+#define ERROR_THED_KILLED			-26	/*线程被杀死*/
 
 #endif

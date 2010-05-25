@@ -9,9 +9,9 @@
 extern long UlifsMntPart(PART_DESC *pd);
 extern void UlifsUmntPart(PART_DESC *pd);
 extern long UlifsSetPart(PART_DESC *pd, PART_INFO *pi);
-extern BOOL UlifsCmpFile(FILE_DESC *fd, const BYTE *path);
-extern long UlifsSchFile(FILE_DESC *fd, const BYTE *path);
-extern long UlifsNewFile(FILE_DESC *fd, const BYTE *path);
+extern BOOL UlifsCmpFile(FILE_DESC *fd, const char *path);
+extern long UlifsSchFile(FILE_DESC *fd, const char *path);
+extern long UlifsNewFile(FILE_DESC *fd, const char *path);
 extern long UlifsDelFile(FILE_DESC *fd);
 extern long UlifsSetFile(FILE_DESC *fd, FILE_INFO *fi);
 extern long UlifsSetSize(FILE_DESC *fd, QWORD siz);
@@ -22,9 +22,9 @@ extern void UlifsFreeData(FILE_DESC *fd);
 extern long Fat32MntPart(PART_DESC *pd);
 extern void Fat32UmntPart(PART_DESC *pd);
 extern long Fat32SetPart(PART_DESC *pd, PART_INFO *pi);
-extern BOOL Fat32CmpFile(FILE_DESC *fd, const BYTE *path);
-extern long Fat32SchFile(FILE_DESC *fd, const BYTE *path);
-extern long Fat32NewFile(FILE_DESC *fd, const BYTE *path);
+extern BOOL Fat32CmpFile(FILE_DESC *fd, const char *path);
+extern long Fat32SchFile(FILE_DESC *fd, const char *path);
+extern long Fat32NewFile(FILE_DESC *fd, const char *path);
 extern long Fat32DelFile(FILE_DESC *fd);
 extern long Fat32SetFile(FILE_DESC *fd, FILE_INFO *fi);
 extern long Fat32SetSize(FILE_DESC *fd, QWORD siz);
@@ -245,7 +245,7 @@ static void DecFildLn(FILE_DESC *fd)
 }
 
 /*查找描述符表中已记录的文件*/
-static FILE_DESC *FindFild(FILE_DESC *par, BOOL (*CmpFile)(FILE_DESC *, const BYTE *), const BYTE *path)
+static FILE_DESC *FindFild(FILE_DESC *par, BOOL (*CmpFile)(FILE_DESC *, const char *), const char *path)
 {
 	FILE_DESC *fd;
 	DWORD i;
@@ -263,7 +263,7 @@ static FILE_DESC *FindFild(FILE_DESC *par, BOOL (*CmpFile)(FILE_DESC *, const BY
 }
 
 /*根据路径字串设置文件描述符链*/
-static long SetFildLn(PROCRES_DESC *pres, const BYTE *path, BOOL isWrite, FILE_DESC **fd)
+static long SetFildLn(PROCRES_DESC *pres, const char *path, BOOL isWrite, FILE_DESC **fd)
 {
 	PART_DESC *CurPart;
 	FILE_DESC *CurFile;
@@ -281,7 +281,7 @@ static long SetFildLn(PROCRES_DESC *pres, const BYTE *path, BOOL isWrite, FILE_D
 		if (i >= PART_LEN || (CurPart = &part[i])->data == NULL)	/*分区号错*/
 			return FS_ERR_WRONG_PARTID;
 		CurFsui = &fsuit[CurPart->FsID];
-		if ((CurFile = FindFild(NULL, NULL, (const BYTE*)CurPart)) != NULL)	/*查找根目录的描述符*/
+		if ((CurFile = FindFild(NULL, NULL, (const char*)CurPart)) != NULL)	/*查找根目录的描述符*/
 		{
 			if (CurFile->flag & FILE_FLAG_WRITE)	/*已经被打开写了*/
 			{
@@ -425,13 +425,13 @@ FoundSub:
 }
 
 /*创建空文件描述符*/
-static long CreateFild(PROCRES_DESC *pres, const BYTE *path, DWORD attr, FILE_DESC **fd)
+static long CreateFild(PROCRES_DESC *pres, const char *path, DWORD attr, FILE_DESC **fd)
 {
 	PART_DESC *CurPart;
 	FILE_DESC *CurFile, *TmpFile;
 	FSUI *CurFsui;
-	const BYTE *name;
-	BYTE DirPath[MAX_PATH];
+	const char *name;
+	char DirPath[MAX_PATH];
 	long res;
 
 	name = path;	/*分离路径和名称*/
@@ -686,7 +686,7 @@ long ProcExt(PROCRES_DESC *pres)
 }
 
 /*取得可执行文件ID*/
-long GetExid(PROCRES_DESC *pres, const BYTE *path, DWORD *fi)
+long GetExid(PROCRES_DESC *pres, const char *path, DWORD *fi)
 {
 	FILE_DESC *CurFile;
 	long res;
@@ -725,7 +725,7 @@ long GetPart(PROCRES_DESC *pres, DWORD pid, PART_INFO *pi)
 }
 
 /*创建文件*/
-long creat(PROCRES_DESC *pres, const BYTE *path, DWORD *fhi)
+long creat(PROCRES_DESC *pres, const char *path, DWORD *fhi)
 {
 	FILE_HANDLE *fh;
 	long res;
@@ -740,7 +740,7 @@ long creat(PROCRES_DESC *pres, const BYTE *path, DWORD *fhi)
 }
 
 /*打开文件*/
-long open(PROCRES_DESC *pres, const BYTE *path, BOOL isWrite, DWORD *fhi)
+long open(PROCRES_DESC *pres, const char *path, BOOL isWrite, DWORD *fhi)
 {
 	FILE_HANDLE *fh;
 	FILE_DESC *CurFile;
@@ -905,7 +905,7 @@ long SetSize(PROCRES_DESC *pres, DWORD fhi, QWORD siz)
 }
 
 /*打开目录*/
-long OpenDir(PROCRES_DESC *pres, const BYTE *path, DWORD *fhi)
+long OpenDir(PROCRES_DESC *pres, const char *path, DWORD *fhi)
 {
 	FILE_HANDLE *fh;
 	FILE_DESC *CurFile;
@@ -946,7 +946,7 @@ long ReadDir(PROCRES_DESC *pres, DWORD fhi, FILE_INFO *fi)
 }
 
 /*切换当前目录*/
-long ChDir(PROCRES_DESC *pres, const BYTE *path)
+long ChDir(PROCRES_DESC *pres, const char *path)
 {
 	FILE_DESC *CurFile;
 	long res;
@@ -964,7 +964,7 @@ long ChDir(PROCRES_DESC *pres, const BYTE *path)
 }
 
 /*创建目录*/
-long MkDir(PROCRES_DESC *pres, const BYTE *path)
+long MkDir(PROCRES_DESC *pres, const char *path)
 {
 	FILE_DESC *CurFile;
 	long res;
@@ -976,7 +976,7 @@ long MkDir(PROCRES_DESC *pres, const BYTE *path)
 }
 
 /*删除文件或空目录*/
-long remove(PROCRES_DESC *pres, const BYTE *path)
+long remove(PROCRES_DESC *pres, const char *path)
 {
 	FILE_DESC *CurFile;
 	long res;
@@ -994,12 +994,12 @@ long remove(PROCRES_DESC *pres, const BYTE *path)
 }
 
 /*重命名文件或目录*/
-long rename(PROCRES_DESC *pres, const BYTE *path, const BYTE *name)
+long rename(PROCRES_DESC *pres, const char *path, const char *name)
 {
 	PART_DESC *CurPart;
 	FILE_DESC *CurFile, TmpFile;
 	FSUI *CurFsui;
-	BYTE *namep;
+	char *namep;
 	long res;
 
 	if ((res = SetFildLn(pres, path, TRUE, &CurFile)) != NO_ERROR)	/*检查所在目录是否存在*/
@@ -1048,7 +1048,7 @@ long rename(PROCRES_DESC *pres, const BYTE *path, const BYTE *name)
 }
 
 /*取得文件或目录的属性信息*/
-long GetAttr(PROCRES_DESC *pres, const BYTE *path, FILE_INFO *fi)
+long GetAttr(PROCRES_DESC *pres, const char *path, FILE_INFO *fi)
 {
 	FILE_DESC *CurFile;
 	long res;
@@ -1061,7 +1061,7 @@ long GetAttr(PROCRES_DESC *pres, const BYTE *path, FILE_INFO *fi)
 }
 
 /*设置文件或目录的属性*/
-long SetAttr(PROCRES_DESC *pres, const BYTE *path, DWORD attr)
+long SetAttr(PROCRES_DESC *pres, const char *path, DWORD attr)
 {
 	FILE_DESC *CurFile;
 	FILE_INFO fi;
@@ -1088,7 +1088,7 @@ long SetAttr(PROCRES_DESC *pres, const BYTE *path, DWORD attr)
 }
 
 /*设置文件或目录的时间*/
-long SetTime(PROCRES_DESC *pres, const BYTE *path, DWORD time, DWORD cma)
+long SetTime(PROCRES_DESC *pres, const char *path, DWORD time, DWORD cma)
 {
 	FILE_DESC *CurFile;
 	FILE_INFO fi;

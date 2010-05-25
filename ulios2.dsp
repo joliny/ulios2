@@ -304,7 +304,7 @@ SOURCE=.\MkApi\app.ld
 # End Source File
 # Begin Source File
 
-SOURCE=.\MkApi\apphead.asm
+SOURCE=.\MkApi\apphead.c
 # End Source File
 # Begin Source File
 

@@ -108,10 +108,10 @@ static inline void memcpy32(void *dest, const void *src, DWORD n)
 }
 
 /*字符串复制*/
-static inline BYTE *strcpy(BYTE *dest, const BYTE *src)
+static inline char *strcpy(char *dest, const char *src)
 {
-	BYTE *_dest;
-	const BYTE *_src;
+	char *_dest;
+	const char *_src;
 	__asm__ __volatile__
 	(
 		"cld\n"
@@ -125,10 +125,10 @@ static inline BYTE *strcpy(BYTE *dest, const BYTE *src)
 }
 
 /*字符串限量复制*/
-static inline void strncpy(BYTE *dest, const BYTE *src, DWORD n)
+static inline void strncpy(char *dest, const char *src, DWORD n)
 {
-	BYTE *_dest;
-	const BYTE *_src;
+	char *_dest;
+	const char *_src;
 	DWORD _n;
 	__asm__ __volatile__
 	(
@@ -169,19 +169,6 @@ static inline BYTE inb(WORD port)
 	register BYTE b;
 	__asm__ __volatile__("inb %w1, %0": "=a"(b): "d"(port));
 	return b;
-}
-
-/*设置用户态段寄存器*/
-static inline void SetUserSeg()
-{
-	__asm__
-	(
-		"movw %ss, %ax\n"
-		"movw %ax, %ds\n"
-		"movw %ax, %es\n"
-		"movw %ax, %fs\n"
-		"movw %ax, %gs\n"
-	);
 }
 
 /**********系统调用接口**********/
@@ -233,7 +220,7 @@ static inline long KKillThread(DWORD ThreadID)
 }
 
 /*创建进程*/
-static inline long KCreateProcess(DWORD attr, DWORD FileID, const BYTE *args, THREAD_ID *ptid)
+static inline long KCreateProcess(DWORD attr, DWORD FileID, const char *args, THREAD_ID *ptid)
 {
 	register long res;
 	__asm__ __volatile__("int $0xF0": "=a"(res), "=b"(*ptid): "0"(0x060000), "1"(attr), "c"(FileID), "S"(args));
