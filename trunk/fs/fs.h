@@ -106,13 +106,13 @@ extern PROCRES_DESC* pret[];/*进程资源表*/
 
 typedef struct _FSUI
 {
-	BYTE name[8];			/*文件系统标示*/
+	char name[8];			/*文件系统标示*/
 	long (*MntPart)(PART_DESC *pd);					/*挂载分区*/
 	void (*UmntPart)(PART_DESC *pd);				/*卸载分区*/
 	long (*SetPart)(PART_DESC *pd, PART_INFO *pi);	/*设置分区信息*/
-	BOOL (*CmpFile)(FILE_DESC *fd, const BYTE *path);	/*比较路径字符串与文件名是否匹配*/
-	long (*SchFile)(FILE_DESC *fd, const BYTE *path);	/*搜索并设置文件项*/
-	long (*NewFile)(FILE_DESC *fd, const BYTE *path);	/*创建并设置文件项*/
+	BOOL (*CmpFile)(FILE_DESC *fd, const char *path);	/*比较路径字符串与文件名是否匹配*/
+	long (*SchFile)(FILE_DESC *fd, const char *path);	/*搜索并设置文件项*/
+	long (*NewFile)(FILE_DESC *fd, const char *path);	/*创建并设置文件项*/
 	long (*DelFile)(FILE_DESC *fd);					/*删除文件项*/
 	long (*SetFile)(FILE_DESC *fd, FILE_INFO *fi);	/*设置文件项信息*/
 	long (*SetSize)(FILE_DESC *fd, QWORD siz);		/*设置文件项长度*/

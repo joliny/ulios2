@@ -993,7 +993,21 @@ void PageFaultProc(DWORD edi, DWORD esi, DWORD ebp, DWORD esp, DWORD ebx, DWORD 
 	CurThed = CurProc->CurTmd;
 	CurThed->attr &= (~THED_ATTR_APPS);	/*进入系统调用态*/
 	if (addr < UADDR_OFF)	/*进程非法访问内核空间*/
-		ThedExit();
+	{
+		MESSAGE_DESC *msg;
+
+		if ((msg = AllocMsg()) != NULL)	/*通知报告服务器异常消息*/
+		{
+			msg->ptid = kpt[REP_KPORT];
+			msg->data[0] = MSG_ATTR_EXCEP;
+			msg->data[1] = ERROR_INVALID_ADDR;
+			msg->data[2] = (DWORD)addr;
+			msg->data[3] = eip;
+			if (SendMsg(msg) != NO_ERROR)
+				FreeMsg(msg);
+		}
+		ThedExit(ERROR_PROC_EXCEP);
+	}
 	CurExec = CurProc->exec;
 	lock(&CurProc->Page_l);
 	lock(&CurExec->Page_l);
@@ -1001,6 +1015,20 @@ void PageFaultProc(DWORD edi, DWORD esi, DWORD ebp, DWORD esp, DWORD ebx, DWORD 
 	ulock(&CurExec->Page_l);
 	ulock(&CurProc->Page_l);
 	if (res != NO_ERROR)
-		ThedExit();
+	{
+		MESSAGE_DESC *msg;
+
+		if ((msg = AllocMsg()) != NULL)	/*通知报告服务器异常消息*/
+		{
+			msg->ptid = kpt[REP_KPORT];
+			msg->data[0] = MSG_ATTR_EXCEP;
+			msg->data[1] = res;
+			msg->data[2] = (DWORD)addr;
+			msg->data[3] = eip;
+			if (SendMsg(msg) != NO_ERROR)
+				FreeMsg(msg);
+		}
+		ThedExit(res);
+	}
 	CurThed->attr |= THED_ATTR_APPS;	/*离开系统调用态*/
 }

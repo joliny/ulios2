@@ -22,7 +22,7 @@
 #define MSG_ATTR_CNLMAP		0x00150000	/*取消页映射消息*/
 
 #define MSG_ATTR_USER		0x01000000	/*用户自定义消息最小值*/
-#define THED_MSG_LEN		32			/*线程中消息链表长度*/
+#define THED_MSG_LEN		64			/*线程中消息链表长度*/
 #define MSG_DATA_LEN		8			/*消息数据总双字数*/
 
 typedef struct _MESSAGE_DESC

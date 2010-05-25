@@ -39,8 +39,8 @@ clean :
 $(FSBIN) : $(OBJS) $(LDFILE)
 	$(LD) $(LDFLAGS) -o $(FSBIN) $(OBJS)
 
-../objs/apphead.o : ../MkApi/apphead.asm
-	$(ASM) $(ASMFLAGS) -o $@ $<
+../objs/apphead.o : ../MkApi/apphead.c
+	$(CC) $(CFLAGS) -o $@ $<
 
 ../objs/fsapi.o : fsapi.c $(HEADS)
 	$(CC) $(CFLAGS) -o $@ $<

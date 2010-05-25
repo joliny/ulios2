@@ -34,7 +34,7 @@ typedef struct _FAT32_BPB
 	BYTE	exres;	/*保留*/
 	BYTE	exbtsg;	/*扩展引导标签为0x29*/
 	DWORD	volume;	/*分区序号,用于区分磁盘*/
-	BYTE	vollab[11];/*卷标*/
+	char	vollab[11];/*卷标*/
 	BYTE	fsid[8];/*系统ID*/
 	BYTE	code[420];	/*引导代码*/
 	WORD	aa55;	/*引导标志*/
@@ -78,7 +78,7 @@ typedef struct _FAT32_FSI
 
 typedef struct _FAT32_DIR
 {
-	BYTE name[FAT32_FILE_NAME_SIZE];	/*文件名*/
+	char name[FAT32_FILE_NAME_SIZE];	/*文件名*/
 	BYTE attr;		/*属性*/
 	BYTE reserved;	/*保留*/
 	BYTE crtmils;	/*创建时间10毫秒位*/
@@ -177,7 +177,7 @@ void Fat32UmntPart(PART_DESC *pd)
 /*设置分区信息*/
 long Fat32SetPart(PART_DESC *pd, PART_INFO *pi)
 {
-	const BYTE *namep;
+	const char *namep;
 	long res;
 	FAT32_BPB buf;
 
@@ -462,9 +462,9 @@ stralc:	clu = AllocClu(CurPart, cun - clui);
 }
 
 /*文件名填入目录结构*/
-static long NameToDir(BYTE DirName[FAT32_FILE_NAME_SIZE], const BYTE *name)
+static long NameToDir(char DirName[FAT32_FILE_NAME_SIZE], const char *name)
 {
-	BYTE *namep;
+	char *namep;
 
 	memset8(DirName, ' ', FAT32_FILE_NAME_SIZE);
 	namep = DirName;
@@ -505,9 +505,9 @@ static long NameToDir(BYTE DirName[FAT32_FILE_NAME_SIZE], const BYTE *name)
 }
 
 /*目录结构填入文件名*/
-static long DirToName(BYTE *name, BYTE DirName[FAT32_FILE_NAME_SIZE])
+static long DirToName(char *name, char DirName[FAT32_FILE_NAME_SIZE])
 {
-	BYTE *namep;
+	char *namep;
 
 	namep = DirName;
 	if (*namep == 0x05)
@@ -567,9 +567,9 @@ static long DirToTime(TM *tm, WORD DirDate, WORD DirTime)
 }
 
 /*比较路径字符串与文件名是否匹配*/
-BOOL Fat32CmpFile(FILE_DESC *fd, const BYTE *path)
+BOOL Fat32CmpFile(FILE_DESC *fd, const char *path)
 {
-	BYTE newnam[FAT32_FILE_NAME_SIZE], *name, *namep;
+	char newnam[FAT32_FILE_NAME_SIZE], *name, *namep;
 
 	if (NameToDir(newnam, path) != NO_ERROR)
 		return FALSE;
@@ -611,7 +611,7 @@ static void InfoToData(FAT32_DIR *fd, FILE_INFO *fi)
 }
 
 /*搜索并设置文件项*/
-long Fat32SchFile(FILE_DESC *fd, const BYTE *path)
+long Fat32SchFile(FILE_DESC *fd, const char *path)
 {
 	FILE_DESC *par;
 	FAT32_DIR *dir;
@@ -661,12 +661,12 @@ long Fat32SchFile(FILE_DESC *fd, const BYTE *path)
 }
 
 /*检查文件名正确性*/
-static long CheckName(const BYTE *name)
+static long CheckName(const char *name)
 {
-	static const BYTE ErrChar[] = {	/*错误字符*/
+	static const char ErrChar[] = {	/*错误字符*/
 		0x22, 0x2A, 0x2B, 0x2C, 0x2E, 0x2F, 0x3A, 0x3B, 0x3C, 0x3D, 0x3E, 0x3F, 0x5B, 0x5C, 0x5D, 0x7C
 	};
-	const BYTE *namep, *errcp;
+	const char *namep, *errcp;
 	if (*name == '.')
 		return FS_ERR_NAME_FORMAT;
 	namep = name;
@@ -701,7 +701,7 @@ static long CheckName(const BYTE *name)
 }
 
 /*创建并设置文件项*/
-long Fat32NewFile(FILE_DESC *fd, const BYTE *path)
+long Fat32NewFile(FILE_DESC *fd, const char *path)
 {
 	FILE_DESC *par;
 	FAT32_DIR *dir;

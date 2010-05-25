@@ -24,7 +24,7 @@ typedef struct _ULIFS_BPB
 	WORD	spbm;	/*每个位图占扇区数*/
 	WORD	cluoff;	/*分区内首簇开始扇区偏移*/
 	DWORD	clucou;	/*数据簇数目*/
-	BYTE	BootPath[88];/*启动列表文件路径*/
+	char	BootPath[88];/*启动列表文件路径*/
 	BYTE	code[382];	/*引导代码*/
 	WORD	aa55;	/*引导标志*/
 }ULIFS_BPB;	/*ulifs BIOS Parameter Block*/
@@ -69,7 +69,7 @@ typedef struct _BLKID
 
 typedef struct _ULIFS_DIR	/*目录项结构*/
 {
-	BYTE name[ULIFS_FILE_NAME_SIZE];/*文件名*/
+	char name[ULIFS_FILE_NAME_SIZE];/*文件名*/
 	DWORD CreateTime;	/*创建时间1970-01-01经过的秒数*/
 	DWORD ModifyTime;	/*修改时间*/
 	DWORD AccessTime;	/*访问时间*/
@@ -137,7 +137,7 @@ long UlifsMntPart(PART_DESC *pd)
 					if (i + j >= fs->CuCou)
 					{
 						RwPart(pd, FALSE, fs->CluID, 1, buf);	/*取得卷标*/
-						strncpy(pd->part.label, &buf[1], LABEL_SIZE - 1);
+						strncpy(pd->part.label, (const char*)&buf[1], LABEL_SIZE - 1);
 						pd->part.label[LABEL_SIZE - 1] = 0;
 						pd->part.size = (QWORD)fs->CuCou * fs->spc * ULIFS_BPS;
 						pd->part.remain = (QWORD)fs->RemCu * fs->spc * ULIFS_BPS;
@@ -601,9 +601,9 @@ stralc:	for (;;)
 }
 
 /*比较路径字符串与文件名是否匹配*/
-BOOL UlifsCmpFile(FILE_DESC *fd, const BYTE *path)
+BOOL UlifsCmpFile(FILE_DESC *fd, const char *path)
 {
-	BYTE *namep = ((ULIFS_DIR*)fd->data)->name;
+	char *namep = ((ULIFS_DIR*)fd->data)->name;
 	while (*namep)
 		if (*namep++ != *path++)
 			return FALSE;	/*文件名不匹配*/
@@ -636,7 +636,7 @@ static void InfoToData(ULIFS_DIR *ud, FILE_INFO *fi)
 }
 
 /*搜索并设置文件项*/
-long UlifsSchFile(FILE_DESC *fd, const BYTE *path)
+long UlifsSchFile(FILE_DESC *fd, const char *path)
 {
 	FILE_DESC *par;
 	ULIFS_DIR *dir;
@@ -686,9 +686,9 @@ long UlifsSchFile(FILE_DESC *fd, const BYTE *path)
 }
 
 /*检查文件名正确性*/
-static long CheckName(const BYTE *name)
+static long CheckName(const char *name)
 {
-	const BYTE *namep;
+	const char *namep;
 	namep = name;
 	while (*namep)	/*文件名超长*/
 	{
@@ -702,7 +702,7 @@ static long CheckName(const BYTE *name)
 }
 
 /*创建并设置文件项*/
-long UlifsNewFile(FILE_DESC *fd, const BYTE *path)
+long UlifsNewFile(FILE_DESC *fd, const char *path)
 {
 	FILE_DESC *par;
 	ULIFS_DIR *dir;

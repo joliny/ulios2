@@ -36,8 +36,8 @@ int main()
 
 	if ((res = KGetKptThed(SRV_FS_PORT, &FsPtid)) != NO_ERROR)
 		return res;
-	FSChDir(FsPtid, (const BYTE*)"/0/ulios");
-	if ((res = FSopen(FsPtid, (const BYTE*)"uli2k.bmp", 0)) < 0)	/*打开BMP文件*/
+	FSChDir(FsPtid, "/0/ulios");
+	if ((res = FSopen(FsPtid, "uli2k.bmp", 0)) < 0)	/*打开BMP文件*/
 		return res;
 	FSseek(FsPtid, res, 54, FS_SEEK_SET);
 	for (j = 63; j >= 0; j--)
@@ -75,14 +75,14 @@ int main()
 
 			ModeCou = VSGetMode(VesaPtid, mode);
 			itoa(str, ModeCou);
-			VSDrawStr(VesaPtid, 120, 0, (const BYTE*)str, 0xFF0000);
+			VSDrawStr(VesaPtid, 120, 0, str, 0xFF0000);
 			for (i = 0; i < ModeCou; i++)
 			{
 				itoa(str, mode[i]);
-				VSDrawStr(VesaPtid, 0, i * 12, (const BYTE*)str, 0xFF0000);
+				VSDrawStr(VesaPtid, 0, i * 12, str, 0xFF0000);
 			}
-			i = FSGetExid(FsPtid, (const BYTE*)"pro.bin");
-			KCreateProcess(0, i, "老婆", (THREAD_ID*)&ModeCou);
+			i = FSGetExid(FsPtid, "pro.bin");
+			KCreateProcess(0, i, "hello laopo heihei ", (THREAD_ID*)&ModeCou);
 
 /*			if (data[1] & KBD_STATE_LSHIFT)
 				KPrintf("LSHIFT\t", 0);

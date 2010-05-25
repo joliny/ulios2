@@ -546,7 +546,7 @@ int main()
 		return res;
 	if ((res = KGetKptThed(SRV_FS_PORT, &ptid)) != NO_ERROR)	/*取得文件系统线程ID*/
 		return res;
-	if ((res = FSopen(ptid, (const BYTE*)"/0/ulios/font.bin", 0)) < 0)	/*打开字体文件*/
+	if ((res = FSopen(ptid, "/0/ulios/font.bin", 0)) < 0)	/*打开字体文件*/
 		return res;
 	if (FSread(ptid, res, font, FONT_SIZE) <= 0)	/*开始读取字体文件*/
 		return -1;

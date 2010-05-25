@@ -12,25 +12,25 @@ extern void CloseFS();
 extern long GetExec(PROCRES_DESC *pres, PROCRES_DESC *par, DWORD fhi, DWORD *exec);
 extern long ReadPage(PROCRES_DESC *pres, void *buf, DWORD siz, DWORD seek);
 extern long ProcExt(PROCRES_DESC *pres);
-extern long GetExid(PROCRES_DESC *pres, const BYTE *path, DWORD *fi);
+extern long GetExid(PROCRES_DESC *pres, const char *path, DWORD *fi);
 extern long EnumPart(PROCRES_DESC *pres, DWORD *pid);
 extern long GetPart(PROCRES_DESC *pres, DWORD pid, PART_INFO *pi);
-extern long creat(PROCRES_DESC *pres, const BYTE *path, DWORD *fhi);
-extern long open(PROCRES_DESC *pres, const BYTE *path, BOOL isWrite, DWORD *fhi);
+extern long creat(PROCRES_DESC *pres, const char *path, DWORD *fhi);
+extern long open(PROCRES_DESC *pres, const char *path, BOOL isWrite, DWORD *fhi);
 extern long close(PROCRES_DESC *pres, DWORD fhi);
 extern long read(PROCRES_DESC *pres, DWORD fhi, void *buf, DWORD *siz);
 extern long write(PROCRES_DESC *pres, DWORD fhi, void *buf, DWORD *siz);
 extern long seek(PROCRES_DESC *pres, DWORD fhi, SQWORD seek, DWORD from);
 extern long SetSize(PROCRES_DESC *pres, DWORD fhi, QWORD siz);
-extern long OpenDir(PROCRES_DESC *pres, const BYTE *path, DWORD *fhi);
+extern long OpenDir(PROCRES_DESC *pres, const char *path, DWORD *fhi);
 extern long ReadDir(PROCRES_DESC *pres, DWORD fhi, FILE_INFO *fi);
-extern long ChDir(PROCRES_DESC *pres, const BYTE *path);
-extern long MkDir(PROCRES_DESC *pres, const BYTE *path);
-extern long remove(PROCRES_DESC *pres, const BYTE *path);
-extern long rename(PROCRES_DESC *pres, const BYTE *path, const BYTE *name);
-extern long GetAttr(PROCRES_DESC *pres, const BYTE *path, FILE_INFO *fi);
-extern long SetAttr(PROCRES_DESC *pres, const BYTE *path, DWORD attr);
-extern long SetTime(PROCRES_DESC *pres, const BYTE *path, DWORD time, DWORD cma);
+extern long ChDir(PROCRES_DESC *pres, const char *path);
+extern long MkDir(PROCRES_DESC *pres, const char *path);
+extern long remove(PROCRES_DESC *pres, const char *path);
+extern long rename(PROCRES_DESC *pres, const char *path, const char *name);
+extern long GetAttr(PROCRES_DESC *pres, const char *path, FILE_INFO *fi);
+extern long SetAttr(PROCRES_DESC *pres, const char *path, DWORD attr);
+extern long SetTime(PROCRES_DESC *pres, const char *path, DWORD time, DWORD cma);
 
 #define ATTR_ID	0
 #define SIZE_ID	1
@@ -38,7 +38,7 @@ extern long SetTime(PROCRES_DESC *pres, const BYTE *path, DWORD time, DWORD cma)
 #define API_ID	3
 #define PTID_ID	MSG_DATA_LEN
 
-static const BYTE *CheckPathSize(const BYTE *path, DWORD siz)
+static const char *CheckPathSize(const char *path, DWORD siz)
 {
 	if (siz > MAX_PATH)
 		return NULL;
@@ -103,11 +103,11 @@ void ApiProcExt(DWORD *argv)
 
 void ApiGetExid(DWORD *argv)
 {
-	const BYTE *path;
+	const char *path;
 
 	if ((argv[ATTR_ID] & 0xFFFF0000) != MSG_ATTR_MAP)
 		return;
-	path = (const BYTE*)argv[ADDR_ID];
+	path = (const char*)argv[ADDR_ID];
 	if (CheckPathSize(path, argv[SIZE_ID]) == NULL)
 		argv[0] = FS_ERR_ARGS_TOOLONG;
 	else
@@ -145,11 +145,11 @@ void ApiGetPart(DWORD *argv)
 
 void ApiCreat(DWORD *argv)
 {
-	const BYTE *path;
+	const char *path;
 
 	if ((argv[ATTR_ID] & 0xFFFF0000) != MSG_ATTR_MAP)
 		return;
-	path = (const BYTE*)argv[ADDR_ID];
+	path = (const char*)argv[ADDR_ID];
 	if (CheckPathSize(path, argv[SIZE_ID]) == NULL)
 		argv[0] = FS_ERR_ARGS_TOOLONG;
 	else
@@ -159,11 +159,11 @@ void ApiCreat(DWORD *argv)
 
 void ApiOpen(DWORD *argv)
 {
-	const BYTE *path;
+	const char *path;
 
 	if ((argv[ATTR_ID] & 0xFFFF0000) != MSG_ATTR_MAP)
 		return;
-	path = (const BYTE*)argv[ADDR_ID];
+	path = (const char*)argv[ADDR_ID];
 	if (CheckPathSize(path, argv[SIZE_ID]) == NULL)
 		argv[0] = FS_ERR_ARGS_TOOLONG;
 	else
@@ -240,11 +240,11 @@ void ApiSetSize(DWORD *argv)
 
 void ApiOpenDir(DWORD *argv)
 {
-	const BYTE *path;
+	const char *path;
 
 	if ((argv[ATTR_ID] & 0xFFFF0000) != MSG_ATTR_MAP)
 		return;
-	path = (const BYTE*)argv[ADDR_ID];
+	path = (const char*)argv[ADDR_ID];
 	if (CheckPathSize(path, argv[SIZE_ID]) == NULL)
 		argv[0] = FS_ERR_ARGS_TOOLONG;
 	else
@@ -271,11 +271,11 @@ void ApiReadDir(DWORD *argv)
 
 void ApiChDir(DWORD *argv)
 {
-	const BYTE *path;
+	const char *path;
 
 	if ((argv[ATTR_ID] & 0xFFFF0000) != MSG_ATTR_MAP)
 		return;
-	path = (const BYTE*)argv[ADDR_ID];
+	path = (const char*)argv[ADDR_ID];
 	if (CheckPathSize(path, argv[SIZE_ID]) == NULL)
 		argv[0] = FS_ERR_ARGS_TOOLONG;
 	else
@@ -285,11 +285,11 @@ void ApiChDir(DWORD *argv)
 
 void ApiMkDir(DWORD *argv)
 {
-	const BYTE *path;
+	const char *path;
 
 	if ((argv[ATTR_ID] & 0xFFFF0000) != MSG_ATTR_MAP)
 		return;
-	path = (const BYTE*)argv[ADDR_ID];
+	path = (const char*)argv[ADDR_ID];
 	if (CheckPathSize(path, argv[SIZE_ID]) == NULL)
 		argv[0] = FS_ERR_ARGS_TOOLONG;
 	else
@@ -299,11 +299,11 @@ void ApiMkDir(DWORD *argv)
 
 void ApiRemove(DWORD *argv)
 {
-	const BYTE *path;
+	const char *path;
 
 	if ((argv[ATTR_ID] & 0xFFFF0000) != MSG_ATTR_MAP)
 		return;
-	path = (const BYTE*)argv[ADDR_ID];
+	path = (const char*)argv[ADDR_ID];
 	if (CheckPathSize(path, argv[SIZE_ID]) == NULL)
 		argv[0] = FS_ERR_ARGS_TOOLONG;
 	else
@@ -313,11 +313,11 @@ void ApiRemove(DWORD *argv)
 
 void ApiReName(DWORD *argv)
 {
-	const BYTE *path, *name;
+	const char *path, *name;
 
 	if ((argv[ATTR_ID] & 0xFFFF0000) != MSG_ATTR_MAP)
 		return;
-	path = (const BYTE*)argv[ADDR_ID];
+	path = (const char*)argv[ADDR_ID];
 	if ((name = CheckPathSize(path, argv[SIZE_ID] >> 1)) == NULL)
 		argv[0] = FS_ERR_ARGS_TOOLONG;
 	else if (CheckPathSize(++name, MAX_PATH) == NULL)
@@ -329,7 +329,7 @@ void ApiReName(DWORD *argv)
 
 void ApiGetAttr(DWORD *argv)
 {
-	BYTE *path;
+	char *path;
 
 	if ((argv[ATTR_ID] & 0xFFFF0000) != MSG_ATTR_MAP)
 		return;
@@ -339,7 +339,7 @@ void ApiGetAttr(DWORD *argv)
 		KUnmapProcAddr((void*)argv[ADDR_ID], argv);
 		return;
 	}
-	path = (BYTE*)argv[ADDR_ID];
+	path = (char*)argv[ADDR_ID];
 	if (CheckPathSize(path, argv[SIZE_ID]) == NULL)
 		argv[0] = FS_ERR_ARGS_TOOLONG;
 	else
@@ -349,11 +349,11 @@ void ApiGetAttr(DWORD *argv)
 
 void ApiSetAttr(DWORD *argv)
 {
-	const BYTE *path;
+	const char *path;
 
 	if ((argv[ATTR_ID] & 0xFFFF0000) != MSG_ATTR_MAP)
 		return;
-	path = (const BYTE*)argv[ADDR_ID];
+	path = (const char*)argv[ADDR_ID];
 	if (CheckPathSize(path, argv[SIZE_ID]) == NULL)
 		argv[0] = FS_ERR_ARGS_TOOLONG;
 	else
@@ -363,11 +363,11 @@ void ApiSetAttr(DWORD *argv)
 
 void ApiSetTime(DWORD *argv)
 {
-	const BYTE *path;
+	const char *path;
 
 	if ((argv[ATTR_ID] & 0xFFFF0000) != MSG_ATTR_MAP)
 		return;
-	path = (const BYTE*)argv[ADDR_ID];
+	path = (const char*)argv[ADDR_ID];
 	if (CheckPathSize(path, argv[SIZE_ID]) == NULL)
 		argv[0] = FS_ERR_ARGS_TOOLONG;
 	else
@@ -385,7 +385,6 @@ void (*ApiTable[])(DWORD *argv) = {
 /*高速缓冲保存线程*/
 void CacheProc(DWORD interval)
 {
-	SetUserSeg();
 	for (;;)
 	{
 		KSleep(interval);
@@ -397,7 +396,6 @@ void ApiProc(DWORD *argv)
 {
 	PROCRES_DESC *CurPres;
 
-	SetUserSeg();
 	if ((CurPres = pret[((THREAD_ID*)&argv[PTID_ID])->ProcID]) == NULL)
 	{
 		if ((CurPres = (PROCRES_DESC*)malloc(sizeof(PROCRES_DESC))) == NULL)

@@ -185,7 +185,7 @@ static inline void RefreshTlb()
 static inline void *GetPageFaultAddr()
 {
 	register void *_addr;
-	__asm__ __volatile__("movl %%cr2, %0": "=r"(_addr));
+	__asm__("movl %%cr2, %0": "=r"(_addr));
 	return _addr;
 }
 

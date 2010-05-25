@@ -12,7 +12,7 @@
 #define SRV_OUT_TIME	100	/*服务调用超时厘秒数INVALID:无限等待*/
 
 /**********AT硬盘相关**********/
-#define SRV_ATHD_PORT	1	/*AT硬盘驱动服务端口*/
+#define SRV_ATHD_PORT	2	/*AT硬盘驱动服务端口*/
 #define ATHD_BPS		512	/*磁盘每扇区字节数*/
 #define ATHD_OUT_TIME	6000	/*超时厘秒数INVALID:无限等待*/
 
@@ -47,7 +47,7 @@ static inline long HDWriteSector(THREAD_ID ptid, DWORD drv, DWORD sec, BYTE cou,
 }
 
 /**********时间服务相关**********/
-#define SRV_TIME_PORT	2	/*时间服务端口*/
+#define SRV_TIME_PORT	3	/*时间服务端口*/
 
 #define TIME_API_CURSECOND		0	/*取得1970年经过的秒功能号*/
 #define TIME_API_CURTIME		1	/*取得当前时间功能号*/
@@ -132,7 +132,7 @@ static inline long TMGetRand(THREAD_ID ptid)
 }
 
 /**********键盘鼠标服务相关**********/
-#define SRV_KBDMUS_PORT	3	/*键盘鼠标服务端口*/
+#define SRV_KBDMUS_PORT	4	/*键盘鼠标服务端口*/
 
 #define KBD_STATE_LSHIFT	0x00010000
 #define KBD_STATE_RSHIFT	0x00020000
@@ -170,7 +170,7 @@ static inline long KMSetRecv(THREAD_ID ptid)
 }
 
 /**********VESA显卡驱动服务相关**********/
-#define SRV_VESA_PORT	4	/*VESA显卡服务端口*/
+#define SRV_VESA_PORT	5	/*VESA显卡服务端口*/
 #define VESA_MAX_MODE	512	/*显示模式列表最大数量*/
 
 #define VESA_API_GETINFO	0	/*取得显示信息功能号*/
@@ -309,10 +309,10 @@ static inline long VSCircle(THREAD_ID ptid, long cx, long cy, long r, long c)
 }
 
 /*输出字符串*/
-static inline long VSDrawStr(THREAD_ID ptid, long x, long y, const BYTE *str, DWORD c)
+static inline long VSDrawStr(THREAD_ID ptid, long x, long y, const char *str, DWORD c)
 {
 	DWORD data[MSG_DATA_LEN];
-	BYTE buf[1024];
+	char buf[1024];
 	data[0] = VESA_API_DRAWSTR;
 	data[1] = x;
 	data[2] = y;
