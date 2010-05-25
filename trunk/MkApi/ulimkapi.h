@@ -206,7 +206,7 @@ static inline long KCreateThread(void (*ThreadProc)(void *data), DWORD StackSize
 }
 
 /*退出线程*/
-static inline void KExitThread(DWORD ExitCode)
+static inline void KExitThread(long ExitCode)
 {
 	__asm__ __volatile__("int $0xF0":: "a"(0x040000), "b"(ExitCode));
 }
@@ -228,7 +228,7 @@ static inline long KCreateProcess(DWORD attr, DWORD FileID, const char *args, TH
 }
 
 /*退出进程*/
-static inline void KExitProcess(DWORD ExitCode)
+static inline void KExitProcess(long ExitCode)
 {
 	__asm__ __volatile__("int $0xF0":: "a"(0x070000), "b"(ExitCode));
 }
