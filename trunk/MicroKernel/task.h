@@ -84,7 +84,7 @@ void wakeup(THREAD_DESC *thed);
 void sleep(DWORD cs);
 
 /*创建线程*/
-long CreateThed(const DWORD *argv, THREAD_ID *ptid);
+long CreateThed(DWORD attr, DWORD proc, DWORD args, THREAD_ID *ptid);
 
 /*删除线程*/
 void DeleteThed();
@@ -93,7 +93,7 @@ void DeleteThed();
 long KillThed(WORD ThedID);
 
 /*创建进程*/
-long CreateProc(const DWORD *argv, THREAD_ID *ptid);
+long CreateProc(DWORD attr, DWORD exec, DWORD args, THREAD_ID *ptid);
 
 /*删除进程*/
 void DeleteProc(DWORD ExitCode);

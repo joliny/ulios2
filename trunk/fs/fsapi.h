@@ -56,10 +56,10 @@ typedef struct _FILE_INFO
 
 #define SRV_FS_PORT		0	/*文件系统服务端口*/
 
-#define FS_API_GETEXEC	0	/*内核专用*/
-#define FS_API_READPAGE	1	/*内核专用*/
-#define FS_API_PROCEXT	2	/*内核专用*/
-#define FS_API_GETEXID	3
+#define FS_API_GETEXID	0	/*内核专用*/
+#define FS_API_GETEXEC	1	/*内核专用*/
+#define FS_API_READPAGE	2	/*内核专用*/
+#define FS_API_PROCEXT	3	/*内核专用*/
 #define FS_API_ENUMPART	4
 #define FS_API_GETPART	5
 #define FS_API_CREAT	6
@@ -104,19 +104,6 @@ typedef struct _FILE_INFO
 #define FS_ERR_DIR_NOT_EMPTY	-277	/*目录非空*/
 #define FS_ERR_END_OF_FILE		-278	/*到达文件结尾*/
 #define FS_ERR_SIZE_LIMIT		-279	/*数量空间限制*/
-
-/*取得可执行文件ID*/
-static inline long FSGetExid(THREAD_ID ptid, const char *path)
-{
-	DWORD data[MSG_DATA_LEN];
-	char buf[MAX_PATH];
-	data[0] = FS_API_GETEXID;
-	if ((data[0] = KWriteProcAddr(buf, strcpy(buf, path) + 1 - buf, ptid, data, INVALID)) != NO_ERROR)
-		return data[0];
-	if (data[2] != NO_ERROR)
-		return data[2];
-	return data[3];
-}
 
 /*枚举分区*/
 static inline long FSEnumPart(THREAD_ID ptid, DWORD pid)

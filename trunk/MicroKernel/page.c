@@ -522,7 +522,7 @@ long UnmapAddr(void *addr)
 long MapProcAddr(void *addr, DWORD siz, THREAD_ID ptid, BOOL isWrite, BOOL isChkExec, DWORD *argv, DWORD cs)
 {
 	PROCESS_DESC *CurProc, *DstProc;
-	THREAD_DESC *CurThed;
+	THREAD_DESC *CurThed, *DstThed;
 	MAPBLK_DESC *map;
 	void *MapAddr, *daddr;
 	PAGE_DESC *FstPg, *EndPg, *FstPg2;
@@ -598,6 +598,12 @@ long MapProcAddr(void *addr, DWORD siz, THREAD_ID ptid, BOOL isWrite, BOOL isChk
 	{
 		sti();
 		return ERROR_WRONG_PROCID;
+	}
+	DstThed = DstProc->tmt[ptid.ThedID];
+	if (DstThed == NULL || (DstThed->attr & THED_ATTR_DEL))
+	{
+		sti();
+		return ERROR_WRONG_THEDID;
 	}
 	if (DstProc->MapCou >= PROC_MAP_LEN)
 	{

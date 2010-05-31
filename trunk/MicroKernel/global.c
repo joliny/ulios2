@@ -59,18 +59,13 @@ void InitKnlVal()
 /*初始化基础服务*/
 long InitBaseSrv()
 {
-	long res;
 	PHYBLK_DESC *CurSeg;
-	DWORD argv[3];
+	THREAD_ID ptid;
+	long res;
 
-	argv[0] = EXEC_ARGV_BASESRV | EXEC_ARGV_DRIVER;
 	for (CurSeg = &BaseSrv[1]; CurSeg->addr; CurSeg++)
-	{
-		argv[1] = CurSeg->addr;
-		argv[2] = CurSeg->siz;
-		if ((res = CreateProc(argv, (THREAD_ID*)&argv[1])) != NO_ERROR)
+		if ((res = CreateProc(EXEC_ARGV_BASESRV | EXEC_ARGV_DRIVER, CurSeg->addr, CurSeg->siz, &ptid)) != NO_ERROR)
 			return res;
-	}
 	return NO_ERROR;
 }
 

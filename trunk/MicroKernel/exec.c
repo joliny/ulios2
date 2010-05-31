@@ -20,7 +20,7 @@ long AllocExid(EXEC_DESC *exec)
 	if (FstExmd >= &exmt[EXMT_LEN])
 	{
 		sti();
-		return ERROR_HAVENO_EXECID;	// 没有空可执行体ID
+		return ERROR_HAVENO_EXECID;	/*没有空可执行体ID*/
 	}
 	exec->id = FstExmd - exmt;
 	exec->cou = 1;
