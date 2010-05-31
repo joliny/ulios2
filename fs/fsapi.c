@@ -9,10 +9,10 @@
 extern long InitFS();
 extern void InitPart();
 extern void CloseFS();
+extern long GetExid(PROCRES_DESC *pres, const char *path, DWORD *fi);
 extern long GetExec(PROCRES_DESC *pres, PROCRES_DESC *par, DWORD fhi, DWORD *exec);
 extern long ReadPage(PROCRES_DESC *pres, void *buf, DWORD siz, DWORD seek);
 extern long ProcExt(PROCRES_DESC *pres);
-extern long GetExid(PROCRES_DESC *pres, const char *path, DWORD *fi);
 extern long EnumPart(PROCRES_DESC *pres, DWORD *pid);
 extern long GetPart(PROCRES_DESC *pres, DWORD pid, PART_INFO *pi);
 extern long creat(PROCRES_DESC *pres, const char *path, DWORD *fhi);
@@ -49,6 +49,20 @@ static const char *CheckPathSize(const char *path, DWORD siz)
 		path++;
 	} while (--siz);
 	return NULL;
+}
+
+void ApiGetExid(DWORD *argv)
+{
+	const char *path;
+	
+	if ((argv[ATTR_ID] & 0xFFFF0000) != MSG_ATTR_MAP)
+		return;
+	path = (const char*)argv[ADDR_ID];
+	if (CheckPathSize(path, argv[SIZE_ID]) == NULL)
+		argv[0] = FS_ERR_ARGS_TOOLONG;
+	else
+		argv[0] = GetExid(pret[((THREAD_ID*)&argv[PTID_ID])->ProcID], path, &argv[1]);
+	KUnmapProcAddr((void*)path, argv);
 }
 
 void ApiGetExec(DWORD *argv)
@@ -99,20 +113,6 @@ void ApiProcExt(DWORD *argv)
 	ProcExt(CurPres);
 	free(CurPres, sizeof(PROCRES_DESC));
 	pret[((THREAD_ID*)&argv[PTID_ID])->ProcID] = NULL;
-}
-
-void ApiGetExid(DWORD *argv)
-{
-	const char *path;
-
-	if ((argv[ATTR_ID] & 0xFFFF0000) != MSG_ATTR_MAP)
-		return;
-	path = (const char*)argv[ADDR_ID];
-	if (CheckPathSize(path, argv[SIZE_ID]) == NULL)
-		argv[0] = FS_ERR_ARGS_TOOLONG;
-	else
-		argv[0] = GetExid(pret[((THREAD_ID*)&argv[PTID_ID])->ProcID], path, &argv[1]);
-	KUnmapProcAddr((void*)path, argv);
 }
 
 void ApiEnumPart(DWORD *argv)
@@ -377,7 +377,7 @@ void ApiSetTime(DWORD *argv)
 
 /*系统调用表*/
 void (*ApiTable[])(DWORD *argv) = {
-	ApiGetExec, ApiReadPage, ApiProcExt, ApiGetExid, ApiEnumPart, ApiGetPart,
+	ApiGetExid, ApiGetExec, ApiReadPage, ApiProcExt, ApiEnumPart, ApiGetPart,
 	ApiCreat, ApiOpen, ApiClose, ApiRead, ApiWrite, ApiSeek, ApiSetSize, ApiOpenDir,
 	ApiReadDir, ApiChDir, ApiMkDir, ApiRemove, ApiReName, ApiGetAttr, ApiSetAttr, ApiSetTime,
 };

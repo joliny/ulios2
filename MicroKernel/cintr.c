@@ -322,12 +322,7 @@ void ApiSleep(DWORD *argv)
 /*创建线程*/
 void ApiCreateThread(DWORD *argv)
 {
-	DWORD data[3];
-
-	data[0] = argv[EBX_ID];
-	data[1] = argv[ECX_ID];
-	data[2] = argv[EDX_ID];
-	argv[EAX_ID] = CreateThed(data, (THREAD_ID*)&argv[EBX_ID]);
+	argv[EAX_ID] = CreateThed(argv[EBX_ID], argv[ECX_ID], argv[EDX_ID], (THREAD_ID*)&argv[EBX_ID]);
 }
 
 /*退出线程*/
@@ -346,7 +341,6 @@ void ApiKillThread(DWORD *argv)
 void ApiCreateProcess(DWORD *argv)
 {
 	BYTE *addr;
-	DWORD data[3];
 
 	addr = (BYTE*)argv[ESI_ID];
 	if (addr >= (BYTE*)UADDR_OFF && addr <= (BYTE*)(0 - PROC_ARGS_SIZE))
@@ -359,15 +353,12 @@ void ApiCreateProcess(DWORD *argv)
 				argv[EAX_ID] = ERROR_WRONG_APPMSG;
 				return;
 			}
-		CurPmd->CurTmd->attr &= (~THED_ATTR_APPS);	/*防止访问用户内存时发生页异常,重新进入系统调用态*/
 		addr = (BYTE*)argv[ESI_ID];
+		CurPmd->CurTmd->attr &= (~THED_ATTR_APPS);	/*防止访问用户内存时发生页异常,重新进入系统调用态*/
 	}
 	else
 		addr = NULL;
-	data[0] = argv[EBX_ID] & (~EXEC_ARGV_BASESRV);
-	data[1] = argv[ECX_ID];
-	data[2] = (DWORD)addr;
-	argv[EAX_ID] = CreateProc(data, (THREAD_ID*)&argv[EBX_ID]);
+	argv[EAX_ID] = CreateProc(argv[EBX_ID] & (~EXEC_ARGV_BASESRV), argv[EDI_ID], (DWORD)addr, (THREAD_ID*)&argv[EBX_ID]);
 }
 
 /*退出进程*/

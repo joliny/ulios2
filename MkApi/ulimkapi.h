@@ -222,10 +222,10 @@ static inline long KKillThread(DWORD ThreadID)
 }
 
 /*创建进程*/
-static inline long KCreateProcess(DWORD attr, DWORD FileID, const char *args, THREAD_ID *ptid)
+static inline long KCreateProcess(DWORD attr, const char *exec, const char *args, THREAD_ID *ptid)
 {
 	register long res;
-	__asm__ __volatile__("int $0xF0": "=a"(res), "=b"(*ptid): "0"(0x060000), "1"(attr), "c"(FileID), "S"(args));
+	__asm__ __volatile__("int $0xF0": "=a"(res), "=b"(*ptid): "0"(0x060000), "1"(attr), "D"(exec), "S"(args));
 	return res;
 }
 

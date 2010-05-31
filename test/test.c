@@ -81,8 +81,7 @@ int main()
 				itoa(str, mode[i]);
 				VSDrawStr(VesaPtid, 0, i * 12, str, 0xFF0000);
 			}
-			i = FSGetExid(FsPtid, "pro.bin");
-			KCreateProcess(0, i, "hello laopo heihei ", (THREAD_ID*)&ModeCou);
+			KCreateProcess(0, "pro.bin", "hello laopo heihei ", (THREAD_ID*)&ModeCou);
 
 /*			if (data[1] & KBD_STATE_LSHIFT)
 				KPrintf("LSHIFT\t", 0);

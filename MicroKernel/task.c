@@ -47,7 +47,7 @@ static void SwitchTS()
 static inline long AllocPid(PROCESS_DESC *proc)
 {
 	if (FstPmd >= &pmt[PMT_LEN])
-		return ERROR_HAVENO_PROCID;	// 没有空进程ID
+		return ERROR_HAVENO_PROCID;	/*没有空进程ID*/
 	proc->tmt[0]->id.ProcID = FstPmd - pmt;
 	*FstPmd = proc;
 	do
@@ -74,7 +74,7 @@ static inline void FreePid(PROCESS_DESC **pmd)
 static inline long AllocTid(PROCESS_DESC *proc, THREAD_DESC *thed)
 {
 	if (proc->FstTmd >= &proc->tmt[TMT_LEN])
-		return ERROR_HAVENO_THEDID;	// 没有空线程ID
+		return ERROR_HAVENO_THEDID;	/*没有空线程ID*/
 	thed->id.ThedID = proc->FstTmd - proc->tmt;
 	*proc->FstTmd = thed;
 	do
@@ -247,7 +247,7 @@ void sleep(DWORD cs)
 }
 
 /*创建线程*/
-long CreateThed(const DWORD *argv, THREAD_ID *ptid)
+long CreateThed(DWORD attr, DWORD proc, DWORD args, THREAD_ID *ptid)
 {
 	PROCESS_DESC *CurProc;
 	THREAD_DESC *CurThed, *NewThed, *NxtThed;
@@ -266,7 +266,9 @@ long CreateThed(const DWORD *argv, THREAD_ID *ptid)
 	NewThed->tss.cs = KCODE_SEL;
 	NewThed->tss.gs = NewThed->tss.fs = NewThed->tss.ds = NewThed->tss.ss = NewThed->tss.es = KDATA_SEL;
 	NewThed->tss.io = sizeof(TSS);
-	memcpy32(NewThed->kstk, argv, 3);	/*复制参数*/
+	NewThed->kstk[0] = attr;	/*复制参数*/
+	NewThed->kstk[1] = proc;
+	NewThed->kstk[2] = args;
 	cli();
 	if (CurProc->attr & PROC_ATTR_DEL)	/*正在被删除的进程不创建线程*/
 	{
@@ -374,14 +376,14 @@ long KillThed(WORD ThedID)
 }
 
 /*创建进程*/
-long CreateProc(const DWORD *argv, THREAD_ID *ptid)
+long CreateProc(DWORD attr, DWORD exec, DWORD args, THREAD_ID *ptid)
 {
 	PROCESS_DESC *CurProc, *NewProc;
 	THREAD_DESC *NewThed;
 	DWORD NewPdt, pdti;
 
 	CurProc = CurPmd;
-	if (CurProc && (CurProc->attr & PROC_ATTR_APPS) && (argv[0] & EXEC_ARGV_DRIVER))	/*应用进程无权启动驱动进程*/
+	if (CurProc && (CurProc->attr & PROC_ATTR_APPS) && (attr & EXEC_ARGV_DRIVER))	/*应用进程无权启动驱动进程*/
 		return ERROR_NOT_DRIVER;
 	if ((NewProc = (PROCESS_DESC*)LockKmalloc(sizeof(PROCESS_DESC))) == NULL)
 		return ERROR_HAVENO_KMEM;
@@ -414,13 +416,33 @@ long CreateProc(const DWORD *argv, THREAD_ID *ptid)
 	NewThed->tss.cs = KCODE_SEL;
 	NewThed->tss.gs = NewThed->tss.fs = NewThed->tss.ds = NewThed->tss.ss = NewThed->tss.es = KDATA_SEL;
 	NewThed->tss.io = sizeof(TSS);
-	if (argv[0] & EXEC_ARGV_BASESRV)
-		memcpy32(NewThed->kstk, argv, 3);	/*复制参数*/
+	NewThed->kstk[0] = attr;	/*复制参数*/
+	if (attr & EXEC_ARGV_BASESRV)
+	{
+		NewThed->kstk[1] = exec;
+		NewThed->kstk[2] = args;
+	}
 	else
 	{
-		memcpy32(NewThed->kstk, argv, 2);	/*复制参数*/
-		if (argv[2])
-			strcpy((BYTE*)&NewThed->kstk[2], (const BYTE*)argv[2]);
+		DWORD data[MSG_DATA_LEN];
+		data[0] = FS_API_GETEXID;
+		if ((data[0] = MapProcAddr((void*)exec, PROC_EXEC_SIZE, kpt[FS_KPORT], FALSE, TRUE, data, INVALID)) != NO_ERROR)
+		{
+			LockFreePage(NewPdt);
+			LockKfree(NewThed, sizeof(THREAD_DESC));
+			LockKfree(NewProc, sizeof(PROCESS_DESC));
+			return data[0];
+		}
+		if (data[2] != NO_ERROR)
+		{
+			LockFreePage(NewPdt);
+			LockKfree(NewThed, sizeof(THREAD_DESC));
+			LockKfree(NewProc, sizeof(PROCESS_DESC));
+			return data[2];
+		}
+		NewThed->kstk[1] =  data[3];
+		if (args)
+			strcpy((BYTE*)&NewThed->kstk[2], (const BYTE*)args);
 	}
 	cli();
 	if (AllocPid(NewProc) != NO_ERROR)
