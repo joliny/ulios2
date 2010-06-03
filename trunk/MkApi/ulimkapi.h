@@ -175,11 +175,11 @@ static inline BYTE inb(WORD port)
 
 /**********系统调用接口**********/
 
-/*取得当前线程ID*/
-static inline long KGetPtid(THREAD_ID *ptid)
+/*取得线程ID*/
+static inline long KGetPtid(THREAD_ID *ptid, DWORD *ParThreadID, DWORD *ParProcessID)
 {
 	register long res;
-	__asm__ __volatile__("int $0xF0": "=a"(res), "=b"(*ptid): "0"(0x000000));
+	__asm__ __volatile__("int $0xF0": "=a"(res), "=b"(*ptid), "=c"(*ParThreadID), "=d"(*ParProcessID): "0"(0x000000));
 	return res;
 }
 

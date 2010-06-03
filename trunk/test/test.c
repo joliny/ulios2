@@ -30,42 +30,24 @@ char *itoa(char *buf, DWORD n)
 
 int main()
 {
-	THREAD_ID FsPtid, VesaPtid;
-	long res, i, j;
-	DWORD bmp[64 * 64];
+	THREAD_ID ptid;
+	long res;
 
-	if ((res = KGetKptThed(SRV_FS_PORT, &FsPtid)) != NO_ERROR)
+	if ((res = KGetKptThed(SRV_FS_PORT, &ptid)) != NO_ERROR)
 		return res;
-	FSChDir(FsPtid, "/0/ulios");
-	if ((res = FSopen(FsPtid, "uli2k.bmp", 0)) < 0)	/*打开BMP文件*/
+	FSChDir(ptid, "/0/ulios");
+	if ((res = KGetKptThed(SRV_KBDMUS_PORT, &ptid)) != NO_ERROR)
 		return res;
-	FSseek(FsPtid, res, 54, FS_SEEK_SET);
-	for (j = 63; j >= 0; j--)
-	{
-		if (FSread(FsPtid, res, bmp + 64 * j, 64 * 3) <= 0)	/*开始读取BMP文件*/
-			return -1;
-		for (i = 63; i >= 0; i--)
-		{
-			DWORD s = 64 * j * 4 + i * 3, d = 64 * j * 4 + i * 4;
-			((BYTE*)bmp)[d + 3] = 0;
-			((BYTE*)bmp)[d + 2] = ((BYTE*)bmp)[s + 2];
-			((BYTE*)bmp)[d + 1] = ((BYTE*)bmp)[s + 1];
-			((BYTE*)bmp)[d] = ((BYTE*)bmp)[s];
-		}
-	}
-	FSclose(FsPtid, res);
-	if ((res = KGetKptThed(SRV_KBDMUS_PORT, &VesaPtid)) != NO_ERROR)
+	if ((res = KMSetRecv(ptid)) != NO_ERROR)
 		return res;
-	if ((res = KMSetRecv(VesaPtid)) != NO_ERROR)
-		return res;
-	if ((res = KGetKptThed(SRV_VESA_PORT, &VesaPtid)) != NO_ERROR)
+	if ((res = KGetKptThed(SRV_VESA_PORT, &ptid)) != NO_ERROR)
 		return res;
 	for (;;)
 	{
-		THREAD_ID ptid;
+		THREAD_ID TmpPtid;
 		DWORD data[MSG_DATA_LEN];
 
-		if ((res = KRecvMsg(&ptid, data, INVALID)) != NO_ERROR)
+		if ((res = KRecvMsg(&TmpPtid, data, INVALID)) != NO_ERROR)
 			break;
 		if (data[0] == MSG_ATTR_KBD)
 		{
@@ -73,15 +55,15 @@ int main()
 			char str[16];
 			DWORD ModeCou, i;
 
-			ModeCou = VSGetMode(VesaPtid, mode);
+			ModeCou = VSGetMode(ptid, mode);
 			itoa(str, ModeCou);
-			VSDrawStr(VesaPtid, 120, 0, str, 0xFF0000);
+			VSDrawStr(ptid, 120, 0, str, 0xFF0000);
 			for (i = 0; i < ModeCou; i++)
 			{
 				itoa(str, mode[i]);
-				VSDrawStr(VesaPtid, 0, i * 12, str, 0xFF0000);
+				VSDrawStr(ptid, 0, i * 12, str, 0xFF0000);
 			}
-			KCreateProcess(0, "pro.bin", "hello laopo heihei ", (THREAD_ID*)&ModeCou);
+			KCreateProcess(0, "pro.bin", "hello \"lao po\" heihei", (THREAD_ID*)&ModeCou);
 
 /*			if (data[1] & KBD_STATE_LSHIFT)
 				KPrintf("LSHIFT\t", 0);
@@ -130,7 +112,7 @@ int main()
 				col = 0xFF0000;
 			else
 				col = 0xFFFFFF;
-			VSPutImage(VesaPtid, data[2], data[3], bmp, 64, 64);
+			VSDrawStr(ptid, data[2], data[3], "Press Key to Run pro.bin", col);
 		}
 	}
 	return NO_ERROR;

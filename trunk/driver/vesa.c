@@ -436,7 +436,7 @@ static inline long DrawAnsi(void *vm, DWORD PixBits, DWORD width, DWORD height, 
 	long i, j;
 	const BYTE *p;
 
-	if (x <= -8 || x >= width || y <= -12 || y >= height)
+	if (x <= -6 || x >= width || y <= -12 || y >= height)
 		return VESA_ERR_LOCATION;
 	p = font + (ch & 0xFF) * 12;
 	switch (PixBits)
@@ -446,7 +446,7 @@ static inline long DrawAnsi(void *vm, DWORD PixBits, DWORD width, DWORD height, 
 		{
 			if ((DWORD)(y + j) >= height)
 				continue;
-			for (i = 7; i >= 0; i--)
+			for (i = 5; i >= 0; i--)
 			{
 				if ((DWORD)(x - i + 7) < width && ((p[j] >> i) & 1ul))
 					((WORD*)vm)[(x - i + 7) + (y + j) * width] = DW2RGB15(c);
@@ -458,7 +458,7 @@ static inline long DrawAnsi(void *vm, DWORD PixBits, DWORD width, DWORD height, 
 		{
 			if ((DWORD)(y + j) >= height)
 				continue;
-			for (i = 7; i >= 0; i--)
+			for (i = 5; i >= 0; i--)
 			{
 				if ((DWORD)(x - i + 7) < width && ((p[j] >> i) & 1ul))
 					((WORD*)vm)[(x - i + 7) + (y + j) * width] = DW2RGB16(c);
@@ -470,7 +470,7 @@ static inline long DrawAnsi(void *vm, DWORD PixBits, DWORD width, DWORD height, 
 		{
 			if ((DWORD)(y + j) >= height)
 				continue;
-			for (i = 7; i >= 0; i--)
+			for (i = 5; i >= 0; i--)
 			{
 				if ((DWORD)(x - i + 7) < width && ((p[j] >> i) & 1ul))
 					((RGB24*)vm)[(x - i + 7) + (y + j) * width] = *(RGB24*)&c;
@@ -482,7 +482,7 @@ static inline long DrawAnsi(void *vm, DWORD PixBits, DWORD width, DWORD height, 
 		{
 			if ((DWORD)(y + j) >= height)
 				continue;
-			for (i = 7; i >= 0; i--)
+			for (i = 5; i >= 0; i--)
 			{
 				if ((DWORD)(x - i + 7) < width && ((p[j] >> i) & 1ul))
 					((DWORD*)vm)[(x - i + 7) + (y + j) * width] = c;
@@ -516,11 +516,11 @@ static inline long DrawStr(void *vm, DWORD PixBits, DWORD width, DWORD height, l
 			if (hzf)	/*有未显示的ASCII*/
 			{
 				DrawAnsi(vm, PixBits, width, height, x, y, hzf, c, font + HZ_SIZE);
-				x += 8;
+				x += 6;
 				hzf = 0;
 			}
 			DrawAnsi(vm, PixBits, width, height, x, y, *str, c, font + HZ_SIZE);	/*显示当前ASCII*/
-			x += 8;
+			x += 6;
 		}
 	}
 	return NO_ERROR;
