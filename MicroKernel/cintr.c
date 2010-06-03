@@ -295,10 +295,15 @@ void ApiCall(DWORD edi, DWORD esi, DWORD ebp, DWORD esp, DWORD ebx, DWORD edx, D
 #define ECX_ID	6
 #define EAX_ID	7
 
-/*取得当前线程ID*/
+/*取得线程ID*/
 void ApiGetPtid(DWORD *argv)
 {
-	argv[EBX_ID] = *(DWORD*)(&CurPmd->CurTmd->id);
+	THREAD_DESC *CurThed;
+
+	CurThed = CurPmd->CurTmd;
+	argv[EBX_ID] = *(DWORD*)(&CurThed->id);
+	argv[ECX_ID] = CurThed->par;
+	argv[EDX_ID] = CurPmd->par;
 	argv[EAX_ID] = NO_ERROR;
 }
 

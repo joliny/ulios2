@@ -82,7 +82,7 @@ void ApiCall(DWORD edi, DWORD esi, DWORD ebp, DWORD esp, DWORD ebx, DWORD edx, D
 
 /*以下为API接口函数*/
 
-/*取得当前线程ID*/
+/*取得线程ID*/
 void ApiGetPtid(DWORD *argv);
 
 /*主动放弃处理机*/
