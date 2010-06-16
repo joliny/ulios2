@@ -109,6 +109,23 @@ static inline void memcpy32(void *dest, const void *src, DWORD n)
 	__asm__ __volatile__("cld;rep movsl": "=&D"(_dest), "=&S"(_src), "=&c"(_n): "0"(dest), "1"(src), "2"(n): "flags", "memory");
 }
 
+/*×Ö·û´®³¤¶È*/
+static inline DWORD strlen(const char *str)
+{
+	DWORD d0;
+	register DWORD _res;
+	__asm__ __volatile__
+	(
+		"cld\n"
+		"repne\n"
+		"scasb\n"
+		"notl %0\n"
+		"decl %0"
+		: "=c"(_res), "=&D"(d0): "1"(str), "a"(0), "0"(0xFFFFFFFFU): "flags"
+	);
+	return _res;
+}
+
 /*×Ö·û´®¸´ÖÆ*/
 static inline char *strcpy(char *dest, const char *src)
 {

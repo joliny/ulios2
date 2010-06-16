@@ -6,7 +6,7 @@
 ######################
 
 # Entry point of ulios basesrv
-ENTRYPOINT	= 0x08048000
+ENTRYPOINT	= 0x08000000
 
 # Programs, flags, etc.
 ASM		= nasm
@@ -21,7 +21,7 @@ DASMFLAGS	= -u -o $(ENTRYPOINT) -e $(ENTRYOFFSET)
 
 # This Program
 HEADS		= ../MkApi/ulimkapi.h basesrv.h
-OBJS		= ../objs/athd.o ../objs/time.o ../objs/kbdmus.o ../objs/vesa.o
+OBJS		= ../objs/athd.o ../objs/time.o ../objs/kbdmus.o ../objs/vesa.o ../objs/gdi.o ../objs/cui.o ../objs/rep.o
 HEADOBJ		= ../objs/apphead.o
 
 # All Phony Targets
@@ -29,24 +29,30 @@ HEADOBJ		= ../objs/apphead.o
 
 # Default starting position
 
-all : ../out/ULIOS/athd.bin ../out/ULIOS/time.bin ../out/ULIOS/kbdmus.bin ../out/ULIOS/vesa.bin
+all : ../out/ulios/athd.bin ../out/ulios/time.bin ../out/ulios/kbdmus.bin ../out/ulios/vesa.bin ../out/ulios/cui.bin ../out/ulios/rep.bin
 
 redo : clean all
 
 clean :
 	rm -f $(OBJS) $(HEADOBJ) $(BINS)
 
-../out/ULIOS/athd.bin : ../objs/athd.o $(HEADOBJ) $(LDFILE)
+../out/ulios/athd.bin : ../objs/athd.o $(HEADOBJ) $(LDFILE)
 	$(LD) $(LDFLAGS) -o $@ $(HEADOBJ) ../objs/athd.o
 
-../out/ULIOS/time.bin : ../objs/time.o $(HEADOBJ) $(LDFILE)
+../out/ulios/time.bin : ../objs/time.o $(HEADOBJ) $(LDFILE)
 	$(LD) $(LDFLAGS) -o $@ $(HEADOBJ) ../objs/time.o
 
-../out/ULIOS/kbdmus.bin : ../objs/kbdmus.o $(HEADOBJ) $(LDFILE)
+../out/ulios/kbdmus.bin : ../objs/kbdmus.o $(HEADOBJ) $(LDFILE)
 	$(LD) $(LDFLAGS) -o $@ $(HEADOBJ) ../objs/kbdmus.o
 
-../out/ULIOS/vesa.bin : ../objs/vesa.o $(HEADOBJ) $(LDFILE)
+../out/ulios/vesa.bin : ../objs/vesa.o $(HEADOBJ) $(LDFILE)
 	$(LD) $(LDFLAGS) -o $@ $(HEADOBJ) ../objs/vesa.o
+
+../out/ulios/cui.bin : ../objs/gdi.o ../objs/cui.o $(HEADOBJ) $(LDFILE)
+	$(LD) $(LDFLAGS) -o $@ $(HEADOBJ) ../objs/gdi.o ../objs/cui.o
+
+../out/ulios/rep.bin : ../objs/rep.o $(HEADOBJ) $(LDFILE)
+	$(LD) $(LDFLAGS) -o $@ $(HEADOBJ) ../objs/rep.o
 
 ../objs/apphead.o : ../MkApi/apphead.c
 	$(CC) $(CFLAGS) -o $@ $<
@@ -61,4 +67,13 @@ clean :
 	$(CC) $(CFLAGS) -o $@ $<
 
 ../objs/vesa.o : vesa.c $(HEADS)
+	$(CC) $(CFLAGS) -o $@ $<
+
+../objs/gdi.o : gdi.c $(HEADS)
+	$(CC) $(CFLAGS) -o $@ $<
+
+../objs/cui.o : cui.c $(HEADS)
+	$(CC) $(CFLAGS) -o $@ $<
+
+../objs/rep.o : rep.c $(HEADS)
 	$(CC) $(CFLAGS) -o $@ $<

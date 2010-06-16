@@ -4,18 +4,19 @@
 	最后修改日期：2010-05-14
 */
 
-#include "../MkApi/ulimkapi.h"
 #include "../driver/basesrv.h"
 
 int main(int argc, char *argv[])
 {
-	THREAD_ID VesaPtid;
+	THREAD_ID ptid;
 	long res;
 
 	KSleep(300);
-	if ((res = KGetKptThed(SRV_VESA_PORT, &VesaPtid)) != NO_ERROR)
+	if ((res = KGetKptThed(SRV_CUI_PORT, &ptid)) != NO_ERROR)
 		return res;
-	for (res = 1; res < argc; res++)
-		VSDrawStr(VesaPtid, 200, res * 20, argv[res], 0xFFFF00);
+	CUISetCur(ptid, 10, 24);
+	CUIPutS(ptid, "This is a args test pro!");
+	for (res = 0; res < 10; res++)
+		CUIPutS(ptid, "老婆，CUI搞定啦 哈哈\n");
 	return NO_ERROR;
 }

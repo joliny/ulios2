@@ -9,12 +9,14 @@
 
 #include "../MkApi/ulimkapi.h"
 
-#define SRV_OUT_TIME	100	/*服务调用超时厘秒数INVALID:无限等待*/
+#define SRV_OUT_TIME	6000	/*服务调用超时厘秒数INVALID:无限等待*/
+
+/**********进程异常报告**********/
+#define SRV_REP_PORT	1	/*进程异常报告服务端口*/
 
 /**********AT硬盘相关**********/
 #define SRV_ATHD_PORT	2	/*AT硬盘驱动服务端口*/
 #define ATHD_BPS		512	/*磁盘每扇区字节数*/
-#define ATHD_OUT_TIME	6000	/*超时厘秒数INVALID:无限等待*/
 
 #define ATHD_API_READSECTOR		0	/*读硬盘扇区功能号*/
 #define ATHD_API_WRITESECTOR	1	/*写硬盘扇区功能号*/
@@ -29,7 +31,7 @@ static inline long HDReadSector(THREAD_ID ptid, DWORD drv, DWORD sec, BYTE cou, 
 	data[0] = ATHD_API_READSECTOR;
 	data[1] = drv;
 	data[2] = sec;
-	if ((data[0] = KReadProcAddr(buf, ATHD_BPS * cou, ptid, data, ATHD_OUT_TIME)) != NO_ERROR)
+	if ((data[0] = KReadProcAddr(buf, ATHD_BPS * cou, ptid, data, SRV_OUT_TIME)) != NO_ERROR)
 		return data[0];
 	return data[2];
 }
@@ -41,7 +43,7 @@ static inline long HDWriteSector(THREAD_ID ptid, DWORD drv, DWORD sec, BYTE cou,
 	data[0] = ATHD_API_WRITESECTOR;
 	data[1] = drv;
 	data[2] = sec;
-	if ((data[0] = KWriteProcAddr(buf, ATHD_BPS * cou, ptid, data, ATHD_OUT_TIME)) != NO_ERROR)
+	if ((data[0] = KWriteProcAddr(buf, ATHD_BPS * cou, ptid, data, SRV_OUT_TIME)) != NO_ERROR)
 		return data[0];
 	return data[2];
 }
@@ -169,39 +171,53 @@ static inline long KMSetRecv(THREAD_ID ptid)
 	return KSendMsg(ptid, data, 0);
 }
 
-/**********VESA显卡驱动服务相关**********/
+/**********VESA显卡驱动服务和GDI库相关**********/
 #define SRV_VESA_PORT	5	/*VESA显卡服务端口*/
 #define VESA_MAX_MODE	512	/*显示模式列表最大数量*/
 
-#define VESA_API_GETINFO	0	/*取得显示信息功能号*/
-#define VESA_API_GETMODE	1	/*取得模式列表功能号*/
-#define VESA_API_PUTPIXEL	2	/*画点功能号*/
-#define VESA_API_GETPIXEL	3	/*取点功能号*/
-#define VESA_API_PUTIMAGE	4	/*贴图功能号*/
-#define VESA_API_GETIMAGE	5	/*截图功能号*/
-#define VESA_API_FILLRECT	6	/*填充矩形功能号*/
-#define VESA_API_DRAWLINE	7	/*画线功能号*/
-#define VESA_API_CIRCLE		8	/*画圆功能号*/
-#define VESA_API_DRAWSTR	9	/*输出字符串功能号*/
+#define VESA_API_GETVMEM	0	/*取得显存映射功能号*/
+#define VESA_API_GETFONT	1	/*取得字体映射功能号*/
+#define VESA_API_GETMODE	2	/*取得模式列表功能号*/
 
 #define VESA_ERR_LOCATION	-1280	/*坐标错误*/
 #define VESA_ERR_SIZE		-1281	/*尺寸错误*/
 #define VESA_ERR_ARGS		-1282	/*参数错误*/
 
-/*取得显示信息*/
-static inline long VSGetInfo(THREAD_ID ptid, DWORD info[4])
+/*取得显存映射*/
+static inline long VSGetVmem(THREAD_ID ptid, void **vm, DWORD *width, DWORD *height, DWORD *PixBits)
 {
 	DWORD data[MSG_DATA_LEN];
 	data[0] = MSG_ATTR_USER;
-	data[3] = VESA_API_GETINFO;
+	data[3] = VESA_API_GETVMEM;
 	if ((data[0] = KSendMsg(ptid, data, SRV_OUT_TIME)) != NO_ERROR)
 		return data[0];
-	memcpy32(info, &data[1], 4);
+	if (data[3] != NO_ERROR)
+		return data[3];
+	*vm = (void*)data[2];
+	*width = data[4];
+	*height = data[5];
+	*PixBits = data[6];
+	return NO_ERROR;
+}
+
+/*取得字体映射*/
+static inline long VSGetFont(THREAD_ID ptid, const BYTE **font, DWORD *CharWidth, DWORD *CharHeight)
+{
+	DWORD data[MSG_DATA_LEN];
+	data[0] = MSG_ATTR_USER;
+	data[3] = VESA_API_GETFONT;
+	if ((data[0] = KSendMsg(ptid, data, SRV_OUT_TIME)) != NO_ERROR)
+		return data[0];
+	if (data[3] != NO_ERROR)
+		return data[3];
+	*font = (const BYTE*)data[2];
+	*CharWidth = data[4];
+	*CharHeight = data[5];
 	return NO_ERROR;
 }
 
 /*取得模式列表*/
-static inline long VSGetMode(THREAD_ID ptid, WORD mode[VESA_MAX_MODE])
+static inline long VSGetMode(THREAD_ID ptid, WORD mode[VESA_MAX_MODE], DWORD *ModeCou, DWORD *CurMode)
 {
 	DWORD data[MSG_DATA_LEN];
 	data[0] = VESA_API_GETMODE;
@@ -209,115 +225,138 @@ static inline long VSGetMode(THREAD_ID ptid, WORD mode[VESA_MAX_MODE])
 		return data[0];
 	if (data[2] != NO_ERROR)
 		return data[2];
-	return data[3];
+	*ModeCou = data[3];
+	*CurMode = data[5];
+	return NO_ERROR;
 }
+
+extern DWORD GDIwidth;
+extern DWORD GDIheight;
+extern DWORD GDIPixBits;
+extern DWORD GDICharWidth;
+extern DWORD GDICharHeight;
+extern THREAD_ID GDIVesaPtid;
+
+/*初始化GDI库*/
+long GDIinit();
+
+/*撤销GDI库*/
+void GDIrelease();
 
 /*画点*/
-static inline long VSPutPixel(THREAD_ID ptid, long x, long y, long c)
-{
-	DWORD data[MSG_DATA_LEN];
-	data[0] = MSG_ATTR_USER;
-	data[1] = x;
-	data[2] = y;
-	data[3] = VESA_API_PUTPIXEL;
-	data[4] = c;
-	return KSendMsg(ptid, data, 0);
-}
+long GDIPutPixel(DWORD x, DWORD y, DWORD c);
 
 /*取点*/
-static inline long VSGetPixel(THREAD_ID ptid, long x, long y)
-{
-	DWORD data[MSG_DATA_LEN];
-	data[0] = MSG_ATTR_USER;
-	data[1] = x;
-	data[2] = y;
-	data[3] = VESA_API_GETPIXEL;
-	if ((data[0] = KSendMsg(ptid, data, SRV_OUT_TIME)) != NO_ERROR)
-		return data[0];
-	if (data[1] != NO_ERROR)
-		return data[1];
-	return data[2];
-}
+long GDIGetPixel(DWORD x, DWORD y, DWORD *c);
 
 /*贴图*/
-static inline long VSPutImage(THREAD_ID ptid, long x, long y, DWORD *img, long w, long h)
-{
-	DWORD data[MSG_DATA_LEN];
-	data[0] = VESA_API_PUTIMAGE;
-	data[1] = x;
-	data[2] = y;
-	data[3] = w;
-	data[4] = h;
-	if ((data[0] = KWriteProcAddr(img, w * h * sizeof(DWORD), ptid, data, SRV_OUT_TIME)) != NO_ERROR)
-		return data[0];
-	return data[2];
-}
+long GDIPutImage(long x, long y, DWORD *img, long w, long h);
 
 /*截图*/
-static inline long VSGetImage(THREAD_ID ptid, long x, long y, DWORD *img, long w, long h)
-{
-	DWORD data[MSG_DATA_LEN];
-	data[0] = VESA_API_GETIMAGE;
-	data[1] = x;
-	data[2] = y;
-	data[3] = w;
-	data[4] = h;
-	if ((data[0] = KReadProcAddr(img, w * h * sizeof(DWORD), ptid, data, SRV_OUT_TIME)) != NO_ERROR)
-		return data[0];
-	return data[2];
-}
+long GDIGetImage(long x, long y, DWORD *img, long w, long h);
 
 /*填充矩形*/
-static inline long VSFillRect(THREAD_ID ptid, long x, long y, long w, long h, DWORD c)
+long GDIFillRect(long x, long y, long w, long h, DWORD c);
+
+/*向上滚屏*/
+long GDIMoveUp(DWORD pix);
+
+/*Bresenham改进算法画线*/
+long GDIDrawLine(long x1, long y1, long x2, long y2, DWORD c);
+
+/*Bresenham算法画圆*/
+long GDIcircle(long cx, long cy, long r, DWORD c);
+
+/*显示汉字*/
+long GDIDrawHz(long x, long y, DWORD hz, DWORD c);
+
+/*显示ASCII字符*/
+long GDIDrawAscii(long x, long y, DWORD ch, DWORD c);
+
+/*输出字符串*/
+long GDIDrawStr(long x, long y, const char *str, DWORD c);
+
+/**********CUI字符界面服务相关**********/
+#define SRV_CUI_PORT	6	/*CUI字符界面服务端口*/
+
+#define CUI_ERR_ARGS	-1536	/*参数错误*/
+
+#define CUI_API_GETCH	0	/*取得键码功能号*/
+#define CUI_API_PUTCH	1	/*注入键码功能号*/
+#define CUI_API_SETCOL	2	/*设置字符界面颜色功能号*/
+#define CUI_API_SETCUR	3	/*设置光标位置功能号*/
+#define CUI_API_CLRSCR	4	/*清屏功能号*/
+#define CUI_API_PUTC	5	/*输出字符功能号*/
+#define CUI_API_PUTS	6	/*输出字符串功能号*/
+
+/*取得键码*/
+static inline long CUIGetCh(THREAD_ID ptid)
 {
 	DWORD data[MSG_DATA_LEN];
 	data[0] = MSG_ATTR_USER;
-	data[1] = x;
-	data[2] = y;
-	data[3] = VESA_API_FILLRECT;
-	data[4] = w;
-	data[5] = h;
-	data[6] = c;
+	data[3] = CUI_API_GETCH;
+	if ((data[0] = KSendMsg(ptid, data, SRV_OUT_TIME)) != NO_ERROR)
+		return data[0];
+	return data[1];
+}
+
+/*注入键码*/
+static inline long CUIPutCh(THREAD_ID ptid, DWORD c)
+{
+	DWORD data[MSG_DATA_LEN];
+	data[0] = MSG_ATTR_USER;
+	data[1] = c;
+	data[3] = CUI_API_PUTCH;
 	return KSendMsg(ptid, data, 0);
 }
 
-/*画线*/
-static inline long VSDrawLine(THREAD_ID ptid, long x1, long y1, long x2, long y2, DWORD c)
+/*设置字符界面颜色*/
+static inline long CUISetCol(THREAD_ID ptid, DWORD CharColor, DWORD BgColor)
 {
 	DWORD data[MSG_DATA_LEN];
 	data[0] = MSG_ATTR_USER;
-	data[1] = x1;
-	data[2] = y1;
-	data[3] = VESA_API_DRAWLINE;
-	data[4] = x2;
-	data[5] = y2;
-	data[6] = c;
+	data[1] = CharColor;
+	data[2] = BgColor;
+	data[3] = CUI_API_SETCOL;
 	return KSendMsg(ptid, data, 0);
 }
 
-/*画圆*/
-static inline long VSCircle(THREAD_ID ptid, long cx, long cy, long r, long c)
+/*设置光标位置*/
+static inline long CUISetCur(THREAD_ID ptid, DWORD CursX, DWORD CursY)
 {
 	DWORD data[MSG_DATA_LEN];
 	data[0] = MSG_ATTR_USER;
-	data[1] = cx;
-	data[2] = cy;
-	data[3] = VESA_API_CIRCLE;
-	data[4] = r;
-	data[5] = c;
+	data[1] = CursX;
+	data[2] = CursY;
+	data[3] = CUI_API_SETCUR;
+	return KSendMsg(ptid, data, 0);
+}
+
+/*清屏*/
+static inline long CUIClrScr(THREAD_ID ptid)
+{
+	DWORD data[MSG_DATA_LEN];
+	data[0] = MSG_ATTR_USER;
+	data[3] = CUI_API_CLRSCR;
+	return KSendMsg(ptid, data, 0);
+}
+
+/*输出字符*/
+static inline long CUIPutC(THREAD_ID ptid, char c)
+{
+	DWORD data[MSG_DATA_LEN];
+	data[0] = MSG_ATTR_USER;
+	data[1] = c;
+	data[3] = CUI_API_PUTC;
 	return KSendMsg(ptid, data, 0);
 }
 
 /*输出字符串*/
-static inline long VSDrawStr(THREAD_ID ptid, long x, long y, const char *str, DWORD c)
+static inline long CUIPutS(THREAD_ID ptid, const char *str)
 {
 	DWORD data[MSG_DATA_LEN];
-	char buf[1024];
-	data[0] = VESA_API_DRAWSTR;
-	data[1] = x;
-	data[2] = y;
-	data[3] = c;
-	if ((data[0] = KWriteProcAddr(buf, strcpy(buf, str) + 1 - buf, ptid, data, SRV_OUT_TIME)) != NO_ERROR)
+	data[0] = CUI_API_PUTS;
+	if ((data[0] = KWriteProcAddr((void*)str, strlen(str) + 1, ptid, data, SRV_OUT_TIME)) != NO_ERROR)
 		return data[0];
 	return data[2];
 }

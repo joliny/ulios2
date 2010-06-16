@@ -19,12 +19,13 @@ SECTIONS
 	.bss : {*(.bss)}
 
 	_BaseSrv =	0x90080;
-	_VesaMode =	0x900FC;
-	_VbeInfo =	0x90100;
-	_ModeInfo =	0x90300;
-	_HdInfo =	0x90400;
-	_MemEnd =	0x90420;
-	_ards =		0x90424;
+	_MemEnd =	0x900FC;
+	_ards =		0x90100;
+	_SysDir =	0x90280;
+	_VesaMode =	0x902FC;
+	_VbeInfo =	0x90300;
+	_ModeInfo =	0x90500;
+	_HdInfo =	0x90600;
 
 	_gramem =	0x000A0000;
 	_txtmem =	0x000B8000;

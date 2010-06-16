@@ -5,7 +5,7 @@
 ;备注：使用NASM编译器编译成BIN文件
 
 [BITS 16]
-[ORG 0x0B00]
+[ORG 0x1A00]
 ;内核表地址大小
 GDTsize		equ	0x0800	;GDT字节数
 GDTseg		equ	0	;GDT段
@@ -18,12 +18,12 @@ KPDTseg		equ	0	;页目录表段
 KPDToff		equ	0x1000	;页目录表偏移
 KNLoff		equ	0x10000	;内核起始地址偏移
 ;启动数据位置
-VesaMode	equ	0x00FC	;4字节启动VESA模式号
-VbeInfo		equ	0x0100	;512字节VESA信息
-ModeInfo	equ	0x0300	;256字节模式信息
-HdInfo		equ	0x0400	;32字节两个硬盘参数
-MemEnd		equ	0x0420	;4字节内存上限
-ARDStruct	equ	0x0424	;20 * N字节内存结构体
+MemEnd		equ	0x00FC	;4字节内存上限
+ARDStruct	equ	0x0100	;20 * 19字节内存结构体
+VesaMode	equ	0x02FC	;4字节启动VESA模式号
+VbeInfo		equ	0x0300	;512字节VESA信息
+ModeInfo	equ	0x0500	;256字节模式信息
+HdInfo		equ	0x0600	;32字节两个硬盘参数
 
 setup:
 	mov	ax,	cs

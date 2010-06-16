@@ -43,6 +43,8 @@ BYTE KeyMapEx[] = {0,	/*美国英语键盘扩展键码表*/
 	0,   0,   0,   0,   0,   0,   0,   0,   0,   0						/*(84-93)F11--APPS*/
 };
 
+#define VS_MODE_ADDR	0x90500	/*显卡模式信息物理地址*/
+
 int main()
 {
 	DWORD code;	/*端口取码*/
@@ -105,7 +107,7 @@ int main()
 		return res;
 	if ((res = KRegIrq(MUS_IRQ)) != NO_ERROR)	/*注册鼠标中断请求号*/
 		return res;
-	if ((res = KMapPhyAddr(&addr, 0x90300, 0x100)) != NO_ERROR)	/*从显卡启动数据里获得屏幕像素数*/
+	if ((res = KMapPhyAddr(&addr, VS_MODE_ADDR, 0x100)) != NO_ERROR)	/*从显卡启动数据里获得屏幕像素数*/
 		return res;
 	MusMaxX = *((WORD*)(addr + 18)) - 1;
 	MusMaxY = *((WORD*)(addr + 20)) - 1;

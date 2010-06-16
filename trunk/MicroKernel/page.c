@@ -238,7 +238,7 @@ long FillPage(EXEC_DESC *exec, void *addr, DWORD ErrCode)
 					return data[0];
 				if (data[2] != NO_ERROR)
 					return data[2];
-				*CurPg0 = *CurPg = PgAddr;	/*读取页时页被设为可写,恢复页属性*/
+				*CurPg0 = PgAddr;
 			}
 			if (exec->DataOff < exec->DataEnd && exec->DataOff < end && exec->DataEnd > fst)	/*数据段与缺页覆盖区有重合*/
 			{
@@ -254,7 +254,7 @@ long FillPage(EXEC_DESC *exec, void *addr, DWORD ErrCode)
 					return data[0];
 				if (data[2] != NO_ERROR)
 					return data[2];
-				*CurPg0 = *CurPg = PgAddr;	/*读取页时页被设为可写,恢复页属性*/
+				*CurPg0 = PgAddr;
 			}
 		}
 	}
@@ -833,11 +833,11 @@ skip:		continue;
 							res = ERROR_HAVENO_PMEM;
 							goto skip2;
 						}
-						pt[(DWORD)FstPg2 >> 12] |= PAGE_ATTR_P | PAGE_ATTR_U | PtAddr;	/*开启用户权限*/
+						pt[(DWORD)FstPg2 >> 12] |= PAGE_ATTR_P | PAGE_ATTR_W | PAGE_ATTR_U | PtAddr;	/*开启用户写权限*/
 						memset32((void*)((DWORD)FstPg2 & 0xFFFFF000), 0, 0x400);	/*清空页表*/
 					}
-					pt[(DWORD)FstPg2 >> 12] |= PAGE_ATTR_W;	/*开启写权限*/
-					*FstPg2 |= (PgAddr & (~PAGE_ATTR_AVL)) | PAGE_ATTR_W;
+					if (!(*FstPg2 & PAGE_ATTR_P))	/*目的页不存在*/
+						*FstPg2 |= PAGE_ATTR_P | PAGE_ATTR_W | PAGE_ATTR_U | (PgAddr & 0xFFFFF000);	/*开启用户写权限*/
 				}
 			} while (((DWORD)(++FstPg2, ++FstPg) & 0xFFF) && FstPg < EndPg);
 		}

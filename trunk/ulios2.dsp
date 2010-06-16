@@ -136,11 +136,23 @@ SOURCE=.\driver\basesrv.h
 # End Source File
 # Begin Source File
 
+SOURCE=.\driver\cui.c
+# End Source File
+# Begin Source File
+
+SOURCE=.\driver\gdi.c
+# End Source File
+# Begin Source File
+
 SOURCE=.\driver\kbdmus.c
 # End Source File
 # Begin Source File
 
 SOURCE=.\driver\Makefile
+# End Source File
+# Begin Source File
+
+SOURCE=.\driver\rep.c
 # End Source File
 # Begin Source File
 
@@ -189,6 +201,14 @@ SOURCE=.\fs\malloc.c
 # Begin Source File
 
 SOURCE=.\fs\ulifs.c
+# End Source File
+# End Group
+# Begin Group "gui"
+
+# PROP Default_Filter ""
+# Begin Source File
+
+SOURCE=.\gui\malloc.c
 # End Source File
 # End Group
 # Begin Group "MicroKernel"
@@ -326,6 +346,14 @@ SOURCE=.\tools\ulifsfmt.c
 # Begin Group "test"
 
 # PROP Default_Filter ""
+# Begin Source File
+
+SOURCE=.\test\cmd.c
+# End Source File
+# Begin Source File
+
+SOURCE=.\test\loader.c
+# End Source File
 # Begin Source File
 
 SOURCE=.\test\Makefile

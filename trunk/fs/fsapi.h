@@ -137,7 +137,7 @@ static inline long FScreat(THREAD_ID ptid, const char *path)
 	DWORD data[MSG_DATA_LEN];
 	char buf[MAX_PATH];
 	data[0] = FS_API_CREAT;
-	if ((data[0] = KWriteProcAddr(buf, strcpy(buf, path) + 1 - buf, ptid, data, INVALID)) != NO_ERROR)
+	if ((data[0] = KWriteProcAddr(buf, strcpy(buf, path) - buf, ptid, data, INVALID)) != NO_ERROR)
 		return data[0];
 	if (data[2] != NO_ERROR)
 		return data[2];
@@ -151,7 +151,7 @@ static inline long FSopen(THREAD_ID ptid, const char *path, DWORD op)
 	char buf[MAX_PATH];
 	data[0] = FS_API_OPEN;
 	data[1] = op;
-	if ((data[0] = KWriteProcAddr(buf, strcpy(buf, path) + 1 - buf, ptid, data, INVALID)) != NO_ERROR)
+	if ((data[0] = KWriteProcAddr(buf, strcpy(buf, path) - buf, ptid, data, INVALID)) != NO_ERROR)
 		return data[0];
 	if (data[2] != NO_ERROR)
 		return data[2];
@@ -229,7 +229,7 @@ static inline long FSOpenDir(THREAD_ID ptid, const char *path)
 	DWORD data[MSG_DATA_LEN];
 	char buf[MAX_PATH];
 	data[0] = FS_API_OPENDIR;
-	if ((data[0] = KWriteProcAddr(buf, strcpy(buf, path) + 1 - buf, ptid, data, INVALID)) != NO_ERROR)
+	if ((data[0] = KWriteProcAddr(buf, strcpy(buf, path) - buf, ptid, data, INVALID)) != NO_ERROR)
 		return data[0];
 	if (data[2] != NO_ERROR)
 		return data[2];
@@ -253,7 +253,7 @@ static inline long FSChDir(THREAD_ID ptid, const char *path)
 	DWORD data[MSG_DATA_LEN];
 	char buf[MAX_PATH];
 	data[0] = FS_API_CHDIR;
-	if ((data[0] = KWriteProcAddr(buf, strcpy(buf, path) + 1 - buf, ptid, data, INVALID)) != NO_ERROR)
+	if ((data[0] = KWriteProcAddr(buf, strcpy(buf, path) - buf, ptid, data, INVALID)) != NO_ERROR)
 		return data[0];
 	return data[2];
 }
@@ -264,7 +264,7 @@ static inline long FSMkDir(THREAD_ID ptid, const char *path)
 	DWORD data[MSG_DATA_LEN];
 	char buf[MAX_PATH];
 	data[0] = FS_API_MKDIR;
-	if ((data[0] = KWriteProcAddr(buf, strcpy(buf, path) + 1 - buf, ptid, data, INVALID)) != NO_ERROR)
+	if ((data[0] = KWriteProcAddr(buf, strcpy(buf, path) - buf, ptid, data, INVALID)) != NO_ERROR)
 		return data[0];
 	return data[2];
 }
@@ -275,7 +275,7 @@ static inline long FSremove(THREAD_ID ptid, const char *path)
 	DWORD data[MSG_DATA_LEN];
 	char buf[MAX_PATH];
 	data[0] = FS_API_REMOVE;
-	if ((data[0] = KWriteProcAddr(buf, strcpy(buf, path) + 1 - buf, ptid, data, INVALID)) != NO_ERROR)
+	if ((data[0] = KWriteProcAddr(buf, strcpy(buf, path) - buf, ptid, data, INVALID)) != NO_ERROR)
 		return data[0];
 	return data[2];
 }
@@ -286,7 +286,7 @@ static inline long FSrename(THREAD_ID ptid, const char *path, const char *name)
 	DWORD data[MSG_DATA_LEN];
 	char buf[MAX_PATH * 2];
 	data[0] = FS_API_RENAME;
-	if ((data[0] = KWriteProcAddr(buf, strcpy(strcpy(buf, path) + 1, name) + 1 - buf, ptid, data, INVALID)) != NO_ERROR)
+	if ((data[0] = KWriteProcAddr(buf, strcpy(strcpy(buf, path), name) - buf, ptid, data, INVALID)) != NO_ERROR)
 		return data[0];
 	return data[2];
 }
@@ -297,7 +297,7 @@ static inline long FSGetAttr(THREAD_ID ptid, const char *path, FILE_INFO *fi)
 	DWORD data[MSG_DATA_LEN];
 	char buf[MAX_PATH];
 	data[0] = FS_API_GETATTR;
-	if ((data[0] = KReadProcAddr(buf, strcpy(buf, path) + 1 - buf, ptid, data, INVALID)) != NO_ERROR)
+	if ((data[0] = KReadProcAddr(buf, strcpy(buf, path) - buf, ptid, data, INVALID)) != NO_ERROR)
 		return data[0];
 	if (data[2] != NO_ERROR)
 		return data[2];
@@ -312,7 +312,7 @@ static inline long FSSetAttr(THREAD_ID ptid, const char *path, DWORD attr)
 	char buf[MAX_PATH];
 	data[0] = FS_API_SETATTR;
 	data[1] = attr;
-	if ((data[0] = KWriteProcAddr(buf, strcpy(buf, path) + 1 - buf, ptid, data, INVALID)) != NO_ERROR)
+	if ((data[0] = KWriteProcAddr(buf, strcpy(buf, path) - buf, ptid, data, INVALID)) != NO_ERROR)
 		return data[0];
 	return data[2];
 }
@@ -325,7 +325,7 @@ static inline long FSSetTime(THREAD_ID ptid, const char *path, DWORD time, DWORD
 	data[0] = FS_API_SETTIME;
 	data[1] = time;
 	data[2] = cma;
-	if ((data[0] = KWriteProcAddr(buf, strcpy(buf, path) + 1 - buf, ptid, data, INVALID)) != NO_ERROR)
+	if ((data[0] = KWriteProcAddr(buf, strcpy(buf, path) - buf, ptid, data, INVALID)) != NO_ERROR)
 		return data[0];
 	return data[2];
 }

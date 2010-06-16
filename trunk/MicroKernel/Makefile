@@ -20,7 +20,7 @@ LDFLAGS		= -T $(LDFILE) -Map ../objs/knlmap.txt
 DASMFLAGS	= -u -o $(ENTRYPOINT) -e $(ENTRYOFFSET)
 
 # This Program
-KERNELBIN	= ../out/ULIOS/uliknl.bin
+KERNELBIN	= ../out/ulios/uliknl.bin
 HEADS		= bootdata.h cintr.h error.h exec.h ipc.h kalloc.h knldef.h page.h task.h ulidef.h x86cpu.h
 OBJS		= ../objs/head.o ../objs/intr.o ../objs/cintr.o ../objs/exec.o ../objs/global.o ../objs/ipc.o ../objs/kalloc.o ../objs/page.o ../objs/task.o ../objs/ulios.o
 

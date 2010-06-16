@@ -6,7 +6,7 @@
 
 ;常数及变量地址
 BaseOfLoader	equ	0x9000	;loader段地址
-OffsetOfLoader	equ	0x0100	;loader段内偏移
+OffsetOfLoader	equ	0x1000	;loader段内偏移
 DRV_num		equ	0x0000	;1字节驱动器号
 DRV_count	equ	0x0001	;1字节驱动器数
 OffsetOfBPB	equ	0x0003	;BPB数据
