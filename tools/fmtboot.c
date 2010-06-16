@@ -224,6 +224,7 @@ int Fat32Setup(PART_INF *part)
 	printf("Reading... f32ldr\n");
 	if ((f = fopen("F32LDR", "rb")) == NULL)
 		return ERROR_FILE;
+	fseek(f, 0xF00, SEEK_SET);
 	fread(buf, 0xA00, 1, f);
 	fclose(f);
 	printf("Reading... setup\n");
@@ -270,6 +271,7 @@ int UlifsSetup(PART_INF *part)
 	printf("Reading... ulildr\n");
 	if ((f = fopen("ULILDR", "rb")) == NULL)
 		return ERROR_FILE;
+	fseek(f, 0xF00, SEEK_SET);
 	fread(buf, 0xA00, 1, f);
 	fclose(f);
 	printf("Reading... setup\n");

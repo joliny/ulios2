@@ -59,9 +59,10 @@ typedef struct _DIR
 #define BUF_COU		0x4000							/*数据缓存上限*/
 #define IDX_COU		(BUF_COU / sizeof(BLKID))		/*索引缓存上限*/
 
-#define SETUP		((void (*)())0x0B00)			/*Setup程序位置*/
+#define SETUP		((void (*)())0x1A00)			/*Setup程序位置*/
 #define BIN_ADDR	((DWORD *)0x0080)				/*Bin程序段数据数组*/
-#define VESA_MODE	((WORD *)0x00FC)				/*启动VESA模式号*/
+#define SYS_DIR		((BYTE *)0x0280)				/*系统目录字符串*/
+#define VESA_MODE	((WORD *)0x02FC)				/*启动VESA模式号*/
 
 #define NO_ERROR	0
 #define NOT_FOUND	1
@@ -70,6 +71,11 @@ void memcpy(BYTE *dst, BYTE *src, WORD size)
 {
 	while (size--)
 		*dst++ = *src++;
+}
+
+void strcpy(BYTE *dst, BYTE *src)
+{
+	while ((*dst++ = *src++) != '\0');
 }
 
 WORD strcmp(BYTE *str1, BYTE *str2)
@@ -347,6 +353,10 @@ void main(BPB *bpb)
 			*BinAddr++ = addr;
 			*BinAddr++ = end - addr;
 			addr = end;
+			break;
+		case 'S':	/*SysDir*/
+		case 's':
+			strcpy(SYS_DIR, cmd);
 			break;
 		case 'V':	/*VesaMode*/
 		case 'v':

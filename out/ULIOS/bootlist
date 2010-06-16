@@ -4,5 +4,8 @@ Fulios/time.bin
 Fulios/fs.bin
 Fulios/kbdmus.bin
 Fulios/vesa.bin
-Fulios/test.bin
-V276
+Fulios/cui.bin
+Fulios/rep.bin
+Fulios/loader.bin
+S/0/ulios
+V277

@@ -616,13 +616,13 @@ long GetExec(PROCRES_DESC *pres, PROCRES_DESC *par, DWORD fi, DWORD *exec)
 		(ehdr.e_machine != EM_386 && ehdr.e_machine != EM_486) ||
 		ehdr.e_version != EV_CURRENT)	/*ELF格式检查*/
 	{
-		pres->CodeOff = 0x8048000;	/*非ELF格式的按BIN处理*/
-		pres->CodeEnd = 0x8048000 + (DWORD)CurFile->file.size;
+		pres->CodeOff = EXEC_DFTENTRY;	/*非ELF格式的按BIN处理*/
+		pres->CodeEnd = EXEC_DFTENTRY + (DWORD)CurFile->file.size;
 		pres->CodeSeek = 0;
 		pres->DataOff = 0;
 		pres->DataEnd = 0;
 		pres->DataSeek = 0;
-		pres->entry = 0x8048000;
+		pres->entry = EXEC_DFTENTRY;
 	}
 	else
 	{

@@ -27,7 +27,7 @@
 #define TSS_SEL		0x28	/*任务状态段选择子*/
 
 #define UADDR_OFF	((void*)0x08000000)	/*用户地址偏移*/
-#define BASESRV_OFF	((void*)0x08048000)	/*基础服务地址偏移*/
+#define BASESRV_OFF	((void*)0x08000000)	/*基础服务地址偏移*/
 #define UFDATA_OFF	((void*)0x40000000)	/*用户自由数据空间偏移*/
 #define UFDATA_SIZ			0x80000000	/*用户自由数据空间大小*/
 #define SHRDLIB_OFF	((void*)0xC0000000)	/*共享库区偏移*/

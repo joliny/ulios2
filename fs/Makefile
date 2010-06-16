@@ -6,7 +6,7 @@
 ######################
 
 # Entry point of ulios file system
-ENTRYPOINT	= 0x08048000
+ENTRYPOINT	= 0x08000000
 
 # Programs, flags, etc.
 ASM		= nasm
@@ -20,7 +20,7 @@ LDFLAGS		= -T $(LDFILE) -Map ../objs/fsmap.txt
 DASMFLAGS	= -u -o $(ENTRYPOINT) -e $(ENTRYOFFSET)
 
 # This Program
-FSBIN		= ../out/ULIOS/fs.bin
+FSBIN		= ../out/ulios/fs.bin
 HEADS		= ../MkApi/ulimkapi.h ../driver/basesrv.h fs.h fsapi.h
 OBJS		= ../objs/apphead.o ../objs/fsapi.o ../objs/malloc.o ../objs/cache.o ../objs/fs.o ../objs/fat32.o ../objs/ulifs.o
 

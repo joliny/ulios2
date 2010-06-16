@@ -78,6 +78,7 @@ typedef struct _FILE_HANDLE
 	QWORD seek;				/*读写指针*/
 }FILE_HANDLE;	/*打开文件句柄*/
 
+#define EXEC_DFTENTRY		0x08000000	/*可执行文件默认入口*/
 #define FHT_LEN				0x100
 typedef struct _PROCRES_DESC
 {

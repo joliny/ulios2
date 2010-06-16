@@ -19,6 +19,9 @@ ASSUME	CS:_TEXT
 _TEXT	SEGMENT
 	ORG	100h
 START	PROC	NEAR
+	jmp	START2
+	DB	3837	DUP(0)
+START2:
 	mov	ax,	cs
 	mov	ds,	ax
 	mov	es,	ax

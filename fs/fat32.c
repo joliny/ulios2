@@ -864,27 +864,31 @@ long Fat32DelFile(FILE_DESC *fd)
 /*设置文件项信息*/
 long Fat32SetFile(FILE_DESC *fd, FILE_INFO *fi)
 {
-	if (fd->par && fi->name[0])
+	if (fd->par)
 	{
-		long res;
-		if ((res = CheckName(fi->name)) != NO_ERROR)
-			return res;
-		strcpy(fd->file.name, fi->name);
+		if (fi->name[0])
+		{
+			long res;
+			if ((res = CheckName(fi->name)) != NO_ERROR)
+				return res;
+			strcpy(fd->file.name, fi->name);
+		}
+		if (fi->CreateTime != INVALID)
+			fd->file.CreateTime = fi->CreateTime;
+		if (fi->ModifyTime != INVALID)
+			fd->file.ModifyTime = fi->ModifyTime;
+		if (fi->AccessTime != INVALID)
+			fd->file.AccessTime = fi->AccessTime;
+		if (fi->attr != INVALID)
+		{
+			if ((fi->attr & FAT32_FILE_ATTR_LONG) == FAT32_FILE_ATTR_LONG)
+				return FS_ERR_WRONG_ARGS;
+			fd->file.attr = fi->attr & 0x3F;
+		}
+		InfoToData(fd->data, &fd->file);
+		return Fat32RwFile(fd->par, TRUE, fd->idx * sizeof(FAT32_DIR), sizeof(FAT32_DIR), fd->data, NULL);
 	}
-	if (fi->CreateTime != INVALID)
-		fd->file.CreateTime = fi->CreateTime;
-	if (fi->ModifyTime != INVALID)
-		fd->file.ModifyTime = fi->ModifyTime;
-	if (fi->AccessTime != INVALID)
-		fd->file.AccessTime = fi->AccessTime;
-	if (fi->attr != INVALID)
-	{
-		if ((fi->attr & FAT32_FILE_ATTR_LONG) == FAT32_FILE_ATTR_LONG)
-			return FS_ERR_WRONG_ARGS;
-		fd->file.attr = fi->attr & 0x3F;
-	}
-	InfoToData(fd->data, &fd->file);
-	return Fat32RwFile(fd->par, TRUE, fd->idx * sizeof(FAT32_DIR), sizeof(FAT32_DIR), fd->data, NULL);
+	return NO_ERROR;
 }
 
 /*获取目录列表*/
@@ -892,7 +896,6 @@ long Fat32ReadDir(FILE_DESC *fd, QWORD *seek, FILE_INFO *fi, DWORD *curc)
 {
 	long res;
 
-	for (curc = 0, seek = 0;; seek += sizeof(FAT32_DIR))
 	for (;;)
 	{
 		FAT32_DIR dir;

@@ -822,7 +822,7 @@ long UlifsSetFile(FILE_DESC *fd, FILE_INFO *fi)
 	if (fi->attr != INVALID)
 		fd->file.attr = fi->attr;
 	InfoToData(fd->data, &fd->file);
-	return UlifsRwFile(fd->par, TRUE, (QWORD)fd->idx * sizeof(ULIFS_DIR), sizeof(ULIFS_DIR), fd->data, NULL);
+	return UlifsRwFile(fd->par ? fd->par : fd, TRUE, (QWORD)fd->idx * sizeof(ULIFS_DIR), sizeof(ULIFS_DIR), fd->data, NULL);
 }
 
 /*获取目录列表*/

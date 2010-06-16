@@ -57,7 +57,7 @@ typedef struct _HD_ARGS
 	BYTE res;		/*保留*/
 }__attribute__((packed)) HD_ARGS;	/*硬盘参数表*/
 
-#define HD_ARGS_ADDR	0x90400	/*硬盘参数物理地址*/
+#define HD_ARGS_ADDR	0x90600	/*硬盘参数物理地址*/
 
 /*读写磁盘扇区*/
 void RwSector(ATHD_REQ *req)
