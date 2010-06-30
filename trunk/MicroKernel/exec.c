@@ -138,28 +138,9 @@ void ProcStart()
 	else	/*启动可执行文件进程*/
 	{
 		MESSAGE_DESC *msg;
-		WORD pid;
+		DWORD pid;
 
-		if ((msg = AllocMsg()) == NULL)	/*申请消息结构*/
-			DeleteThed();
-		msg->ptid = kpt[FS_KPORT];
-		msg->data[0] = MSG_ATTR_USER;
-		msg->data[3] = FS_API_GETEXEC;
-		msg->data[4] = CurProc->par;
-		msg->data[5] = CurThed->kstk[1];
-		if (SendMsg(msg) != NO_ERROR)	/*向文件系统发送可执行体请求*/
-		{
-			FreeMsg(msg);
-			DeleteThed();
-		}
-		if (WaitThedMsg(&msg, kpt[FS_KPORT], INVALID) != NO_ERROR)
-			DeleteThed();
-		if (msg->data[1] < (DWORD)UADDR_OFF)	/*可执行体信息有误*/
-		{
-			FreeMsg(msg);
-			DeleteThed();
-		}
-		if ((pid = (WORD)msg->data[0]) != 0xFFFF)	/*有可重用可执行体*/
+		if ((pid = CurThed->kstk[1] & 0xFFFF) != 0xFFFF)	/*有可重用可执行体*/
 		{
 			cli();
 			if (pmt[pid] && pmt[pid]->exec)	/*可执行体有效*/
@@ -174,19 +155,23 @@ void ProcStart()
 		}
 		if ((NewExec = (EXEC_DESC*)LockKmalloc(sizeof(EXEC_DESC))) == NULL)	/*没有可重用可执行体*/
 		{
+			if ((msg = AllocMsg()) == NULL)	/*申请消息结构*/
+				DeleteThed();
 			msg->ptid = kpt[FS_KPORT];	/*通知文件服务器退出消息*/
-			msg->data[0] = MSG_ATTR_PROCEXT;
+			msg->data[0] = MSG_ATTR_PROCEXIT;
 			if (SendMsg(msg) != NO_ERROR)
 				FreeMsg(msg);
 			DeleteThed();
 		}
-		memcpy32(NewExec, msg->data, 8);	/*复制文件系统取得的可执行体信息*/
+		memcpy32(NewExec, &CurThed->kstk[1], 8);	/*复制可执行体信息*/
 		ulock(&NewExec->Page_l);
 		if ((NewPdt = LockAllocPage()) == 0)
 		{
 			LockKfree(NewExec, sizeof(EXEC_DESC));
+			if ((msg = AllocMsg()) == NULL)	/*申请消息结构*/
+				DeleteThed();
 			msg->ptid = kpt[FS_KPORT];	/*通知文件服务器退出消息*/
-			msg->data[0] = MSG_ATTR_PROCEXT;
+			msg->data[0] = MSG_ATTR_PROCEXIT;
 			if (SendMsg(msg) != NO_ERROR)
 				FreeMsg(msg);
 			DeleteThed();
@@ -199,14 +184,16 @@ void ProcStart()
 		{
 			LockFreePage(NewPdt);
 			LockKfree(NewExec, sizeof(EXEC_DESC));
+			if ((msg = AllocMsg()) == NULL)	/*申请消息结构*/
+				DeleteThed();
 			msg->ptid = kpt[FS_KPORT];	/*通知文件服务器退出消息*/
-			msg->data[0] = MSG_ATTR_PROCEXT;
+			msg->data[0] = MSG_ATTR_PROCEXIT;
 			if (SendMsg(msg) != NO_ERROR)
 				FreeMsg(msg);
 			DeleteThed();
 		}
-strset:	FreeMsg(msg);
 	}
+strset:
 	if (!(CurThed->kstk[0] & EXEC_ARGV_DRIVER))	/*设置用户应用进程*/
 		CurProc->attr |= PROC_ATTR_APPS;
 	CurProc->exec = NewExec;
@@ -218,7 +205,7 @@ strset:	FreeMsg(msg);
 	CurThed->tss.stk[0].ss = KDATA_SEL;
 	CurThed->attr |= THED_ATTR_APPS;	/*离开系统调用态*/
 	*(DWORD*)(CurThed->ustk + CurThed->UstkSiz - PROC_ARGS_SIZE - sizeof(DWORD)) = (DWORD)CurThed->ustk + CurThed->UstkSiz - PROC_ARGS_SIZE;
-	strcpy((BYTE*)(CurThed->ustk + CurThed->UstkSiz - PROC_ARGS_SIZE), (const BYTE*)&CurThed->kstk[2]);	/*复制参数到用户堆栈*/
+	strcpy((BYTE*)(CurThed->ustk + CurThed->UstkSiz - PROC_ARGS_SIZE), (const BYTE*)&CurThed->kstk[9]);	/*复制参数到用户堆栈*/
 	__asm__
 	(
 		"pushl %0\n"		/*ss3*/
@@ -251,9 +238,6 @@ void ThedExit(DWORD ExitCode)
 	UnregAllIrq();	/*清除线程资源*/
 	UnregAllKnlPort();
 	FreeAllMsg();
-	lock(&CurProc->Page_l);
-	ClearPage(&pt[(DWORD)CurThed->ustk >> 12], &pt[((DWORD)CurThed->ustk + CurThed->UstkSiz) >> 12], TRUE);
-	ulock(&CurProc->Page_l);
 	LockFreeUFData(CurProc, CurThed->ustk, CurThed->UstkSiz);
 	if (CurThed->i387)	/*清除协处理器寄存器*/
 	{
@@ -267,7 +251,7 @@ void ThedExit(DWORD ExitCode)
 	{
 		msg->ptid.ProcID = CurThed->id.ProcID;
 		msg->ptid.ThedID = CurThed->par;
-		msg->data[0] = MSG_ATTR_THEDEXT;
+		msg->data[0] = MSG_ATTR_THEDEXIT;
 		msg->data[1] = ExitCode;
 		if (SendMsg(msg) != NO_ERROR)
 			FreeMsg(msg);
@@ -283,7 +267,7 @@ void ThedExit(DWORD ExitCode)
 		{
 			msg->ptid.ProcID = CurProc->par;
 			msg->ptid.ThedID = 0;
-			msg->data[0] = MSG_ATTR_PROCEXT;
+			msg->data[0] = MSG_ATTR_PROCEXIT;
 			msg->data[1] = ExitCode;
 			if (SendMsg(msg) != NO_ERROR)
 				FreeMsg(msg);
@@ -291,7 +275,7 @@ void ThedExit(DWORD ExitCode)
 		if ((msg = AllocMsg()) != NULL)	/*通知文件服务器退出消息*/
 		{
 			msg->ptid = kpt[FS_KPORT];
-			msg->data[0] = MSG_ATTR_PROCEXT;
+			msg->data[0] = MSG_ATTR_PROCEXIT;
 			if (SendMsg(msg) != NO_ERROR)
 				FreeMsg(msg);
 		}

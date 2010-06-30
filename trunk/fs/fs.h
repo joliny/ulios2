@@ -91,7 +91,7 @@ typedef struct _PROCRES_DESC
 	DWORD DataSeek;			/*数据段文件偏移*/
 	DWORD entry;			/*入口点*/
 	FILE_DESC *CurDir;		/*进程当前目录*/
-	FILE_HANDLE fht[FHT_LEN];
+	FILE_HANDLE fht[FHT_LEN];	/*打开文件列表*/
 }PROCRES_DESC;	/*进程资源描述符*/
 
 extern THREAD_ID AthdPtid;	/*磁盘服务ID*/
@@ -130,6 +130,12 @@ void free(void *addr, DWORD siz);
 
 /*缓冲读写*/
 long RwCache(DWORD drv, BOOL isWrite, DWORD sec, DWORD cou, void *buf);
+
+/*读写磁盘*/
+static inline long RwHd(DWORD drv, BOOL isWrite, DWORD sec, DWORD cou, void *buf)
+{
+	return RwCache(drv, isWrite, sec, cou, buf);
+}
 
 /*读写分区*/
 static inline long RwPart(PART_DESC *part, BOOL isWrite, DWORD sec, DWORD cou, void *buf)

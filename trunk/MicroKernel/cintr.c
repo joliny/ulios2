@@ -208,12 +208,12 @@ void FpuFaultProc(DWORD edi, DWORD esi, DWORD ebp, DWORD esp, DWORD ebx, DWORD e
 	if (LastI387 != CurI387)	/*使用协处理器的线程不变时不必切换*/
 	{
 		if (LastI387)
-			__asm__ ("fwait;fnsave %0"::"m"(LastI387));	/*保存协处理器寄存器*/
+			__asm__("fwait;fnsave %0": "=m"(*LastI387));	/*保存协处理器寄存器*/
 		if (CurThed->i387)	/*协处理器已经可用*/
-			__asm__ ("frstor %0"::"m"(CurI387));	/*加载协处理器寄存器*/
+			__asm__("frstor %0":: "m"(*CurI387));	/*加载协处理器寄存器*/
 		else
 		{
-			__asm__ ("fninit");	/*初始化协处理器*/
+			__asm__("fninit");	/*初始化协处理器*/
 			CurThed->i387 = CurI387;
 		}
 		LastI387 = CurI387;

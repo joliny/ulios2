@@ -146,7 +146,7 @@ void exitcmd(char *args)
 void delfile(char *args)
 {
 	if (FSremove(FsPtid, args) != NO_ERROR)
-		CUIPutS(CuiPtid, "删除文件出错！\n");
+		CUIPutS(CuiPtid, "无法删除！\n");
 }
 
 /*复制文件*/
@@ -243,13 +243,6 @@ void md(char *args)
 		CUIPutS(CuiPtid, "无法创建目录！\n");
 }
 
-/*删除空目录*/
-void rd(char *args)
-{
-	if (FSremove(FsPtid, args) != NO_ERROR)
-		CUIPutS(CuiPtid, "无法删除目录！\n");
-}
-
 /*显示时间*/
 void showtim(char *args)
 {
@@ -267,13 +260,12 @@ void help(char *args)
 		"cls:清屏\n"
 		"color:设置显示颜色\n"
 		"exit:退出\n"
-		"del:删除文件\n"
+		"del:删除文件或空目录\n"
 		"copy:复制文件\n"
 		"ren:重命名\n"
 		"dir:目录列表\n"
 		"cd:切换目录\n"
 		"md:创建目录\n"
-		"rd:删除空目录\n"
 		"time:显示当前时间\n"
 		"help:帮助\n");
 }
@@ -307,7 +299,6 @@ void CmdProc(char *str)
 		{"dir", dir},
 		{"cd", cd},
 		{"md", md},
-		{"rd", rd},
 		{"time", showtim},
 		{"help", help}
 	};

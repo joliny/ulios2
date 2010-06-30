@@ -281,34 +281,11 @@ long GDIDrawStr(long x, long y, const char *str, DWORD c);
 
 #define CUI_ERR_ARGS	-1536	/*参数错误*/
 
-#define CUI_API_GETCH	0	/*取得键码功能号*/
-#define CUI_API_PUTCH	1	/*注入键码功能号*/
-#define CUI_API_SETCOL	2	/*设置字符界面颜色功能号*/
-#define CUI_API_SETCUR	3	/*设置光标位置功能号*/
-#define CUI_API_CLRSCR	4	/*清屏功能号*/
-#define CUI_API_PUTC	5	/*输出字符功能号*/
-#define CUI_API_PUTS	6	/*输出字符串功能号*/
-
-/*取得键码*/
-static inline long CUIGetCh(THREAD_ID ptid)
-{
-	DWORD data[MSG_DATA_LEN];
-	data[0] = MSG_ATTR_USER;
-	data[3] = CUI_API_GETCH;
-	if ((data[0] = KSendMsg(ptid, data, SRV_OUT_TIME)) != NO_ERROR)
-		return data[0];
-	return data[1];
-}
-
-/*注入键码*/
-static inline long CUIPutCh(THREAD_ID ptid, DWORD c)
-{
-	DWORD data[MSG_DATA_LEN];
-	data[0] = MSG_ATTR_USER;
-	data[1] = c;
-	data[3] = CUI_API_PUTCH;
-	return KSendMsg(ptid, data, 0);
-}
+#define CUI_API_SETCOL	0	/*设置字符界面颜色功能号*/
+#define CUI_API_SETCUR	1	/*设置光标位置功能号*/
+#define CUI_API_CLRSCR	2	/*清屏功能号*/
+#define CUI_API_PUTC	3	/*输出字符功能号*/
+#define CUI_API_PUTS	4	/*输出字符串功能号*/
 
 /*设置字符界面颜色*/
 static inline long CUISetCol(THREAD_ID ptid, DWORD CharColor, DWORD BgColor)

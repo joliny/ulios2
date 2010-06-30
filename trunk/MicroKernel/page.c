@@ -963,7 +963,7 @@ void FreeAllMap()
 	MAPBLK_DESC *CurMap, *map;
 	DWORD data[MSG_DATA_LEN - 2];
 
-	data[0] = MSG_ATTR_PROCEXT;
+	data[0] = MSG_ATTR_PROCEXIT;
 	CurProc = CurPmd;
 	while (CurProc->Map_l)	/*等待其它进程映射完成*/
 		schedul();

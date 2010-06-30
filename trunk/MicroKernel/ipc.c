@@ -78,10 +78,7 @@ long SendMsg(MESSAGE_DESC *msg)
 		return ERROR_WRONG_PROCID;
 	if (ptid.ThedID >= TMT_LEN)
 		return ERROR_WRONG_THEDID;
-	if (msg->data[0] >= MSG_ATTR_THEDEXT)
-		CurThed = CurPmd->CurTmd;
-	else
-		CurThed = NULL;
+	CurThed = CurPmd ? CurPmd->CurTmd : NULL;
 	cli();	/*要访问其他进程的信息,所以防止任务切换*/
 	DstProc = pmt[ptid.ProcID];
 	if (DstProc == NULL || (DstProc->attr & PROC_ATTR_DEL))
@@ -95,7 +92,7 @@ long SendMsg(MESSAGE_DESC *msg)
 		sti();
 		return ERROR_WRONG_THEDID;
 	}
-	if (DstThed->MsgCou >= THED_MSG_LEN && msg->data[0] >= MSG_ATTR_USER && (!CurThed || *(DWORD*)(&DstThed->WaitId) != *(DWORD*)(&CurThed->id)))
+	if (DstThed->MsgCou >= THED_MSG_LEN && msg->data[0] >= MSG_ATTR_USER && *(DWORD*)(&DstThed->WaitId) != *(DWORD*)(&CurThed->id))
 	{
 		sti();
 		return ERROR_HAVENO_MSGDESC;	/*消息满且是用户消息且目标线程没有等待本线程的消息,取消发送消息*/

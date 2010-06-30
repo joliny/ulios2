@@ -71,7 +71,7 @@ typedef struct _FAT32_FSI
 #define FAT32_FILE_ATTR_RDONLY	0x01	/*只读*/
 #define FAT32_FILE_ATTR_HIDDEN	0x02	/*隐藏*/
 #define FAT32_FILE_ATTR_SYSTEM	0x04	/*系统*/
-#define FAT32_FILE_ATTR_LABEL	0x08	/*卷标*/
+#define FAT32_FILE_ATTR_LABEL	0x08	/*卷标(只读)*/
 #define FAT32_FILE_ATTR_DIREC	0x10	/*目录(只读)*/
 #define FAT32_FILE_ATTR_ARCH	0x20	/*归档*/
 #define FAT32_FILE_ATTR_LONG	(FAT32_FILE_ATTR_RDONLY | FAT32_FILE_ATTR_HIDDEN | FAT32_FILE_ATTR_SYSTEM | FAT32_FILE_ATTR_LABEL)	/*长文件名*/
@@ -468,9 +468,9 @@ static long NameToDir(char DirName[FAT32_FILE_NAME_SIZE], const char *name)
 
 	memset8(DirName, ' ', FAT32_FILE_NAME_SIZE);
 	namep = DirName;
-	if (*name == 0xE5)
+	if (*name == (char)0xE5)
 	{
-		*namep = 0x05;
+		*namep = (char)0x05;
 		namep++;
 		name++;
 	}
@@ -510,9 +510,9 @@ static long DirToName(char *name, char DirName[FAT32_FILE_NAME_SIZE])
 	char *namep;
 
 	namep = DirName;
-	if (*namep == 0x05)
+	if (*namep == (char)0x05)
 	{
-		*name = 0xE5;
+		*name = (char)0xE5;
 		namep++;
 		name++;
 	}
@@ -645,6 +645,8 @@ long Fat32SchFile(FILE_DESC *fd, const char *path)
 				free(dir, sizeof(FAT32_DIR));
 				return res;
 			}
+			if (dir->attr & FAT32_FILE_ATTR_LABEL)
+				continue;
 			if (dir->name[0] == 0)
 				break;
 			if (Fat32CmpFile(fd, path))
@@ -731,9 +733,9 @@ long Fat32NewFile(FILE_DESC *fd, const char *path)
 			free(dir, sizeof(FAT32_DIR));
 			return res;
 		}
-		if (dir->name[0] == 0xE5)
+		if (dir->name[0] == (char)0xE5)
 			goto crtdir;
-		if (dir->name[0] == 0)
+		if (dir->name[0] == (char)0)
 			break;
 	}
 	if (seek >= sizeof(FAT32_DIR) * FAT32_MAX_DIR)
@@ -810,9 +812,9 @@ long Fat32DelFile(FILE_DESC *fd)
 		{
 			if ((res = Fat32RwFile(fd, FALSE, seek, sizeof(FAT32_DIR), &dir, &curc)) != NO_ERROR)
 				return res;
-			if (dir.name[0] == 0)
+			if (dir.name[0] == (char)0)
 				break;
-			if (dir.name[0] != 0xE5)	/*不空的目录不能删除*/
+			if (dir.name[0] != (char)0xE5)	/*不空的目录不能删除*/
 				return FS_ERR_DIR_NOT_EMPTY;
 		}
 		data->size = seek + sizeof(FAT32_DIR);
@@ -836,7 +838,7 @@ long Fat32DelFile(FILE_DESC *fd)
 		{
 			if ((res = Fat32RwFile(par, FALSE, seek - sizeof(FAT32_DIR), sizeof(FAT32_DIR), data, NULL)) != NO_ERROR)
 				return res;
-			if (data->name[0] != 0xE5)
+			if (data->name[0] != (char)0xE5)
 				break;
 			seek -= sizeof(FAT32_DIR);
 		}
@@ -852,7 +854,7 @@ long Fat32DelFile(FILE_DESC *fd)
 	}
 	else	/*直接标记为删除*/
 	{
-		data->name[0] = 0xE5;
+		data->name[0] = (char)0xE5;
 		if ((res = Fat32RwFile(par, TRUE, seek, sizeof(FAT32_DIR), data, NULL)) != NO_ERROR)
 			return res;
 	}
@@ -904,7 +906,7 @@ long Fat32ReadDir(FILE_DESC *fd, QWORD *seek, FILE_INFO *fi, DWORD *curc)
 		*seek += sizeof(FAT32_DIR);
 		if (dir.name[0] == 0)
 			break;
-		if (dir.name[0] != 0xE5 && (dir.attr & FAT32_FILE_ATTR_LONG) != FAT32_FILE_ATTR_LONG)	/*有效的文件名,除去长文件名*/
+		if (dir.name[0] != (char)0xE5 && !(dir.attr & FAT32_FILE_ATTR_LABEL))	/*有效的文件名,除去长文件名和卷标*/
 		{
 			DataToInfo(fi, &dir);
 			return NO_ERROR;

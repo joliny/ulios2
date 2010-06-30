@@ -162,7 +162,8 @@ int main()
 		{
 			ATHD_REQ *CurReq;
 
-			CurReq = ReqList;
+			if ((CurReq = ReqList) == NULL)
+				continue;
 			if (CurReq->cou)
 				RwSector(CurReq);
 			if (CurReq->cou == 0)	/*╤ап╢мЙЁи*/

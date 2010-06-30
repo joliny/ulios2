@@ -40,7 +40,7 @@ static void SwitchTS()
 	else	/*没有就绪进程,切换到内核*/
 		CurTss = &KnlTss;
 	SetSegDesc(&gdt[TSS_SEL >> 3], (DWORD)CurTss, sizeof(TSS) - 1, DESC_ATTR_P | SYSSEG_ATTR_T_TSS);	/*设置任务的TSS描述符*/
-	__asm__("ljmp %0, $0":: "i"(TSS_SEL));
+	__asm__("ljmp %0, $0":: "i"(TSS_SEL));	/*长跳转执行切换*/
 }
 
 /*分配空进程ID*/
@@ -416,34 +416,6 @@ long CreateProc(DWORD attr, DWORD exec, DWORD args, THREAD_ID *ptid)
 	NewThed->tss.cs = KCODE_SEL;
 	NewThed->tss.gs = NewThed->tss.fs = NewThed->tss.ds = NewThed->tss.ss = NewThed->tss.es = KDATA_SEL;
 	NewThed->tss.io = sizeof(TSS);
-	NewThed->kstk[0] = attr;	/*复制参数*/
-	if (attr & EXEC_ARGV_BASESRV)
-	{
-		NewThed->kstk[1] = exec;
-		NewThed->kstk[2] = args;
-	}
-	else
-	{
-		DWORD data[MSG_DATA_LEN];
-		data[0] = FS_API_GETEXID;
-		if ((data[0] = MapProcAddr((void*)exec, PROC_EXEC_SIZE, kpt[FS_KPORT], FALSE, TRUE, data, INVALID)) != NO_ERROR)
-		{
-			LockFreePage(NewPdt);
-			LockKfree(NewThed, sizeof(THREAD_DESC));
-			LockKfree(NewProc, sizeof(PROCESS_DESC));
-			return data[0];
-		}
-		if (data[2] != NO_ERROR)
-		{
-			LockFreePage(NewPdt);
-			LockKfree(NewThed, sizeof(THREAD_DESC));
-			LockKfree(NewProc, sizeof(PROCESS_DESC));
-			return data[2];
-		}
-		NewThed->kstk[1] =  data[3];
-		if (args)
-			strcpy((BYTE*)&NewThed->kstk[2], (const BYTE*)args);
-	}
 	cli();
 	if (AllocPid(NewProc) != NO_ERROR)
 	{
@@ -453,7 +425,56 @@ long CreateProc(DWORD attr, DWORD exec, DWORD args, THREAD_ID *ptid)
 		LockKfree(NewProc, sizeof(PROCESS_DESC));
 		return ERROR_HAVENO_PROCID;
 	}
+	sti();
 	pdti = NewThed->id.ProcID;
+	NewThed->kstk[0] = attr;	/*复制参数*/
+	if (attr & EXEC_ARGV_BASESRV)
+	{
+		NewThed->kstk[1] = exec;
+		NewThed->kstk[2] = args;
+	}
+	else
+	{
+		DWORD data[MSG_DATA_LEN];
+		MESSAGE_DESC *msg;
+
+		data[0] = FS_API_GETEXEC;
+		data[1] = pdti;
+		if ((data[0] = MapProcAddr((void*)exec, PROC_EXEC_SIZE, kpt[FS_KPORT], FALSE, TRUE, data, FS_OUT_TIME)) != NO_ERROR)	/*向文件系统发送可执行体请求*/
+		{
+			cli();
+			FreePid(&pmt[pdti]);
+			sti();
+			LockFreePage(NewPdt);
+			LockKfree(NewThed, sizeof(THREAD_DESC));
+			LockKfree(NewProc, sizeof(PROCESS_DESC));
+			return data[0];
+		}
+		if (data[2] != NO_ERROR)
+		{
+			cli();
+			FreePid(&pmt[pdti]);
+			sti();
+			LockFreePage(NewPdt);
+			LockKfree(NewThed, sizeof(THREAD_DESC));
+			LockKfree(NewProc, sizeof(PROCESS_DESC));
+			return data[2];
+		}
+		if ((data[0] = WaitThedMsg(&msg, kpt[FS_KPORT], FS_OUT_TIME)) != NO_ERROR)
+		{
+			cli();
+			FreePid(&pmt[pdti]);
+			sti();
+			LockFreePage(NewPdt);
+			LockKfree(NewThed, sizeof(THREAD_DESC));
+			LockKfree(NewProc, sizeof(PROCESS_DESC));
+			return data[0];
+		}
+		memcpy32(&NewThed->kstk[1], msg->data, 8);
+		if (args)
+			strcpy((BYTE*)&NewThed->kstk[9], (const BYTE*)args);
+	}
+	cli();
 	NewPdt |= PAGE_ATTR_P;
 	pddt[pdti] = NewPdt;	/*映射新进程的页目录表*/
 	pdti <<= 10;
