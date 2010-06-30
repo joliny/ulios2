@@ -63,13 +63,12 @@ typedef struct _THREAD_ID
 
 #define MSG_ATTR_ISR		0x00010000	/*硬件陷阱消息*/
 #define MSG_ATTR_IRQ		0x00020000	/*硬件中断消息*/
-
-#define MSG_ATTR_THEDEXT	0x00100000	/*线程退出消息*/
-#define MSG_ATTR_PROCEXT	0x00110000	/*进程退出消息*/
-#define MSG_ATTR_EXCEP		0x00120000	/*异常退出消息*/
-#define MSG_ATTR_MAP		0x00130000	/*页映射消息*/
-#define MSG_ATTR_UNMAP		0x00140000	/*解除页映射消息*/
-#define MSG_ATTR_CNLMAP		0x00150000	/*取消页映射消息*/
+#define MSG_ATTR_THEDEXIT	0x00030000	/*线程退出消息*/
+#define MSG_ATTR_PROCEXIT	0x00040000	/*进程退出消息*/
+#define MSG_ATTR_EXCEP		0x00050000	/*异常退出消息*/
+#define MSG_ATTR_MAP		0x00060000	/*页映射消息*/
+#define MSG_ATTR_UNMAP		0x00070000	/*解除页映射消息*/
+#define MSG_ATTR_CNLMAP		0x00080000	/*取消页映射消息*/
 
 #define MSG_ATTR_USER		0x01000000	/*用户自定义消息最小值*/
 

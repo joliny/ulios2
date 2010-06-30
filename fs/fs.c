@@ -105,7 +105,7 @@ void InitPart()
 	{
 		BOOT_SEC mbr;
 
-		if (RwCache(i, FALSE, 0, 1, &mbr) != NO_ERROR)
+		if (RwHd(i, FALSE, 0, 1, &mbr) != NO_ERROR)
 			continue;
 		if (mbr.aa55 != 0xAA55)	/*bad MBR*/
 			continue;
@@ -125,7 +125,7 @@ void InitPart()
 				{
 					BOOT_SEC ebr;
 
-					if (RwCache(i, FALSE, fst, 1, &ebr) != NO_ERROR)
+					if (RwHd(i, FALSE, fst, 1, &ebr) != NO_ERROR)
 						break;
 					if (ebr.aa55 != 0xAA55)	/*bad EBR*/
 						break;
@@ -459,14 +459,13 @@ static long CreateFild(PROCRES_DESC *pres, const char *path, DWORD attr, FILE_DE
 		DecFildLn(CurFile);
 		return FS_ERR_PATH_NOT_DIR;
 	}
-	CurPart = CurFile->part;
-	CurFsui = &fsuit[CurPart->FsID];
-	name++;
 	if ((TmpFile = (FILE_DESC*)malloc(sizeof(FILE_DESC))) == NULL)
 	{
 		DecFildLn(CurFile);
 		return FS_ERR_HAVENO_MEMORY;
 	}
+	CurPart = CurFile->part;
+	CurFsui = &fsuit[CurPart->FsID];
 	TmpFile->part = CurPart;
 	TmpFile->flag = FILE_FLAG_WRITE;
 	TmpFile->cou = 1;
@@ -476,6 +475,8 @@ static long CreateFild(PROCRES_DESC *pres, const char *path, DWORD attr, FILE_DE
 	TmpFile->file.AccessTime = TmpFile->file.ModifyTime = TmpFile->file.CreateTime;
 	TmpFile->file.attr = attr;
 	TmpFile->data = NULL;
+	if (*name == '/')
+		name++;
 	if ((res = CurFsui->NewFile(TmpFile, name)) != NO_ERROR)	/*创建文件描述符*/
 	{
 		free(TmpFile, sizeof(FILE_DESC));
@@ -506,7 +507,7 @@ static FILE_HANDLE *FindFh(FILE_HANDLE *fht)
 }
 
 /*取得可执行文件信息*/
-long GetExec(PROCRES_DESC *pres, PROCRES_DESC *par, DWORD fi, DWORD *exec)
+long GetExec(PROCRES_DESC *pres, const char *path, DWORD pid, DWORD *exec)
 {
 	typedef struct
 	{
@@ -551,62 +552,62 @@ long GetExec(PROCRES_DESC *pres, PROCRES_DESC *par, DWORD fi, DWORD *exec)
 #define PF_X		1		// 可执行
 #define PF_W		2		// 可写
 
+	PROCRES_DESC *ChlPres;	/*子进程资源*/
 	FILE_DESC *CurFile;
 	FSUI *CurFsui;
 	long res;
-	DWORD seek, avl;
+	DWORD i, seek, avl;
 	ELF32_EHDR ehdr;
 	ELF32_PHDR phdr;
 
-	if (fi >= FILT_LEN)
-		return FS_ERR_WRONG_HANDLE;	/*检查句柄错误*/
-	lock(&filtl);
-	if (filt[fi] == NULL)
+	if (pres->CurDir == NULL)
+		return FS_ERR_WRONG_CURDIR;	/*没有设置当前目录*/
+	if ((ChlPres = (PROCRES_DESC*)malloc(sizeof(PROCRES_DESC))) == NULL)	/*申请新进程的资源*/
+		return FS_ERR_HAVENO_MEMORY;
+	if ((res = SetFildLn(pres, path, FALSE, &CurFile)) != NO_ERROR)	/*搜索路径*/
 	{
-		ulock(&filtl);
-		return FS_ERR_WRONG_HANDLE;	/*空句柄*/
-	}
-	CurFile = filt[fi];
-	if (CurFile->flag & FILE_FLAG_WRITE)
-	{
-		ulock(&filtl);
-		return FS_ERR_PATH_WRITTEN;	/*尝试执行打开写的文件*/
+		free(ChlPres, sizeof(PROCRES_DESC));
+		return res;
 	}
 	if (CurFile->file.attr & FILE_ATTR_DIREC)
 	{
-		ulock(&filtl);
-		return FS_ERR_PATH_NOT_FILE;	/*是目录句柄*/
+		DecFildLn(CurFile);
+		free(ChlPres, sizeof(PROCRES_DESC));
+		return FS_ERR_PATH_NOT_FILE;	/*搜索到的是目录*/
 	}
 	if (CurFile->file.size == 0)
 	{
-		ulock(&filtl);
-		return FS_ERR_WRONG_ARGS;	/*非法文件*/
+		DecFildLn(CurFile);
+		free(ChlPres, sizeof(PROCRES_DESC));
+		return FS_ERR_FILE_EMPTY;	/*空文件不可执行*/
 	}
-	if (par->CurDir == NULL)
-	{
-		ulock(&filtl);
-		return FS_ERR_WRONG_CURDIR;	/*没有设置当前目录*/
-	}
-	pres->CurDir = par->CurDir;
-	IncFildLn(pres->CurDir);	/*设置当前目录*/
-	for (fi = 0; fi < PRET_LEN; fi++)	/*查找副本进程号*/
-		if (pret[fi] && pret[fi]->exec == CurFile)
+	memset32(ChlPres, 0, sizeof(PROCRES_DESC) / sizeof(DWORD));
+	ChlPres->exec = CurFile;
+	ChlPres->CurDir = pres->CurDir;
+	IncFildLn(ChlPres->CurDir);	/*设置当前目录*/
+	cli();	/*保证子进程资源已释放*/
+	while (*((volatile DWORD*)&pret[pid]))
+		KGiveUp();
+	sti();
+	lock(&filtl);
+	for (i = 0; i < PRET_LEN; i++)	/*查找副本进程号*/
+		if (pret[i] && pret[i]->exec == CurFile)
 		{
-			pres->exec = CurFile;
-			memcpy32(&pres->CodeOff, &pret[fi]->CodeOff, 7);
+			memcpy32(&ChlPres->CodeOff, &pret[i]->CodeOff, 7);
 			ulock(&filtl);
-			exec[0] = fi;
-			memcpy32(&exec[1], &pres->CodeOff, 7);
+			exec[0] = i;
+			memcpy32(&exec[1], &ChlPres->CodeOff, 7);
+			pret[pid] = ChlPres;
 			return NO_ERROR;
 		}
-	pres->exec = CurFile;
 	ulock(&filtl);
 	exec[0] = 0xFFFF;
 	CurFsui = &fsuit[CurFile->part->FsID];	/*开始取得ELF文件信息*/
 	if ((res = CurFsui->RwFile(CurFile, FALSE, 0, sizeof(ELF32_EHDR), &ehdr, NULL)) != NO_ERROR)
 	{
+		DecFildLn(ChlPres->CurDir);
 		DecFildLn(CurFile);
-		DecFildLn(pres->CurDir);
+		free(ChlPres, sizeof(PROCRES_DESC));
 		return res;
 	}
 	if (ehdr.ei_mag != EIM_ELF ||
@@ -616,46 +617,48 @@ long GetExec(PROCRES_DESC *pres, PROCRES_DESC *par, DWORD fi, DWORD *exec)
 		(ehdr.e_machine != EM_386 && ehdr.e_machine != EM_486) ||
 		ehdr.e_version != EV_CURRENT)	/*ELF格式检查*/
 	{
-		pres->CodeOff = EXEC_DFTENTRY;	/*非ELF格式的按BIN处理*/
-		pres->CodeEnd = EXEC_DFTENTRY + (DWORD)CurFile->file.size;
-		pres->CodeSeek = 0;
-		pres->DataOff = 0;
-		pres->DataEnd = 0;
-		pres->DataSeek = 0;
-		pres->entry = EXEC_DFTENTRY;
+		ChlPres->CodeOff = EXEC_DFTENTRY;	/*非ELF格式的按BIN处理*/
+		ChlPres->CodeEnd = EXEC_DFTENTRY + (DWORD)CurFile->file.size;
+		ChlPres->CodeSeek = 0;
+		ChlPres->DataOff = 0;
+		ChlPres->DataEnd = 0;
+		ChlPres->DataSeek = 0;
+		ChlPres->entry = EXEC_DFTENTRY;
 	}
 	else
 	{
-		pres->entry = ehdr.e_entry;
+		ChlPres->entry = ehdr.e_entry;
 		seek = ehdr.e_phoff;
 		avl = 0;
-		for (fi = 0; fi < ehdr.e_phnum; fi++)	/*读取程序头部表*/
+		for (i = 0; i < ehdr.e_phnum; i++)	/*读取程序头部表*/
 		{
 			if ((res = CurFsui->RwFile(CurFile, FALSE, seek, ehdr.e_phentsize, &phdr, &avl)) != NO_ERROR)
 			{
+				DecFildLn(ChlPres->CurDir);
 				DecFildLn(CurFile);
-				DecFildLn(pres->CurDir);
+				free(ChlPres, sizeof(PROCRES_DESC));
 				return res;
 			}
 			if (phdr.p_type == PT_LOAD)
 			{
 				if (phdr.p_flags & PF_X)	/*代码段*/
 				{
-					pres->CodeOff = phdr.p_vaddr;
-					pres->CodeEnd = phdr.p_vaddr + phdr.p_filesz;
-					pres->CodeSeek = phdr.p_offset;
+					ChlPres->CodeOff = phdr.p_vaddr;
+					ChlPres->CodeEnd = phdr.p_vaddr + phdr.p_filesz;
+					ChlPres->CodeSeek = phdr.p_offset;
 				}
 				else if (phdr.p_flags & PF_W)	/*数据段*/
 				{
-					pres->DataOff = phdr.p_vaddr;
-					pres->DataEnd = phdr.p_vaddr + phdr.p_filesz;
-					pres->DataSeek = phdr.p_offset;
+					ChlPres->DataOff = phdr.p_vaddr;
+					ChlPres->DataEnd = phdr.p_vaddr + phdr.p_filesz;
+					ChlPres->DataSeek = phdr.p_offset;
 				}
 			}
 			seek += ehdr.e_phentsize;
 		}
 	}
-	memcpy32(&exec[1], &pres->CodeOff, 7);
+	memcpy32(&exec[1], &ChlPres->CodeOff, 7);
+	pret[pid] = ChlPres;
 	return NO_ERROR;
 }
 
@@ -674,7 +677,7 @@ long ReadPage(PROCRES_DESC *pres, void *buf, DWORD siz, DWORD seek)
 }
 
 /*进程退出*/
-long ProcExt(PROCRES_DESC *pres)
+long ProcExit(PROCRES_DESC *pres)
 {
 	DWORD i;
 
@@ -682,23 +685,6 @@ long ProcExt(PROCRES_DESC *pres)
 		DecFildLn(pres->fht[i].fd);
 	DecFildLn(pres->exec);
 	DecFildLn(pres->CurDir);
-	return NO_ERROR;
-}
-
-/*取得可执行文件ID*/
-long GetExid(PROCRES_DESC *pres, const char *path, DWORD *fi)
-{
-	FILE_DESC *CurFile;
-	long res;
-
-	if ((res = SetFildLn(pres, path, FALSE, &CurFile)) != NO_ERROR)	/*搜索路径*/
-		return res;
-	if (CurFile->file.attr & FILE_ATTR_DIREC)	/*搜索到的是目录*/
-	{
-		DecFildLn(CurFile);
-		return FS_ERR_PATH_NOT_FILE;
-	}
-	*fi = CurFile->id;
 	return NO_ERROR;
 }
 
@@ -1081,6 +1067,10 @@ long SetAttr(PROCRES_DESC *pres, const char *path, DWORD attr)
 		attr |= FILE_ATTR_DIREC;
 	else
 		attr &= (~FILE_ATTR_DIREC);
+	if (fi.attr & FILE_ATTR_LABEL)
+		attr |= FILE_ATTR_LABEL;
+	else
+		attr &= (~FILE_ATTR_LABEL);
 	fi.attr = attr;
 	res = fsuit[CurFile->part->FsID].SetFile(CurFile, &fi);
 	DecFildLn(CurFile);

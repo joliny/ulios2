@@ -26,7 +26,7 @@ typedef struct _PART_INFO
 #define FILE_ATTR_RDONLY	0x00000001	/*只读*/
 #define FILE_ATTR_HIDDEN	0x00000002	/*隐藏*/
 #define FILE_ATTR_SYSTEM	0x00000004	/*系统*/
-#define FILE_ATTR_LABEL		0x00000008	/*卷标*/
+#define FILE_ATTR_LABEL		0x00000008	/*卷标(只读)*/
 #define FILE_ATTR_DIREC		0x00000010	/*目录(只读)*/
 #define FILE_ATTR_ARCH		0x00000020	/*归档*/
 #define FILE_ATTR_EXEC		0x00000040	/*可执行*/
@@ -56,28 +56,27 @@ typedef struct _FILE_INFO
 
 #define SRV_FS_PORT		0	/*文件系统服务端口*/
 
-#define FS_API_GETEXID	0	/*内核专用*/
-#define FS_API_GETEXEC	1	/*内核专用*/
-#define FS_API_READPAGE	2	/*内核专用*/
-#define FS_API_PROCEXT	3	/*内核专用*/
-#define FS_API_ENUMPART	4
-#define FS_API_GETPART	5
-#define FS_API_CREAT	6
-#define FS_API_OPEN		7
-#define FS_API_CLOSE	8
-#define FS_API_READ		9
-#define FS_API_WRITE	10
-#define FS_API_SEEK		11
-#define FS_API_SETSIZE	12
-#define FS_API_OPENDIR	13
-#define FS_API_READDIR	14
-#define FS_API_CHDIR	15
-#define FS_API_MKDIR	16
-#define FS_API_REMOVE	17
-#define FS_API_RENAME	18
-#define FS_API_GETATTR	19
-#define FS_API_SETATTR	20
-#define FS_API_SETTIME	21
+#define FS_API_GETEXEC	0	/*内核专用*/
+#define FS_API_READPAGE	1	/*内核专用*/
+#define FS_API_PROCEXIT	2	/*内核专用*/
+#define FS_API_ENUMPART	3
+#define FS_API_GETPART	4
+#define FS_API_CREAT	5
+#define FS_API_OPEN		6
+#define FS_API_CLOSE	7
+#define FS_API_READ		8
+#define FS_API_WRITE	9
+#define FS_API_SEEK		10
+#define FS_API_SETSIZE	11
+#define FS_API_OPENDIR	12
+#define FS_API_READDIR	13
+#define FS_API_CHDIR	14
+#define FS_API_MKDIR	15
+#define FS_API_REMOVE	16
+#define FS_API_RENAME	17
+#define FS_API_GETATTR	18
+#define FS_API_SETATTR	19
+#define FS_API_SETTIME	20
 
 /*错误定义*/
 #define FS_ERR_HAVENO_FILD		-256	/*文件描述符不足*/
@@ -104,6 +103,7 @@ typedef struct _FILE_INFO
 #define FS_ERR_DIR_NOT_EMPTY	-277	/*目录非空*/
 #define FS_ERR_END_OF_FILE		-278	/*到达文件结尾*/
 #define FS_ERR_SIZE_LIMIT		-279	/*数量空间限制*/
+#define FS_ERR_FILE_EMPTY		-280	/*空文件*/
 
 /*枚举分区*/
 static inline long FSEnumPart(THREAD_ID ptid, DWORD pid)
@@ -284,7 +284,7 @@ static inline long FSremove(THREAD_ID ptid, const char *path)
 static inline long FSrename(THREAD_ID ptid, const char *path, const char *name)
 {
 	DWORD data[MSG_DATA_LEN];
-	char buf[MAX_PATH * 2];
+	char buf[MAX_PATH];
 	data[0] = FS_API_RENAME;
 	if ((data[0] = KWriteProcAddr(buf, strcpy(strcpy(buf, path), name) - buf, ptid, data, INVALID)) != NO_ERROR)
 		return data[0];

@@ -9,10 +9,9 @@
 extern long InitFS();
 extern void InitPart();
 extern void CloseFS();
-extern long GetExid(PROCRES_DESC *pres, const char *path, DWORD *fi);
-extern long GetExec(PROCRES_DESC *pres, PROCRES_DESC *par, DWORD fhi, DWORD *exec);
+extern long GetExec(PROCRES_DESC *pres, const char *path, DWORD pid, DWORD *exec);
 extern long ReadPage(PROCRES_DESC *pres, void *buf, DWORD siz, DWORD seek);
-extern long ProcExt(PROCRES_DESC *pres);
+extern long ProcExit(PROCRES_DESC *pres);
 extern long EnumPart(PROCRES_DESC *pres, DWORD *pid);
 extern long GetPart(PROCRES_DESC *pres, DWORD pid, PART_INFO *pi);
 extern long creat(PROCRES_DESC *pres, const char *path, DWORD *fhi);
@@ -51,41 +50,24 @@ static const char *CheckPathSize(const char *path, DWORD siz)
 	return NULL;
 }
 
-void ApiGetExid(DWORD *argv)
+void ApiGetExec(DWORD *argv)
 {
 	const char *path;
-	
+	DWORD exec[8];
+
 	if ((argv[ATTR_ID] & 0xFFFF0000) != MSG_ATTR_MAP)
 		return;
 	path = (const char*)argv[ADDR_ID];
 	if (CheckPathSize(path, argv[SIZE_ID]) == NULL)
 		argv[0] = FS_ERR_ARGS_TOOLONG;
 	else
-		argv[0] = GetExid(pret[((THREAD_ID*)&argv[PTID_ID])->ProcID], path, &argv[1]);
+		argv[0] = GetExec(pret[((THREAD_ID*)&argv[PTID_ID])->ProcID], path, argv[API_ID + 1], exec);
 	KUnmapProcAddr((void*)path, argv);
-}
-
-void ApiGetExec(DWORD *argv)
-{
-	PROCRES_DESC *CurPres;
-
-	if ((argv[ATTR_ID] & 0xFFFF0000) == MSG_ATTR_MAP)
+	if (argv[0] == NO_ERROR)
 	{
-		argv[0] = FS_ERR_WRONG_ARGS;
-		KUnmapProcAddr((void*)argv[ADDR_ID], argv);
-		return;
+		exec[0] |= MSG_ATTR_USER;
+		KSendMsg(*((THREAD_ID*)&argv[PTID_ID]), exec, 0);
 	}
-	CurPres = pret[((THREAD_ID*)&argv[PTID_ID])->ProcID];
-	if (CurPres->CurDir)	/*进程已经启动了*/
-		return;
-	if (GetExec(CurPres, pret[argv[API_ID + 1]], argv[API_ID + 2], argv) != NO_ERROR)
-	{
-		free(CurPres, sizeof(PROCRES_DESC));
-		pret[((THREAD_ID*)&argv[PTID_ID])->ProcID] = NULL;
-		argv[1] = 0;
-	}
-	argv[0] |= MSG_ATTR_USER;
-	KSendMsg(*((THREAD_ID*)&argv[PTID_ID]), argv, 0);
 }
 
 void ApiReadPage(DWORD *argv)
@@ -105,12 +87,12 @@ void ApiReadPage(DWORD *argv)
 	KUnmapProcAddr(buf, argv);
 }
 
-void ApiProcExt(DWORD *argv)
+void ApiProcExit(DWORD *argv)
 {
 	PROCRES_DESC *CurPres;
 
 	CurPres = pret[((THREAD_ID*)&argv[PTID_ID])->ProcID];
-	ProcExt(CurPres);
+	ProcExit(CurPres);
 	free(CurPres, sizeof(PROCRES_DESC));
 	pret[((THREAD_ID*)&argv[PTID_ID])->ProcID] = NULL;
 }
@@ -266,7 +248,7 @@ void ApiReadDir(DWORD *argv)
 	}
 	buf = (FILE_INFO*)argv[ADDR_ID];
 	argv[0] = ReadDir(pret[((THREAD_ID*)&argv[PTID_ID])->ProcID], argv[API_ID + 1], buf);
-	KUnmapProcAddr(buf, argv);
+	KUnmapProcAddr((void*)buf, argv);
 }
 
 void ApiChDir(DWORD *argv)
@@ -318,9 +300,9 @@ void ApiReName(DWORD *argv)
 	if ((argv[ATTR_ID] & 0xFFFF0000) != MSG_ATTR_MAP)
 		return;
 	path = (const char*)argv[ADDR_ID];
-	if ((name = CheckPathSize(path, argv[SIZE_ID] >> 1)) == NULL)
+	if ((name = CheckPathSize(path, argv[SIZE_ID])) == NULL)
 		argv[0] = FS_ERR_ARGS_TOOLONG;
-	else if (CheckPathSize(++name, MAX_PATH) == NULL)
+	else if (name++, CheckPathSize(name, argv[SIZE_ID] - (name - path)) == NULL)
 		argv[0] = FS_ERR_ARGS_TOOLONG;
 	else
 		argv[0] = rename(pret[((THREAD_ID*)&argv[PTID_ID])->ProcID], path, name);
@@ -377,7 +359,7 @@ void ApiSetTime(DWORD *argv)
 
 /*系统调用表*/
 void (*ApiTable[])(DWORD *argv) = {
-	ApiGetExid, ApiGetExec, ApiReadPage, ApiProcExt, ApiEnumPart, ApiGetPart,
+	ApiGetExec, ApiReadPage, ApiProcExit, ApiEnumPart, ApiGetPart,
 	ApiCreat, ApiOpen, ApiClose, ApiRead, ApiWrite, ApiSeek, ApiSetSize, ApiOpenDir,
 	ApiReadDir, ApiChDir, ApiMkDir, ApiRemove, ApiReName, ApiGetAttr, ApiSetAttr, ApiSetTime,
 };
@@ -438,9 +420,9 @@ int main()
 
 		if ((res = KRecvMsg((THREAD_ID*)&data[PTID_ID], data, INVALID)) != NO_ERROR)	/*等待消息*/
 			break;
-		if (data[ATTR_ID] == MSG_ATTR_PROCEXT)
-			data[API_ID] = FS_API_PROCEXT;
-		if (((data[ATTR_ID] & 0xFFFF0000) == MSG_ATTR_MAP || data[ATTR_ID] == MSG_ATTR_USER || data[ATTR_ID] == MSG_ATTR_PROCEXT) && data[API_ID] < sizeof(ApiTable) / sizeof(void*))
+		if (data[ATTR_ID] == MSG_ATTR_PROCEXIT)
+			data[API_ID] = FS_API_PROCEXIT;
+		if (((data[ATTR_ID] & 0xFFFF0000) == MSG_ATTR_MAP || data[ATTR_ID] == MSG_ATTR_USER || data[ATTR_ID] == MSG_ATTR_PROCEXIT) && data[API_ID] < sizeof(ApiTable) / sizeof(void*))
 		{
 			DWORD *buf;
 

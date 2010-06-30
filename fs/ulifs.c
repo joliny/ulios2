@@ -59,7 +59,7 @@ typedef struct _BLKID
 #define ULIFS_FILE_ATTR_RDONLY	0x00000001	/*只读*/
 #define ULIFS_FILE_ATTR_HIDDEN	0x00000002	/*隐藏*/
 #define ULIFS_FILE_ATTR_SYSTEM	0x00000004	/*系统*/
-#define ULIFS_FILE_ATTR_LABEL	0x00000008	/*卷标*/
+#define ULIFS_FILE_ATTR_LABEL	0x00000008	/*卷标(只读)*/
 #define ULIFS_FILE_ATTR_DIREC	0x00000010	/*目录(只读)*/
 #define ULIFS_FILE_ATTR_ARCH	0x00000020	/*归档*/
 #define ULIFS_FILE_ATTR_EXEC	0x00000040	/*可执行*/
@@ -831,11 +831,12 @@ long UlifsReadDir(FILE_DESC *fd, QWORD *seek, FILE_INFO *fi, DWORD *curc)
 	QWORD siz;
 	long res;
 
-	for (siz = ((ULIFS_DIR*)fd->data)->size; *seek < siz; *seek += sizeof(ULIFS_DIR))
+	for (siz = ((ULIFS_DIR*)fd->data)->size; *seek < siz;)
 	{
 		ULIFS_DIR dir;
 		if ((res = UlifsRwFile(fd, FALSE, *seek, sizeof(ULIFS_DIR), &dir, curc)) != NO_ERROR)
 			return res;
+		*seek += sizeof(ULIFS_DIR);
 		if (dir.name[0] && dir.name[0] != '/')	/*有效的文件名,除去根目录*/
 		{
 			DataToInfo(fi, &dir);

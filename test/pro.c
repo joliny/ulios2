@@ -6,17 +6,46 @@
 
 #include "../driver/basesrv.h"
 
-int main(int argc, char *argv[])
-{
-	THREAD_ID ptid;
-	long res;
+#define WIDTH	800
+#define HEIGHT	600
+#define PN		50
 
-	KSleep(300);
-	if ((res = KGetKptThed(SRV_CUI_PORT, &ptid)) != NO_ERROR)
+int main()
+{
+	float x[PN], y[PN], z[PN];
+	long sx[PN], sy[PN];
+	THREAD_ID ptid;
+	long i, res;
+
+	if ((res = KGetKptThed(SRV_TIME_PORT, &ptid)) != NO_ERROR)
 		return res;
-	CUISetCur(ptid, 10, 24);
-	CUIPutS(ptid, "This is a args test pro!");
-	for (res = 0; res < 10; res++)
-		CUIPutS(ptid, "ÀÏÆÅ£¬CUI¸ã¶¨À² ¹þ¹þ\n");
+	for (i = 0; i < PN; i++)
+	{
+		x[i] = (float)((TMGetRand(ptid) & 0x1FF) - 256);
+		y[i] = (float)((TMGetRand(ptid) & 0x1FF) - 256);
+		z[i] = (float)((TMGetRand(ptid) & 0x1FF) - 256);
+	}
+	KSleep(100);
+	if ((res = GDIinit()) != NO_ERROR)
+		return res;
+	GDIFillRect(0, 0, WIDTH, HEIGHT, 0x4080FF);
+	GDIDrawStr(0, 0, "welcome to ulios 3Dline Demo!", 0xABCDEF);
+	for (res = 0; res < 1000; res++)
+	{
+		for (i = 0; i < PN - 1; i++)
+			GDIDrawLine(sx[i], sy[i], sx[i + 1], sy[i + 1], 0x4080FF);
+		for (i = 0; i < PN; i++)
+		{
+			float temp = x[i];
+			x[i] = x[i] * 0.99955f + y[i] * 0.0299955f;
+			y[i] = y[i] * 0.99955f - temp * 0.0299955f;
+			sx[i] = (long)(1000.0f * y[i] / (1400.0f - x[i])) + 400;
+			sy[i] = 300 - (long)(1000.0f * z[i] / (1400.0f - x[i]));
+		}
+		for (i = 0; i < PN - 1; i++)
+			GDIDrawLine(sx[i], sy[i], sx[i + 1], sy[i + 1], 0xFFFFFF);
+		KSleep(5);
+	}
+	GDIrelease();
 	return NO_ERROR;
 }
