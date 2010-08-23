@@ -67,13 +67,13 @@ int main()
 				data[1] = width;	/*像素分辨率*/
 				data[2] = height;
 				data[3] = PixBits;	/*色彩位数*/
-				KReadProcAddr(vm, VmSiz, ptid, data, 0);
+				KReadProcAddr(vm, VmSiz, &ptid, data, 0);
 				break;
 			case VESA_API_GETFONT:
 				data[0] = NO_ERROR;
 				data[1] = 6;	/*字符大小*/
 				data[2] = 12;
-				KWriteProcAddr(font, FONT_SIZE, ptid, data, 0);
+				KWriteProcAddr(font, FONT_SIZE, &ptid, data, 0);
 				break;
 			}
 		}

@@ -400,7 +400,6 @@ long CreateProc(DWORD attr, DWORD exec, DWORD args, THREAD_ID *ptid)
 	}
 	memset32(NewProc, 0, sizeof(PROCESS_DESC) / sizeof(DWORD));
 	NewProc->par = CurProc ? CurProc->CurTmd->id.ProcID : INVALID;
-	NewProc->MemSiz = PAGE_SIZE;	/*页目录表占用*/
 	NewProc->tmt[0] = NewThed;
 	NewProc->EndTmd = NewProc->FstTmd = &NewProc->tmt[1];
 	NewProc->CurTmd = NewThed;
@@ -435,12 +434,14 @@ long CreateProc(DWORD attr, DWORD exec, DWORD args, THREAD_ID *ptid)
 	}
 	else
 	{
+		THREAD_ID ptid;
 		DWORD data[MSG_DATA_LEN];
 		MESSAGE_DESC *msg;
 
 		data[0] = FS_API_GETEXEC;
 		data[1] = pdti;
-		if ((data[0] = MapProcAddr((void*)exec, PROC_EXEC_SIZE, kpt[FS_KPORT], FALSE, TRUE, data, FS_OUT_TIME)) != NO_ERROR)	/*向文件系统发送可执行体请求*/
+		ptid = kpt[FS_KPORT];
+		if ((data[0] = MapProcAddr((void*)exec, PROC_EXEC_SIZE, &ptid, FALSE, TRUE, data, FS_OUT_TIME)) != NO_ERROR)	/*向文件系统发送可执行体请求*/
 		{
 			cli();
 			FreePid(&pmt[pdti]);
@@ -460,7 +461,7 @@ long CreateProc(DWORD attr, DWORD exec, DWORD args, THREAD_ID *ptid)
 			LockKfree(NewProc, sizeof(PROCESS_DESC));
 			return data[2];
 		}
-		if ((data[0] = WaitThedMsg(&msg, kpt[FS_KPORT], FS_OUT_TIME)) != NO_ERROR)
+		if ((data[0] = RecvProcMsg(&msg, kpt[FS_KPORT], FS_OUT_TIME)) != NO_ERROR)
 		{
 			cli();
 			FreePid(&pmt[pdti]);

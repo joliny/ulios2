@@ -228,13 +228,15 @@ long FillPage(EXEC_DESC *exec, void *addr, DWORD ErrCode)
 			{
 				void *buf;
 				DWORD siz;
+				THREAD_ID ptid;
 				DWORD data[MSG_DATA_LEN];
 
 				buf = (fst < exec->CodeOff ? exec->CodeOff : fst);
 				siz = (end > exec->CodeEnd ? exec->CodeEnd : end) - buf;
 				data[0] = FS_API_READPAGE;	/*向文件系统发出消息读取可执行文件页*/
 				data[1] = buf - exec->CodeOff + exec->CodeSeek;
-				if ((data[0] = MapProcAddr(buf, siz, kpt[FS_KPORT], TRUE, FALSE, data, FS_OUT_TIME)) != NO_ERROR)
+				ptid = kpt[FS_KPORT];
+				if ((data[0] = MapProcAddr(buf, siz, &ptid, TRUE, FALSE, data, FS_OUT_TIME)) != NO_ERROR)
 					return data[0];
 				if (data[2] != NO_ERROR)
 					return data[2];
@@ -244,13 +246,15 @@ long FillPage(EXEC_DESC *exec, void *addr, DWORD ErrCode)
 			{
 				void *buf;
 				DWORD siz;
+				THREAD_ID ptid;
 				DWORD data[MSG_DATA_LEN];
 
 				buf = (fst < exec->DataOff ? exec->DataOff : fst);
 				siz = (end > exec->DataEnd ? exec->DataEnd : end) - buf;
 				data[0] = FS_API_READPAGE;	/*向文件系统发出消息读取可执行文件页*/
 				data[1] = buf - exec->DataOff + exec->DataSeek;
-				if ((data[0] = MapProcAddr(buf, siz, kpt[FS_KPORT], TRUE, FALSE, data, FS_OUT_TIME)) != NO_ERROR)
+				ptid = kpt[FS_KPORT];
+				if ((data[0] = MapProcAddr(buf, siz, &ptid, TRUE, FALSE, data, FS_OUT_TIME)) != NO_ERROR)
 					return data[0];
 				if (data[2] != NO_ERROR)
 					return data[2];
@@ -519,7 +523,7 @@ long UnmapAddr(void *addr)
 }
 
 /*映射地址块给别的进程,并发送映射消息*/
-long MapProcAddr(void *addr, DWORD siz, THREAD_ID ptid, BOOL isWrite, BOOL isChkExec, DWORD *argv, DWORD cs)
+long MapProcAddr(void *addr, DWORD siz, THREAD_ID *ptid, BOOL isWrite, BOOL isChkExec, DWORD *argv, DWORD cs)
 {
 	PROCESS_DESC *CurProc, *DstProc;
 	THREAD_DESC *CurThed, *DstThed;
@@ -540,13 +544,13 @@ long MapProcAddr(void *addr, DWORD siz, THREAD_ID ptid, BOOL isWrite, BOOL isChk
 		return ERROR_INVALID_MAPSIZE;
 	if (addr < UADDR_OFF)	/*与不允许被映射的区域有重合*/
 		return ERROR_INVALID_MAPADDR;
-	if (ptid.ProcID >= PMT_LEN)
+	if (ptid->ProcID >= PMT_LEN)
 		return ERROR_WRONG_PROCID;
-	if (ptid.ThedID >= TMT_LEN)
+	if (ptid->ThedID >= TMT_LEN)
 		return ERROR_WRONG_THEDID;
 	CurProc = CurPmd;
 	CurThed = CurProc->CurTmd;
-	if (ptid.ProcID == CurThed->id.ProcID)	/*不允许进程自身映射*/
+	if (ptid->ProcID == CurThed->id.ProcID)	/*不允许进程自身映射*/
 		return ERROR_WRONG_PROCID;
 	if (isChkExec)
 	{
@@ -593,13 +597,13 @@ long MapProcAddr(void *addr, DWORD siz, THREAD_ID ptid, BOOL isWrite, BOOL isChk
 		ulock(&CurProc->Page_l);
 	}
 	cli();	/*要访问其他进程的信息,所以防止任务切换*/
-	DstProc = pmt[ptid.ProcID];
+	DstProc = pmt[ptid->ProcID];
 	if (DstProc == NULL || (DstProc->attr & PROC_ATTR_DEL))
 	{
 		sti();
 		return ERROR_WRONG_PROCID;
 	}
-	DstThed = DstProc->tmt[ptid.ThedID];
+	DstThed = DstProc->tmt[ptid->ThedID];
 	if (DstThed == NULL || (DstThed->attr & THED_ATTR_DEL))
 	{
 		sti();
@@ -628,7 +632,7 @@ long MapProcAddr(void *addr, DWORD siz, THREAD_ID ptid, BOOL isWrite, BOOL isChk
 	EndPg = &pt[((DWORD)addr + siz) >> 12];
 	FstPg2 = &pt2[(DWORD)MapAddr >> 12];
 	lock(&DstProc->Page_l);
-	lockset(&pt[(PT_ID << 10) | PT2_ID], pddt[ptid.ProcID]);	/*映射关系进程的页表*/
+	lockset(&pt[(PT_ID << 10) | PT2_ID], pddt[ptid->ProcID]);	/*映射关系进程的页表*/
 	ClearPage(FstPg2, &pt2[((DWORD)MapAddr + siz) >> 12], TRUE);
 	while (FstPg < EndPg)	/*修改页表,映射地址*/
 	{
@@ -710,7 +714,7 @@ long MapProcAddr(void *addr, DWORD siz, THREAD_ID ptid, BOOL isWrite, BOOL isChk
 	map->addr = (void*)(*((DWORD*)&MapAddr) | *((DWORD*)&daddr));	/*设置映射结构*/
 	map->addr2 = (void*)(*((DWORD*)&addr) | *((DWORD*)&daddr));
 	map->siz = siz;
-	map->ptid = ptid;
+	map->ptid = *ptid;
 	map->ptid2 = CurThed->id;
 	cli();
 	map->nxt = DstProc->map;
@@ -721,7 +725,7 @@ long MapProcAddr(void *addr, DWORD siz, THREAD_ID ptid, BOOL isWrite, BOOL isChk
 	sti();	/*到此映射完成*/
 	if ((msg = AllocMsg()) == NULL)	/*申请消息结构*/
 		return ERROR_HAVENO_MSGDESC;
-	msg->ptid = ptid;	/*设置消息*/
+	msg->ptid = *ptid;	/*设置消息*/
 	msg->data[0] = isWrite ? (MSG_ATTR_MAP | TRUE) : MSG_ATTR_MAP;
 	msg->data[1] = dsiz;
 	msg->data[2] = *((DWORD*)&MapAddr) | *((DWORD*)&daddr);
@@ -733,8 +737,9 @@ long MapProcAddr(void *addr, DWORD siz, THREAD_ID ptid, BOOL isWrite, BOOL isChk
 	}
 	if (cs)	/*等待返回消息*/
 	{
-		if ((res = WaitThedMsg(&msg, ptid, cs)) != NO_ERROR)
+		if ((res = RecvProcMsg(&msg, *ptid, cs)) != NO_ERROR)
 			return res;
+		*ptid = msg->ptid;
 		memcpy32(argv, msg->data, MSG_DATA_LEN);
 		FreeMsg(msg);
 	}

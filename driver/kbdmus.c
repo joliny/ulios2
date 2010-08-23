@@ -295,7 +295,7 @@ int main()
 
 						data[0] = MSG_ATTR_KBD;
 						data[1] = KbdKey;
-						KSendMsg(RecvPtid, data, 0);
+						KSendMsg(&RecvPtid, data, 0);
 					}
 				}
 				KbdFlag = 0;
@@ -351,7 +351,7 @@ int main()
 					data[2] = MusX;
 					data[3] = MusY;
 					data[4] = MusZ;
-					KSendMsg(RecvPtid, data, 0);
+					KSendMsg(&RecvPtid, data, 0);
 				}
 			}
 		}

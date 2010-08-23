@@ -49,7 +49,7 @@ long SendMsg(MESSAGE_DESC *msg);
 /*接收消息*/
 long RecvMsg(MESSAGE_DESC **msg, DWORD cs);
 
-/*阻塞并等待指定线程的消息*/
-long WaitThedMsg(MESSAGE_DESC **msg, THREAD_ID ptid, DWORD cs);
+/*接收指定进程的消息*/
+long RecvProcMsg(MESSAGE_DESC **msg, THREAD_ID ptid, DWORD cs);
 
 #endif

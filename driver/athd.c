@@ -18,7 +18,7 @@ typedef struct _ATHD_REQ
 	BYTE cmd;
 	struct _ATHD_REQ *nxt;
 }ATHD_REQ;	/*AT磁盘请求节点*/
-#define REQ_LEN		0x200
+#define REQ_LEN		0x100
 
 #define ATHD_IRQ	0xE	/*AT磁盘中断请求号*/
 
@@ -145,8 +145,7 @@ int main()
 		return res;
 	secou[0] = haddr[0].cylinders * haddr[0].heads * haddr[0].spt;
 	secou[1] = haddr[1].cylinders * haddr[1].heads * haddr[1].spt;
-	if ((res = KFreeAddr(haddr)) != NO_ERROR)
-		return res;
+	KFreeAddr(haddr);
 	memset32(req, 0, sizeof(req) / sizeof(DWORD));	/*初始化变量*/
 	FstReq = req;
 	LstReq = ReqList = NULL;
@@ -162,21 +161,29 @@ int main()
 		{
 			ATHD_REQ *CurReq;
 
-			if ((CurReq = ReqList) == NULL)
-				continue;
-			if (CurReq->cou)
-				RwSector(CurReq);
-			if (CurReq->cou == 0)	/*读写完成*/
+			CurReq = ReqList;
+			if (CurReq->isWrite)	/*写中断*/
 			{
-				data[0] = NO_ERROR;
-				KUnmapProcAddr(CurReq->addr, data);
-				DelReq(&ReqList);
-				FreeReq(&FstReq, CurReq);
-				if (ReqList)	/*检查有没有剩余任务*/
-					OutCmd(ReqList);
-				else
-					state = STATE_WAIT;
+				if (CurReq->cou)
+				{
+					RwSector(CurReq);
+					continue;
+				}
 			}
+			else	/*读中断*/
+			{
+				RwSector(CurReq);
+				if (CurReq->cou)
+					continue;
+			}
+			data[0] = NO_ERROR;
+			KUnmapProcAddr(CurReq->addr, data);
+			DelReq(&ReqList);
+			FreeReq(&FstReq, CurReq);
+			if (ReqList)	/*检查有没有剩余任务*/
+				OutCmd(ReqList);
+			else
+				state = STATE_WAIT;
 		}
 		else if ((data[0] & 0xFFFF0000) == MSG_ATTR_MAP)	/*磁盘驱动服务消息*/
 		{

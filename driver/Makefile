@@ -14,14 +14,14 @@ DASM		= ndisasm
 CC		= gcc
 LD		= ld
 ASMFLAGS	= -f aout
-CFLAGS		= -c -O1 -Wall
+CFLAGS		= -c -O1 -Wall -m32 -fno-builtin -fleading-underscore -fno-stack-protector
 LDFILE		= ../MkApi/app.ld
-LDFLAGS		= -T $(LDFILE)
+LDFLAGS		= -T $(LDFILE) -mi386go32
 DASMFLAGS	= -u -o $(ENTRYPOINT) -e $(ENTRYOFFSET)
 
 # This Program
 HEADS		= ../MkApi/ulimkapi.h basesrv.h
-OBJS		= ../objs/athd.o ../objs/time.o ../objs/kbdmus.o ../objs/vesa.o ../objs/gdi.o ../objs/cui.o ../objs/rep.o
+OBJS		= ../objs/athd.o ../objs/time.o ../objs/kbdmus.o ../objs/vesa.o ../objs/gdi.o ../objs/cui.o ../objs/rep.o ../objs/speaker.o
 HEADOBJ		= ../objs/apphead.o
 
 # All Phony Targets
@@ -29,7 +29,7 @@ HEADOBJ		= ../objs/apphead.o
 
 # Default starting position
 
-all : ../out/ulios/athd.bin ../out/ulios/time.bin ../out/ulios/kbdmus.bin ../out/ulios/vesa.bin ../out/ulios/cui.bin ../out/ulios/rep.bin
+all : ../out/ulios/athd.bin ../out/ulios/time.bin ../out/ulios/kbdmus.bin ../out/ulios/vesa.bin ../out/ulios/cui.bin ../out/ulios/rep.bin ../out/ulios/speaker.bin
 
 redo : clean all
 
@@ -54,6 +54,9 @@ clean :
 ../out/ulios/rep.bin : ../objs/rep.o $(HEADOBJ) $(LDFILE)
 	$(LD) $(LDFLAGS) -o $@ $(HEADOBJ) ../objs/rep.o
 
+../out/ulios/speaker.bin : ../objs/speaker.o $(HEADOBJ) $(LDFILE)
+	$(LD) $(LDFLAGS) -o $@ $(HEADOBJ) ../objs/speaker.o
+
 ../objs/apphead.o : ../MkApi/apphead.c
 	$(CC) $(CFLAGS) -o $@ $<
 
@@ -66,7 +69,7 @@ clean :
 ../objs/kbdmus.o : kbdmus.c $(HEADS)
 	$(CC) $(CFLAGS) -o $@ $<
 
-../objs/vesa.o : vesa.c $(HEADS)
+../objs/vesa.o : vesa.c $(HEADS) ../fs/fsapi.h
 	$(CC) $(CFLAGS) -o $@ $<
 
 ../objs/gdi.o : gdi.c $(HEADS)
@@ -76,4 +79,7 @@ clean :
 	$(CC) $(CFLAGS) -o $@ $<
 
 ../objs/rep.o : rep.c $(HEADS)
+	$(CC) $(CFLAGS) -o $@ $<
+
+../objs/speaker.o : speaker.c $(HEADS)
 	$(CC) $(CFLAGS) -o $@ $<

@@ -439,20 +439,23 @@ strfre:	if ((res = FreeClu(CurPart, CurIdx)) != NO_ERROR)
 			PreIdx = CurIdx;
 			CurIdx = idx[CurIdx & 0x7F];
 		}
-stralc:	clu = AllocClu(CurPart, cun - clui);
-		if (cun0)	/*设置连接簇*/
+stralc:	if (cun - clui)
 		{
-			RwPart(CurPart, FALSE, ((FAT32*)CurPart->data)->res + (PreIdx >> 7), 1, idx);
-			idx[PreIdx & 0x7F] = clu;
-			RwPart(CurPart, TRUE, ((FAT32*)CurPart->data)->res + (PreIdx >> 7), 1, idx);
-			RwPart(CurPart, TRUE, ((FAT32*)CurPart->data)->res + ((FAT32*)CurPart->data)->spfat + (PreIdx >> 7), 1, idx);
+			clu = AllocClu(CurPart, cun - clui);
+			if (cun0)	/*设置连接簇*/
+			{
+				RwPart(CurPart, FALSE, ((FAT32*)CurPart->data)->res + (PreIdx >> 7), 1, idx);
+				idx[PreIdx & 0x7F] = clu;
+				RwPart(CurPart, TRUE, ((FAT32*)CurPart->data)->res + (PreIdx >> 7), 1, idx);
+				RwPart(CurPart, TRUE, ((FAT32*)CurPart->data)->res + ((FAT32*)CurPart->data)->spfat + (PreIdx >> 7), 1, idx);
+			}
+			else
+			{
+				data->idxh = clu >> 16;
+				data->idxl = clu;
+			}
+			CurPart->part.remain -= (cun - cun0) * bpc;
 		}
-		else
-		{
-			data->idxh = clu >> 16;
-			data->idxl = clu;
-		}
-		CurPart->part.remain -= (cun - cun0) * bpc;
 		data->size = (data->attr & FAT32_FILE_ATTR_DIREC) ? 0 : siz;
 		fd->file.size = siz;
 		if (par)
@@ -655,6 +658,8 @@ long Fat32SchFile(FILE_DESC *fd, const char *path)
 				fd->idx = seek / sizeof(FAT32_DIR);
 				return NO_ERROR;
 			}
+			if (curc == 0)
+				break;
 		}
 		fd->data = NULL;
 		free(dir, sizeof(FAT32_DIR));
@@ -708,7 +713,9 @@ long Fat32NewFile(FILE_DESC *fd, const char *path)
 	FILE_DESC *par;
 	FAT32_DIR *dir;
 	DWORD curc, seek;
+	DWORD bpc;
 	long res;
+	FAT32_DIR dat[FAT32_BPS * FAT32_MAX_SPC / sizeof(FAT32_DIR)];	/*数据簇*/
 
 	if ((res = CheckName(path)) != NO_ERROR)	/*检查文件名*/
 		return res;
@@ -724,55 +731,66 @@ long Fat32NewFile(FILE_DESC *fd, const char *path)
 	}
 	if ((dir = (FAT32_DIR*)malloc(sizeof(FAT32_DIR))) == NULL)
 		return FS_ERR_HAVENO_MEMORY;
+	bpc = ((FAT32*)fd->part->data)->spc * FAT32_BPS;
 	/*搜索空位*/
 	par = fd->par;
 	for (curc = 0, seek = 0;; seek += sizeof(FAT32_DIR))
 	{
+		DWORD tmpcurc = curc;
 		if ((res = Fat32RwFile(par, FALSE, seek, sizeof(FAT32_DIR), dir, &curc)) != NO_ERROR)
 		{
 			free(dir, sizeof(FAT32_DIR));
 			return res;
 		}
 		if (dir->name[0] == (char)0xE5)
+		{
+			strcpy(fd->file.name, path);
+			fd->file.size = 0;
+			InfoToData(dir, &fd->file);
+			if ((res = Fat32RwFile(par, TRUE, seek, sizeof(FAT32_DIR), dir, &tmpcurc)) != NO_ERROR)
+			{
+				free(dir, sizeof(FAT32_DIR));
+				return res;
+			}
 			goto crtdir;
-		if (dir->name[0] == (char)0)
+		}
+		if (dir->name[0] == 0)
 			break;
+		if (curc == 0)
+		{
+			seek += sizeof(FAT32_DIR);
+			break;
+		}
 	}
 	if (seek >= sizeof(FAT32_DIR) * FAT32_MAX_DIR)
 	{
 		free(dir, sizeof(FAT32_DIR));
 		return FS_ERR_SIZE_LIMIT;
 	}
-	((FAT32_DIR*)par->data)->size = seek + sizeof(FAT32_DIR);
-	if ((res = Fat32SetSize(par, seek + sizeof(FAT32_DIR) * 2)) != NO_ERROR)	/*增大目录*/
+	((FAT32_DIR*)par->data)->size = seek;
+	if ((res = Fat32SetSize(par, seek + sizeof(FAT32_DIR))) != NO_ERROR)	/*增大目录*/
 	{
 		((FAT32_DIR*)par->data)->size = 0;
 		free(dir, sizeof(FAT32_DIR));
 		return res;
 	}
-	if ((res = Fat32RwFile(par, TRUE, seek + sizeof(FAT32_DIR), sizeof(FAT32_DIR), dir, NULL)) != NO_ERROR)	/*设置结束目录项*/
-	{
-		free(dir, sizeof(FAT32_DIR));
-		return res;
-	}
-crtdir:	/*创建*/
 	strcpy(fd->file.name, path);
 	fd->file.size = 0;
 	InfoToData(dir, &fd->file);
-	if ((res = Fat32RwFile(par, TRUE, seek, sizeof(FAT32_DIR), dir, &curc)) != NO_ERROR)
+	memcpy32(&dat[0], dir, sizeof(FAT32_DIR) / sizeof(DWORD));
+	memset32(&dat[1], 0, (bpc - seek % bpc - sizeof(FAT32_DIR)) / sizeof(DWORD));
+	if ((res = Fat32RwFile(par, TRUE, seek, bpc - seek % bpc, dat, NULL)) != NO_ERROR)
 	{
 		free(dir, sizeof(FAT32_DIR));
 		return res;
 	}
+crtdir:
 	fd->idx = seek / sizeof(FAT32_DIR);
 	fd->data = dir;
 	if (dir->attr & FAT32_FILE_ATTR_DIREC)	/*目录中创建目录的.和..*/
 	{
-		DWORD bpc;
-		FAT32_DIR dat[FAT32_BPS * FAT32_MAX_SPC / sizeof(FAT32_DIR)];	/*数据簇*/
-		bpc = ((FAT32*)fd->part->data)->spc * FAT32_BPS;
 		dir->size = 0;
-		if ((res = Fat32SetSize(fd, sizeof(FAT32_DIR) * 3)) != NO_ERROR)	/*设置初始目录大小*/
+		if ((res = Fat32SetSize(fd, sizeof(FAT32_DIR) * 2)) != NO_ERROR)	/*设置初始目录大小*/
 		{
 			fd->data = NULL;
 			free(dir, sizeof(FAT32_DIR));
@@ -800,24 +818,28 @@ long Fat32DelFile(FILE_DESC *fd)
 {
 	FAT32_DIR *data;
 	FILE_DESC *par;
-	DWORD seek;
+	DWORD curc, seek;
 	long res;
 
 	data = (FAT32_DIR*)fd->data;
 	if (data->attr & FAT32_FILE_ATTR_DIREC)
 	{
-		DWORD curc;
 		FAT32_DIR dir;
 		for(seek = sizeof(FAT32_DIR) * 2, curc = 0;; seek += sizeof(FAT32_DIR))	/*检查目录是否空*/
 		{
 			if ((res = Fat32RwFile(fd, FALSE, seek, sizeof(FAT32_DIR), &dir, &curc)) != NO_ERROR)
 				return res;
-			if (dir.name[0] == (char)0)
+			if (dir.name[0] == 0)
 				break;
+			if (curc == 0)
+			{
+				seek += sizeof(FAT32_DIR);
+				break;
+			}
 			if (dir.name[0] != (char)0xE5)	/*不空的目录不能删除*/
 				return FS_ERR_DIR_NOT_EMPTY;
 		}
-		data->size = seek + sizeof(FAT32_DIR);
+		data->size = seek;
 		if ((res = Fat32SetSize(fd, 0)) != NO_ERROR)	/*清空目录*/
 		{
 			data->size = 0;
@@ -829,11 +851,15 @@ long Fat32DelFile(FILE_DESC *fd)
 			return res;
 	par = fd->par;
 	seek = fd->idx * sizeof(FAT32_DIR);
-	if ((res = Fat32RwFile(par, FALSE, seek + sizeof(FAT32_DIR), sizeof(FAT32_DIR), data, NULL)) != NO_ERROR)
+	curc = 0;
+	data->name[0] = (char)0xE5;
+	if ((res = Fat32RwFile(par, TRUE, seek, sizeof(FAT32_DIR), data, &curc)) != NO_ERROR)	/*标记为删除并检查是不是最后一项*/
 		return res;
-	if (data->name[0] == 0)	/*已是最后一项*/
+	if (curc && (res = Fat32RwFile(par, FALSE, seek + sizeof(FAT32_DIR), sizeof(FAT32_DIR), data, NULL)) != NO_ERROR)
+		return res;
+	if (curc == 0 || data->name[0] == 0)	/*已是最后一项,清除目录占用的空间*/
 	{
-		DWORD tmpseek = seek + sizeof(FAT32_DIR) * 2;
+		DWORD tmpseek = seek + sizeof(FAT32_DIR);
 		while (seek)
 		{
 			if ((res = Fat32RwFile(par, FALSE, seek - sizeof(FAT32_DIR), sizeof(FAT32_DIR), data, NULL)) != NO_ERROR)
@@ -842,21 +868,12 @@ long Fat32DelFile(FILE_DESC *fd)
 				break;
 			seek -= sizeof(FAT32_DIR);
 		}
-		memset32(data, 0, sizeof(FAT32_DIR) / sizeof(DWORD));
-		if ((res = Fat32RwFile(par, TRUE, seek, sizeof(FAT32_DIR), data, NULL)) != NO_ERROR)
-			return res;
 		((FAT32_DIR*)par->data)->size = tmpseek;
-		if ((res = Fat32SetSize(par, seek + sizeof(FAT32_DIR))) != NO_ERROR)
+		if ((res = Fat32SetSize(par, seek)) != NO_ERROR)
 		{
 			((FAT32_DIR*)par->data)->size = 0;
 			return res;
 		}
-	}
-	else	/*直接标记为删除*/
-	{
-		data->name[0] = (char)0xE5;
-		if ((res = Fat32RwFile(par, TRUE, seek, sizeof(FAT32_DIR), data, NULL)) != NO_ERROR)
-			return res;
 	}
 	free(data, sizeof(FAT32_DIR));
 	fd->data = NULL;
@@ -888,6 +905,8 @@ long Fat32SetFile(FILE_DESC *fd, FILE_INFO *fi)
 			fd->file.attr = fi->attr & 0x3F;
 		}
 		InfoToData(fd->data, &fd->file);
+		if (((FAT32_DIR*)fd->data)->attr & FAT32_FILE_ATTR_DIREC)
+			((FAT32_DIR*)fd->data)->size = 0;
 		return Fat32RwFile(fd->par, TRUE, fd->idx * sizeof(FAT32_DIR), sizeof(FAT32_DIR), fd->data, NULL);
 	}
 	return NO_ERROR;
@@ -911,6 +930,8 @@ long Fat32ReadDir(FILE_DESC *fd, QWORD *seek, FILE_INFO *fi, DWORD *curc)
 			DataToInfo(fi, &dir);
 			return NO_ERROR;
 		}
+		if (*curc == 0)
+			break;
 	}
 	*seek = 0;
 	return FS_ERR_END_OF_FILE;

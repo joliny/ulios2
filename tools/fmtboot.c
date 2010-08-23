@@ -200,7 +200,7 @@ void ReadPart(PART_INF *part)
 	part->fsid = 0;
 }
 
-int Fat32Setup(PART_INF *part)
+int Fat32Setup(PART_INF *part, BOOL isAdvCpu)
 {
 	FAT32_BOOTSEC dbr, boot;
 	BYTE buf[0xE00];
@@ -227,9 +227,18 @@ int Fat32Setup(PART_INF *part)
 	fseek(f, 0xF00, SEEK_SET);
 	fread(buf, 0xA00, 1, f);
 	fclose(f);
-	printf("Reading... setup\n");
-	if ((f = fopen("SETUP", "rb")) == NULL)
-		return ERROR_FILE;
+	if (isAdvCpu)
+	{
+		printf("Reading... setup\n");
+		if ((f = fopen("SETUP", "rb")) == NULL)
+			return ERROR_FILE;
+	}
+	else
+	{
+		printf("Reading... setup386\n");
+		if ((f = fopen("SETUP386", "rb")) == NULL)
+			return ERROR_FILE;
+	}
 	fread(&buf[0xA00], 0x400, 1, f);
 	fclose(f);
 
@@ -248,7 +257,7 @@ int Fat32Setup(PART_INF *part)
 	return NO_ERROR;
 }
 
-int UlifsSetup(PART_INF *part)
+int UlifsSetup(PART_INF *part, BOOL isAdvCpu)
 {
 	ULIFS_BOOTSEC dbr, boot;
 	BYTE buf[0xE00];
@@ -274,9 +283,18 @@ int UlifsSetup(PART_INF *part)
 	fseek(f, 0xF00, SEEK_SET);
 	fread(buf, 0xA00, 1, f);
 	fclose(f);
-	printf("Reading... setup\n");
-	if ((f = fopen("SETUP", "rb")) == NULL)
-		return ERROR_FILE;
+	if (isAdvCpu)
+	{
+		printf("Reading... setup\n");
+		if ((f = fopen("SETUP", "rb")) == NULL)
+			return ERROR_FILE;
+	}
+	else
+	{
+		printf("Reading... setup386\n");
+		if ((f = fopen("SETUP386", "rb")) == NULL)
+			return ERROR_FILE;
+	}
 	fread(&buf[0xA00], 0x400, 1, f);
 	fclose(f);
 
@@ -298,6 +316,7 @@ int UlifsSetup(PART_INF *part)
 int main()
 {
 	PART_INF part[32], *partp;
+	char buf[16];
 	WORD partn, sel;
 	int res;
 	printf("Welcome to ulios loader install program!\nI will write ulios loader to your hard disk.\nWrite f32boot/f32ldr/setup to partition when you select FAT32\nwrite uliboot/ulildr/setup when you select ULIFS.\n\n");
@@ -326,7 +345,6 @@ int main()
 	printf("Which partition you want to setup ulios?\n[0:Exit, 1 to %u:Select partition]:", partn);
 	for (;;)
 	{
-		char buf[16];
 		gets(buf);
 		sel = atoi(buf);
 		if (sel == 0)
@@ -344,15 +362,17 @@ int main()
 		}
 		break;
 	}
+	printf("Do you have a advanced x86 CPU?(It support most of x86 CPU, except 80386/486/Pentium100/Pentium1)[y/n]:");
+	gets(buf);
 	switch (partp->fsid)
 	{
 	case 0x01:
 	case 0x0B:
 	case 0x0C:
-		res = Fat32Setup(partp);
+		res = Fat32Setup(partp, buf[0] == 'y');
 		break;
 	case 0x7C:
-		res = UlifsSetup(partp);
+		res = UlifsSetup(partp, buf[0] == 'y');
 		break;
 	}
 	switch (res)

@@ -12,8 +12,9 @@ extern void CloseFS();
 extern long GetExec(PROCRES_DESC *pres, const char *path, DWORD pid, DWORD *exec);
 extern long ReadPage(PROCRES_DESC *pres, void *buf, DWORD siz, DWORD seek);
 extern long ProcExit(PROCRES_DESC *pres);
-extern long EnumPart(PROCRES_DESC *pres, DWORD *pid);
-extern long GetPart(PROCRES_DESC *pres, DWORD pid, PART_INFO *pi);
+extern long EnumPart(DWORD *pid);
+extern long GetPart(DWORD pid, PART_INFO *pi);
+extern long SetPart(DWORD pid, PART_INFO *pi);
 extern long creat(PROCRES_DESC *pres, const char *path, DWORD *fhi);
 extern long open(PROCRES_DESC *pres, const char *path, BOOL isWrite, DWORD *fhi);
 extern long close(PROCRES_DESC *pres, DWORD fhi);
@@ -30,6 +31,7 @@ extern long rename(PROCRES_DESC *pres, const char *path, const char *name);
 extern long GetAttr(PROCRES_DESC *pres, const char *path, FILE_INFO *fi);
 extern long SetAttr(PROCRES_DESC *pres, const char *path, DWORD attr);
 extern long SetTime(PROCRES_DESC *pres, const char *path, DWORD time, DWORD cma);
+extern long ProcInfo(DWORD *pid, FILE_INFO *fi);
 
 #define ATTR_ID	0
 #define SIZE_ID	1
@@ -66,7 +68,7 @@ void ApiGetExec(DWORD *argv)
 	if (argv[0] == NO_ERROR)
 	{
 		exec[0] |= MSG_ATTR_USER;
-		KSendMsg(*((THREAD_ID*)&argv[PTID_ID]), exec, 0);
+		KSendMsg((THREAD_ID*)&argv[PTID_ID], exec, 0);
 	}
 }
 
@@ -106,9 +108,9 @@ void ApiEnumPart(DWORD *argv)
 		return;
 	}
 	argv[0] = MSG_ATTR_USER;
-	argv[1] = EnumPart(pret[((THREAD_ID*)&argv[PTID_ID])->ProcID], &argv[API_ID + 1]);
+	argv[1] = EnumPart(&argv[API_ID + 1]);
 	argv[2] = argv[API_ID + 1];
-	KSendMsg(*((THREAD_ID*)&argv[PTID_ID]), argv, 0);
+	KSendMsg((THREAD_ID*)&argv[PTID_ID], argv, 0);
 }
 
 void ApiGetPart(DWORD *argv)
@@ -121,7 +123,21 @@ void ApiGetPart(DWORD *argv)
 		KUnmapProcAddr((void*)argv[ADDR_ID], argv);
 		return;
 	}
-	argv[0] = GetPart(pret[((THREAD_ID*)&argv[PTID_ID])->ProcID], argv[API_ID + 1], (PART_INFO*)argv[ADDR_ID]);
+	argv[0] = GetPart(argv[API_ID + 1], (PART_INFO*)argv[ADDR_ID]);
+	KUnmapProcAddr((void*)argv[ADDR_ID], argv);
+}
+
+void ApiSetPart(DWORD *argv)
+{
+	if ((argv[ATTR_ID] & 0xFFFF0000) != MSG_ATTR_MAP)
+		return;
+	if (argv[SIZE_ID] < sizeof(PART_INFO))
+	{
+		argv[0] = FS_ERR_WRONG_ARGS;
+		KUnmapProcAddr((void*)argv[ADDR_ID], argv);
+		return; 
+	}
+	argv[0] = SetPart(argv[API_ID + 1], (PART_INFO*)argv[ADDR_ID]);
 	KUnmapProcAddr((void*)argv[ADDR_ID], argv);
 }
 
@@ -163,7 +179,7 @@ void ApiClose(DWORD *argv)
 	}
 	argv[0] = MSG_ATTR_USER;
 	argv[1] = close(pret[((THREAD_ID*)&argv[PTID_ID])->ProcID], argv[API_ID + 1]);
-	KSendMsg(*((THREAD_ID*)&argv[PTID_ID]), argv, 0);
+	KSendMsg((THREAD_ID*)&argv[PTID_ID], argv, 0);
 }
 
 void ApiRead(DWORD *argv)
@@ -204,7 +220,7 @@ void ApiSeek(DWORD *argv)
 	}
 	argv[0] = MSG_ATTR_USER;
 	argv[1] = seek(pret[((THREAD_ID*)&argv[PTID_ID])->ProcID], argv[API_ID + 1], *((SQWORD*)&argv[API_ID + 2]), argv[API_ID + 4]);
-	KSendMsg(*((THREAD_ID*)&argv[PTID_ID]), argv, 0);
+	KSendMsg((THREAD_ID*)&argv[PTID_ID], argv, 0);
 }
 
 void ApiSetSize(DWORD *argv)
@@ -217,7 +233,7 @@ void ApiSetSize(DWORD *argv)
 	}
 	argv[0] = MSG_ATTR_USER;
 	argv[1] = SetSize(pret[((THREAD_ID*)&argv[PTID_ID])->ProcID], argv[API_ID + 1], *((QWORD*)&argv[API_ID + 2]));
-	KSendMsg(*((THREAD_ID*)&argv[PTID_ID]), argv, 0);
+	KSendMsg((THREAD_ID*)&argv[PTID_ID], argv, 0);
 }
 
 void ApiOpenDir(DWORD *argv)
@@ -357,11 +373,29 @@ void ApiSetTime(DWORD *argv)
 	KUnmapProcAddr((void*)path, argv);
 }
 
+void ApiProcInfo(DWORD *argv)
+{
+	FILE_INFO *buf;
+
+	if ((argv[ATTR_ID] & 0xFFFF0000) != MSG_ATTR_MAP)
+		return;
+	if (!(argv[ATTR_ID] & 1) || argv[SIZE_ID] < sizeof(FILE_INFO))
+	{
+		argv[0] = FS_ERR_WRONG_ARGS;
+		KUnmapProcAddr((void*)argv[ADDR_ID], argv);
+		return;
+	}
+	buf = (FILE_INFO*)argv[ADDR_ID];
+	argv[0] = ProcInfo(&argv[API_ID + 1], buf);
+	argv[1] = argv[API_ID + 1];
+	KUnmapProcAddr((void*)buf, argv);
+}
+
 /*系统调用表*/
 void (*ApiTable[])(DWORD *argv) = {
-	ApiGetExec, ApiReadPage, ApiProcExit, ApiEnumPart, ApiGetPart,
-	ApiCreat, ApiOpen, ApiClose, ApiRead, ApiWrite, ApiSeek, ApiSetSize, ApiOpenDir,
-	ApiReadDir, ApiChDir, ApiMkDir, ApiRemove, ApiReName, ApiGetAttr, ApiSetAttr, ApiSetTime,
+	ApiGetExec, ApiReadPage, ApiProcExit, ApiEnumPart, ApiGetPart, ApiSetPart, ApiCreat, ApiOpen,
+	ApiClose, ApiRead, ApiWrite, ApiSeek, ApiSetSize, ApiOpenDir, ApiReadDir, ApiChDir,
+	ApiMkDir, ApiRemove, ApiReName, ApiGetAttr, ApiSetAttr, ApiSetTime, ApiProcInfo
 };
 
 /*高速缓冲保存线程*/
@@ -391,7 +425,7 @@ void ApiProc(DWORD *argv)
 			{
 				argv[0] = MSG_ATTR_USER;
 				argv[1] = FS_ERR_HAVENO_MEMORY;
-				KSendMsg(*((THREAD_ID*)&argv[PTID_ID]), argv, 0);
+				KSendMsg((THREAD_ID*)&argv[PTID_ID], argv, 0);
 			}
 			free(argv, sizeof(DWORD) * (MSG_DATA_LEN + 1));
 			KExitThread(NO_ERROR);
@@ -422,6 +456,8 @@ int main()
 			break;
 		if (data[ATTR_ID] == MSG_ATTR_PROCEXIT)
 			data[API_ID] = FS_API_PROCEXIT;
+		else if (data[ATTR_ID] == MSG_ATTR_EXITREQ)
+			break;
 		if (((data[ATTR_ID] & 0xFFFF0000) == MSG_ATTR_MAP || data[ATTR_ID] == MSG_ATTR_USER || data[ATTR_ID] == MSG_ATTR_PROCEXIT) && data[API_ID] < sizeof(ApiTable) / sizeof(void*))
 		{
 			DWORD *buf;
@@ -437,7 +473,7 @@ int main()
 				{
 					data[0] = MSG_ATTR_USER;
 					data[1] = FS_ERR_HAVENO_MEMORY;
-					KSendMsg(*((THREAD_ID*)&data[PTID_ID]), data, 0);
+					KSendMsg((THREAD_ID*)&data[PTID_ID], data, 0);
 				}
 				continue;
 			}
@@ -445,6 +481,7 @@ int main()
 			KCreateThread((void(*)(void*))ApiProc, 0x40000, buf, &ptid);
 		}
 	}
+	KSleep(100);
 	CloseFS();
 	return NO_ERROR;
 }

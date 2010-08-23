@@ -64,7 +64,7 @@ long MapUserAddr(void **addr, DWORD siz);
 long UnmapAddr(void *addr);
 
 /*映射地址块给别的进程,并发送开始消息*/
-long MapProcAddr(void *addr, DWORD siz, THREAD_ID ptid, BOOL isWrite, BOOL isChkExec, DWORD *argv, DWORD cs);
+long MapProcAddr(void *addr, DWORD siz, THREAD_ID *ptid, BOOL isWrite, BOOL isChkExec, DWORD *argv, DWORD cs);
 
 /*解除映射进程共享地址,并发送完成消息*/
 long UnmapProcAddr(void *addr, const DWORD *argv);
