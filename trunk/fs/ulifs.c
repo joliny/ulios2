@@ -646,13 +646,13 @@ long UlifsSchFile(FILE_DESC *fd, const char *path)
 		return FS_ERR_HAVENO_MEMORY;
 	if ((par = fd->par) == NULL)	/*取得根目录项*/
 	{
-		ULIFS_DIR dir[ULIFS_BPS / sizeof(ULIFS_DIR)];
-		if ((res = RwPart(fd->part, FALSE, ((ULIFS*)fd->part->data)->CluID, 1, dir)) != NO_ERROR)	/*读取数据簇中的第一个扇区*/
+		ULIFS_DIR tmpdir[ULIFS_BPS / sizeof(ULIFS_DIR)];
+		if ((res = RwPart(fd->part, FALSE, ((ULIFS*)fd->part->data)->CluID, 1, tmpdir)) != NO_ERROR)	/*读取数据簇中的第一个扇区*/
 		{
 			free(dir, sizeof(ULIFS_DIR));
 			return res;
 		}
-		*dir = dir[0];
+		*dir = tmpdir[0];
 		DataToInfo(&fd->file, dir);
 		fd->idx = 0;
 		fd->data = dir;

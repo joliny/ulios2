@@ -1,13 +1,11 @@
-/*	pro.c
+/*	3dline.c for ulios application
 	作者：孙亮
-	功能：可执行文件测试程序
+	功能：3D线条浮点运算测试程序
 	最后修改日期：2010-05-14
 */
 
 #include "../driver/basesrv.h"
 
-#define WIDTH	800
-#define HEIGHT	600
 #define PN		50
 
 int main()
@@ -25,10 +23,9 @@ int main()
 		y[i] = (float)((TMGetRand(ptid) & 0x1FF) - 256);
 		z[i] = (float)((TMGetRand(ptid) & 0x1FF) - 256);
 	}
-	KSleep(100);
 	if ((res = GDIinit()) != NO_ERROR)
 		return res;
-	GDIFillRect(0, 0, WIDTH, HEIGHT, 0x4080FF);
+	GDIFillRect(0, 0, GDIwidth, GDIheight, 0x4080FF);
 	GDIDrawStr(0, 0, "welcome to ulios 3Dline Demo!", 0xABCDEF);
 	for (res = 0; res < 1000; res++)
 	{

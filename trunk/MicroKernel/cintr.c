@@ -47,7 +47,8 @@ void (*AsmIrqCallTable[])() = {
 void (*ApiCallTable[])(DWORD *argv) = {
 	ApiGetPtid, ApiGiveUp, ApiSleep, ApiCreateThread, ApiExitThread, ApiKillThread, ApiCreateProcess, ApiExitProcess,
 	ApiKillProcess, ApiRegKnlPort, ApiUnregKnlPort, ApiGetKpToThed, ApiRegIrq, ApiUnregIrq, ApiSendMsg, ApiRecvMsg,
-	ApiMapPhyAddr, ApiMapUserAddr, ApiFreeAddr, ApiReadProcAddr, ApiWriteProcAddr, ApiUnmapProcAddr, ApiCnlmapProcAddr, ApiGetClock
+	ApiRecvProcMsg, ApiMapPhyAddr, ApiMapUserAddr, ApiFreeAddr, ApiReadProcAddr, ApiWriteProcAddr, ApiUnmapProcAddr, ApiCnlmapProcAddr,
+	ApiGetClock
 };
 
 /*中断处理初始化*/
@@ -438,8 +439,9 @@ void ApiSendMsg(DWORD *argv)
 	if ((argv[EAX_ID] = SendMsg(msg)) != NO_ERROR)
 		FreeMsg(msg);
 	if (argv[EAX_ID] == NO_ERROR && argv[ECX_ID])	/*等待返回消息*/
-		if ((argv[EAX_ID] = WaitThedMsg(&msg, *((THREAD_ID*)&argv[EBX_ID]), argv[ECX_ID])) == NO_ERROR)
+		if ((argv[EAX_ID] = RecvProcMsg(&msg, *((THREAD_ID*)&argv[EBX_ID]), argv[ECX_ID])) == NO_ERROR)
 		{
+			argv[EBX_ID] = *((DWORD*)&msg->ptid);
 			memcpy32(data, msg->data, MSG_DATA_LEN);
 			FreeMsg(msg);
 			memcpy32(addr, data, MSG_DATA_LEN);	/*复制数据到用户空间*/
@@ -452,11 +454,32 @@ void ApiRecvMsg(DWORD *argv)
 	MESSAGE_DESC *msg;
 	void *addr;
 	DWORD data[MSG_DATA_LEN];
-
+	
 	addr = (void*)argv[ESI_ID];
 	if (addr < UADDR_OFF || addr > (void*)(0 - sizeof(data)))
 		addr = NULL;
-	if ((argv[EAX_ID] = RecvMsg(&msg, argv[EBX_ID])) == NO_ERROR)
+	if ((argv[EAX_ID] = RecvMsg(&msg, argv[ECX_ID])) == NO_ERROR)
+	{
+		argv[EBX_ID] = *((DWORD*)&msg->ptid);
+		if (addr)
+			memcpy32(data, msg->data, MSG_DATA_LEN);
+		FreeMsg(msg);
+		if (addr)
+			memcpy32(addr, data, MSG_DATA_LEN);	/*复制数据到用户空间*/
+	}
+}
+
+/*接收指定进程的消息*/
+void ApiRecvProcMsg(DWORD *argv)
+{
+	MESSAGE_DESC *msg;
+	void *addr;
+	DWORD data[MSG_DATA_LEN];
+	
+	addr = (void*)argv[ESI_ID];
+	if (addr < UADDR_OFF || addr > (void*)(0 - sizeof(data)))
+		addr = NULL;
+	if ((argv[EAX_ID] = RecvProcMsg(&msg, *((THREAD_ID*)&argv[EBX_ID]), argv[ECX_ID])) == NO_ERROR)
 	{
 		argv[EBX_ID] = *((DWORD*)&msg->ptid);
 		if (addr)
@@ -499,7 +522,7 @@ void ApiReadProcAddr(DWORD *argv)
 		memcpy32(data, addr, MSG_DATA_LEN - 3);	/*复制数据到内核空间*/
 		CurPmd->CurTmd->attr &= (~THED_ATTR_APPS);	/*防止访问用户内存时发生页异常,重新进入系统调用态*/
 	}
-	if ((argv[EAX_ID] = MapProcAddr((void*)argv[EDI_ID], argv[ECX_ID], *((THREAD_ID*)&argv[EBX_ID]), TRUE, TRUE, data, argv[EDX_ID])) == NO_ERROR)
+	if ((argv[EAX_ID] = MapProcAddr((void*)argv[EDI_ID], argv[ECX_ID], (THREAD_ID*)&argv[EBX_ID], TRUE, TRUE, data, argv[EDX_ID])) == NO_ERROR)
 		if (addr)
 			memcpy32(addr, data, MSG_DATA_LEN);	/*复制数据到用户空间*/
 }
@@ -518,7 +541,7 @@ void ApiWriteProcAddr(DWORD *argv)
 		memcpy32(data, addr, MSG_DATA_LEN - 3);	/*复制数据到内核空间*/
 		CurPmd->CurTmd->attr &= (~THED_ATTR_APPS);	/*防止访问用户内存时发生页异常,重新进入系统调用态*/
 	}
-	if ((argv[EAX_ID] = MapProcAddr((void*)argv[EDI_ID], argv[ECX_ID], *((THREAD_ID*)&argv[EBX_ID]), FALSE, TRUE, data, argv[EDX_ID])) == NO_ERROR)
+	if ((argv[EAX_ID] = MapProcAddr((void*)argv[EDI_ID], argv[ECX_ID], (THREAD_ID*)&argv[EBX_ID], FALSE, TRUE, data, argv[EDX_ID])) == NO_ERROR)
 		if (addr)
 			memcpy32(addr, data, MSG_DATA_LEN);	/*复制数据到用户空间*/
 }

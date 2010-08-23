@@ -42,7 +42,7 @@ typedef struct _CACHE_DESC
 #define BLKATTR_MASK	(~BLKID_MASK)				/*块属性蒙板*/
 #define BMT_LEN			(1ul << BLKID_SHIFT)		/*缓冲块数量*/
 #define MAXPROC_COU		0x80						/*最多处理块数量*/
-#define PROC_INTERVAL	0x1000						/*缓冲数据保存时间间隔*/
+#define PROC_INTERVAL	0x400						/*缓冲数据保存时间间隔*/
 extern CACHE_DESC bmt[];	/*高速缓冲管理表*/
 extern void *cache;			/*高速缓冲*/
 extern DWORD cahl;			/*缓冲管理锁*/

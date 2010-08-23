@@ -14,9 +14,9 @@ DASM		= ndisasm
 CC		= gcc
 LD		= ld
 ASMFLAGS	= -f aout
-CFLAGS		= -c -O1 -Wall
+CFLAGS		= -c -O1 -Wall -m32 -fno-builtin -fleading-underscore -fno-stack-protector
 LDFILE		= ../MkApi/app.ld
-LDFLAGS		= -T $(LDFILE) -Map ../objs/fsmap.txt
+LDFLAGS		= -T $(LDFILE) -mi386go32 -Map ../objs/fsmap.txt
 DASMFLAGS	= -u -o $(ENTRYPOINT) -e $(ENTRYOFFSET)
 
 # This Program

@@ -10,7 +10,7 @@
 #define CMD_LEN		256
 #define PROMPT		"命令:"
 
-THREAD_ID TimePtid, FsPtid, CuiPtid;
+THREAD_ID TimePtid, FsPtid, KbdPtid, CuiPtid;
 char cmd[CMD_LEN], *cmdp;	/*输入命令缓冲*/
 
 /*双字转化为数字*/
@@ -20,13 +20,12 @@ char *Itoa(char *buf, DWORD n, DWORD r)
 	char *p, *q;
 
 	q = p = buf;
-	for (;;)
+	do
 	{
 		*p++ = num[n % r];
 		n /= r;
-		if (n == 0)
-			break;
 	}
+	while (n);
 	buf = p;	/*确定字符串尾部*/
 	*p-- = '\0';
 	while (p > q)	/*翻转字符串*/
@@ -88,8 +87,25 @@ void Sprintf(char *buf, const char *fmtstr, ...)
 	*buf = '\0';
 }
 
+/*10进制字符串转换为无符号整数*/
+DWORD Atoi10(const char *str)
+{
+	DWORD res;
+
+	res = 0;
+	for (;;)
+	{
+		if (*str >= '0' && *str <= '9')
+			res = res * 10 + (*str - '0');
+		else
+			break;
+		str++;
+	}
+	return res;
+}
+
 /*16进制字符串转换为无符号整数*/
-DWORD Atoi16(char *str)
+DWORD Atoi16(const char *str)
 {
 	DWORD res;
 
@@ -119,7 +135,7 @@ void cls(char *args)
 void SetColor(char *args)
 {
 	char *p;
-	
+
 	for (p = args;; p++)
 	{
 		if (*p == ' ')
@@ -139,6 +155,7 @@ void SetColor(char *args)
 /*退出*/
 void exitcmd(char *args)
 {
+	SendExitReq(FsPtid);
 	KExitProcess(NO_ERROR);
 }
 
@@ -207,26 +224,63 @@ void ren(char *args)
 		CUIPutS(CuiPtid, "重命名出错！\n");
 }
 
+/*显示分区列表*/
+void partlist(char *args)
+{
+	struct _PiInfo 
+	{
+		PART_INFO info;
+		char fstype[8];
+	}pi;
+	DWORD pid;
+	
+	pid = 0;
+	while (FSEnumPart(FsPtid, &pid) == NO_ERROR)
+	{
+		THREAD_ID ptid;
+		char buf[4096];
+
+		FSGetPart(FsPtid, pid, &pi.info);
+		Sprintf(buf, "/%u\t容量:%uMB\t剩余:%uMB\t格式:%s\t卷标:%s\n", pid, (DWORD)(pi.info.size / 0x100000), (DWORD)(pi.info.remain / 0x100000), pi.fstype, pi.info.label);
+		CUIPutS(CuiPtid, buf);
+		ptid = KbdPtid;
+		if (KRecvProcMsg(&ptid, (DWORD*)buf, 0) == NO_ERROR && ((DWORD*)buf)[0] == MSG_ATTR_KBD && buf[4] == 27)
+		{
+			CUIPutS(CuiPtid, "用户取消！\n");
+			break;
+		}
+		pid++;
+	}
+}
+
 /*显示目录列表*/
 void dir(char *args)
 {
 	FILE_INFO fi;
-	long dir;
-	if ((dir = FSOpenDir(FsPtid, args)) < 0)
+	long dhl;
+
+	if ((dhl = FSOpenDir(FsPtid, args)) < 0)
 	{
 		CUIPutS(CuiPtid, "目录不存在！\n");
 		return;
 	}
-	while (FSReadDir(FsPtid, dir, &fi) == NO_ERROR)
+	while (FSReadDir(FsPtid, dhl, &fi) == NO_ERROR)
 	{
+		THREAD_ID ptid;
 		TM tm;
 		char buf[4096];
 
 		TMLocalTime(TimePtid, fi.ModifyTime, &tm);
 		Sprintf(buf, "%d-%d-%d\t%d:%d:%d   \t%s\t%d\t%s\n", tm.yer, tm.mon, tm.day, tm.hor, tm.min, tm.sec, (fi.attr & FILE_ATTR_DIREC) ? "目录" : "文件", (DWORD)fi.size, fi.name);
 		CUIPutS(CuiPtid, buf);
+		ptid = KbdPtid;
+		if (KRecvProcMsg(&ptid, (DWORD*)buf, 0) == NO_ERROR && ((DWORD*)buf)[0] == MSG_ATTR_KBD && buf[4] == 27)
+		{
+			CUIPutS(CuiPtid, "用户取消！\n");
+			break;
+		}
 	}
-	FSclose(FsPtid, dir);
+	FSclose(FsPtid, dhl);
 }
 
 /*切换目录*/
@@ -253,21 +307,69 @@ void showtim(char *args)
 	CUIPutS(CuiPtid, buf);
 }
 
+/*显示进程列表*/
+void proclist(char *args)
+{
+	FILE_INFO fi;
+	DWORD pid;
+
+	pid = 0;
+	while (FSProcInfo(FsPtid, &pid, &fi) == NO_ERROR)
+	{
+		THREAD_ID ptid;
+		char buf[4096];
+
+		Sprintf(buf, "PID:%d\t%s\n", pid, fi.name);
+		CUIPutS(CuiPtid, buf);
+		ptid = KbdPtid;
+		if (KRecvProcMsg(&ptid, (DWORD*)buf, 0) == NO_ERROR && ((DWORD*)buf)[0] == MSG_ATTR_KBD && buf[4] == 27)
+		{
+			CUIPutS(CuiPtid, "用户取消！\n");
+			break;
+		}
+		pid++;
+	}
+}
+
+/*杀死进程*/
+void killproc(char *args)
+{
+	if (KKillProcess(Atoi10(args)) != NO_ERROR)
+		CUIPutS(CuiPtid, "强行结束进程失败！\n");
+}
+
+/*杀死进程*/
+void sound(char *args)
+{
+	THREAD_ID SpkPtid;
+
+	if (KGetKptThed(SRV_SPK_PORT, &SpkPtid) != NO_ERROR)
+		CUIPutS(CuiPtid, "未发现扬声器驱动！\n");
+	SpkSound(SpkPtid, Atoi10(args));
+	KSleep(100);
+	SpkNosound(SpkPtid);
+}
+
 /*帮助*/
 void help(char *args)
 {
 	CUIPutS(CuiPtid, 
 		"cls:清屏\n"
-		"color:设置显示颜色\n"
+		"color rrggbb rrggbb:设置前景和背景色\n"
 		"exit:退出\n"
-		"del:删除文件或空目录\n"
-		"copy:复制文件\n"
-		"ren:重命名\n"
-		"dir:目录列表\n"
-		"cd:切换目录\n"
-		"md:创建目录\n"
+		"part:分区列表\n"
+		"del path:删除文件或空目录\n"
+		"copy SrcPath DestPath:复制文件\n"
+		"ren path name:重命名\n"
+		"dir DirPath:目录列表\n"
+		"cd DirPath:切换目录\n"
+		"md DirPath:创建目录\n"
 		"time:显示当前时间\n"
-		"help:帮助\n");
+		"ps:进程列表\n"
+		"kill ProcID:强行结束进程\n"
+		"sound freq:以一定频率发声一秒"
+		"help:帮助\n"
+		"输入可执行文件路径将运行该程序\n");
 }
 
 /*命令匹配*/
@@ -293,6 +395,7 @@ void CmdProc(char *str)
 		{"cls", cls},
 		{"color", SetColor},
 		{"exit", exitcmd},
+		{"part", partlist},
 		{"del", delfile},
 		{"copy", copy},
 		{"ren", ren},
@@ -300,6 +403,9 @@ void CmdProc(char *str)
 		{"cd", cd},
 		{"md", md},
 		{"time", showtim},
+		{"ps", proclist},
+		{"kill", killproc},
+		{"sound", sound},
 		{"help", help}
 	};
 	long i;
@@ -374,9 +480,9 @@ int main()
 		return res;
 	if ((res = KGetKptThed(SRV_CUI_PORT, &CuiPtid)) != NO_ERROR)
 		return res;
-	if ((res = KGetKptThed(SRV_KBDMUS_PORT, &ptid)) != NO_ERROR)
+	if ((res = KGetKptThed(SRV_KBDMUS_PORT, &KbdPtid)) != NO_ERROR)
 		return res;
-	if ((res = KMSetRecv(ptid)) != NO_ERROR)
+	if ((res = KMSetRecv(KbdPtid)) != NO_ERROR)
 		return res;
 	CUIPutS(CuiPtid,
 		"欢迎来到\n"
@@ -395,7 +501,7 @@ int main()
 
 		if ((res = KRecvMsg(&ptid, data, INVALID)) != NO_ERROR)
 			break;
-		if (data[0] == MSG_ATTR_KBD)	/*键盘消息*/
+		if (ptid.ProcID == KbdPtid.ProcID && data[0] == MSG_ATTR_KBD)	/*键盘消息*/
 			KeyProc(data[1]);
 	}
 	return NO_ERROR;

@@ -31,7 +31,7 @@ static inline long HDReadSector(THREAD_ID ptid, DWORD drv, DWORD sec, BYTE cou, 
 	data[0] = ATHD_API_READSECTOR;
 	data[1] = drv;
 	data[2] = sec;
-	if ((data[0] = KReadProcAddr(buf, ATHD_BPS * cou, ptid, data, SRV_OUT_TIME)) != NO_ERROR)
+	if ((data[0] = KReadProcAddr(buf, ATHD_BPS * cou, &ptid, data, SRV_OUT_TIME)) != NO_ERROR)
 		return data[0];
 	return data[2];
 }
@@ -43,7 +43,7 @@ static inline long HDWriteSector(THREAD_ID ptid, DWORD drv, DWORD sec, BYTE cou,
 	data[0] = ATHD_API_WRITESECTOR;
 	data[1] = drv;
 	data[2] = sec;
-	if ((data[0] = KWriteProcAddr(buf, ATHD_BPS * cou, ptid, data, SRV_OUT_TIME)) != NO_ERROR)
+	if ((data[0] = KWriteProcAddr(buf, ATHD_BPS * cou, &ptid, data, SRV_OUT_TIME)) != NO_ERROR)
 		return data[0];
 	return data[2];
 }
@@ -78,7 +78,7 @@ static inline long TMCurSecond(THREAD_ID ptid, DWORD *sec)
 	DWORD data[MSG_DATA_LEN];
 	data[0] = MSG_ATTR_USER;
 	data[1] = TIME_API_CURSECOND;
-	if ((data[0] = KSendMsg(ptid, data, SRV_OUT_TIME)) != NO_ERROR)
+	if ((data[0] = KSendMsg(&ptid, data, SRV_OUT_TIME)) != NO_ERROR)
 		return data[0];
 	*sec = data[1];
 	return NO_ERROR;
@@ -90,7 +90,7 @@ static inline long TMCurTime(THREAD_ID ptid, TM *tm)
 	DWORD data[MSG_DATA_LEN];
 	data[0] = MSG_ATTR_USER;
 	data[1] = TIME_API_CURTIME;
-	if ((data[0] = KSendMsg(ptid, data, SRV_OUT_TIME)) != NO_ERROR)
+	if ((data[0] = KSendMsg(&ptid, data, SRV_OUT_TIME)) != NO_ERROR)
 		return data[0];
 	memcpy32(tm, &data[1], sizeof(TM) / sizeof(DWORD));
 	return NO_ERROR;
@@ -103,7 +103,7 @@ static inline long TMMkTime(THREAD_ID ptid, DWORD *sec, const TM *tm)
 	data[0] = MSG_ATTR_USER;
 	data[1] = TIME_API_MKTIME;
 	memcpy32(&data[2], tm, sizeof(TM) / sizeof(DWORD));
-	if ((data[0] = KSendMsg(ptid, data, SRV_OUT_TIME)) != NO_ERROR)
+	if ((data[0] = KSendMsg(&ptid, data, SRV_OUT_TIME)) != NO_ERROR)
 		return data[0];
 	*sec = data[1];
 	return NO_ERROR;
@@ -116,7 +116,7 @@ static inline long TMLocalTime(THREAD_ID ptid, DWORD sec, TM *tm)
 	data[0] = MSG_ATTR_USER;
 	data[1] = TIME_API_LOCALTIME;
 	data[2] = sec;
-	if ((data[0] = KSendMsg(ptid, data, SRV_OUT_TIME)) != NO_ERROR)
+	if ((data[0] = KSendMsg(&ptid, data, SRV_OUT_TIME)) != NO_ERROR)
 		return data[0];
 	memcpy32(tm, &data[1], sizeof(TM) / sizeof(DWORD));
 	return NO_ERROR;
@@ -128,7 +128,7 @@ static inline long TMGetRand(THREAD_ID ptid)
 	DWORD data[MSG_DATA_LEN];
 	data[0] = MSG_ATTR_USER;
 	data[1] = TIME_API_GETRAND;
-	if ((data[0] = KSendMsg(ptid, data, SRV_OUT_TIME)) != NO_ERROR)
+	if ((data[0] = KSendMsg(&ptid, data, SRV_OUT_TIME)) != NO_ERROR)
 		return data[0];
 	return data[1];
 }
@@ -168,7 +168,7 @@ static inline long KMSetRecv(THREAD_ID ptid)
 	DWORD data[MSG_DATA_LEN];
 	data[0] = MSG_ATTR_USER;
 	data[1] = KBDMUS_API_SETRECV;
-	return KSendMsg(ptid, data, 0);
+	return KSendMsg(&ptid, data, 0);
 }
 
 /**********VESA显卡驱动服务和GDI库相关**********/
@@ -189,7 +189,7 @@ static inline long VSGetVmem(THREAD_ID ptid, void **vm, DWORD *width, DWORD *hei
 	DWORD data[MSG_DATA_LEN];
 	data[0] = MSG_ATTR_USER;
 	data[3] = VESA_API_GETVMEM;
-	if ((data[0] = KSendMsg(ptid, data, SRV_OUT_TIME)) != NO_ERROR)
+	if ((data[0] = KSendMsg(&ptid, data, SRV_OUT_TIME)) != NO_ERROR)
 		return data[0];
 	if (data[3] != NO_ERROR)
 		return data[3];
@@ -206,7 +206,7 @@ static inline long VSGetFont(THREAD_ID ptid, const BYTE **font, DWORD *CharWidth
 	DWORD data[MSG_DATA_LEN];
 	data[0] = MSG_ATTR_USER;
 	data[3] = VESA_API_GETFONT;
-	if ((data[0] = KSendMsg(ptid, data, SRV_OUT_TIME)) != NO_ERROR)
+	if ((data[0] = KSendMsg(&ptid, data, SRV_OUT_TIME)) != NO_ERROR)
 		return data[0];
 	if (data[3] != NO_ERROR)
 		return data[3];
@@ -221,7 +221,7 @@ static inline long VSGetMode(THREAD_ID ptid, WORD mode[VESA_MAX_MODE], DWORD *Mo
 {
 	DWORD data[MSG_DATA_LEN];
 	data[0] = VESA_API_GETMODE;
-	if ((data[0] = KReadProcAddr(mode, VESA_MAX_MODE * sizeof(WORD), ptid, data, SRV_OUT_TIME)) != NO_ERROR)
+	if ((data[0] = KReadProcAddr(mode, VESA_MAX_MODE * sizeof(WORD), &ptid, data, SRV_OUT_TIME)) != NO_ERROR)
 		return data[0];
 	if (data[2] != NO_ERROR)
 		return data[2];
@@ -295,7 +295,7 @@ static inline long CUISetCol(THREAD_ID ptid, DWORD CharColor, DWORD BgColor)
 	data[1] = CharColor;
 	data[2] = BgColor;
 	data[3] = CUI_API_SETCOL;
-	return KSendMsg(ptid, data, 0);
+	return KSendMsg(&ptid, data, 0);
 }
 
 /*设置光标位置*/
@@ -306,7 +306,7 @@ static inline long CUISetCur(THREAD_ID ptid, DWORD CursX, DWORD CursY)
 	data[1] = CursX;
 	data[2] = CursY;
 	data[3] = CUI_API_SETCUR;
-	return KSendMsg(ptid, data, 0);
+	return KSendMsg(&ptid, data, 0);
 }
 
 /*清屏*/
@@ -315,7 +315,7 @@ static inline long CUIClrScr(THREAD_ID ptid)
 	DWORD data[MSG_DATA_LEN];
 	data[0] = MSG_ATTR_USER;
 	data[3] = CUI_API_CLRSCR;
-	return KSendMsg(ptid, data, 0);
+	return KSendMsg(&ptid, data, 0);
 }
 
 /*输出字符*/
@@ -325,7 +325,7 @@ static inline long CUIPutC(THREAD_ID ptid, char c)
 	data[0] = MSG_ATTR_USER;
 	data[1] = c;
 	data[3] = CUI_API_PUTC;
-	return KSendMsg(ptid, data, 0);
+	return KSendMsg(&ptid, data, 0);
 }
 
 /*输出字符串*/
@@ -333,9 +333,34 @@ static inline long CUIPutS(THREAD_ID ptid, const char *str)
 {
 	DWORD data[MSG_DATA_LEN];
 	data[0] = CUI_API_PUTS;
-	if ((data[0] = KWriteProcAddr((void*)str, strlen(str) + 1, ptid, data, SRV_OUT_TIME)) != NO_ERROR)
+	if ((data[0] = KWriteProcAddr((void*)str, strlen(str) + 1, &ptid, data, SRV_OUT_TIME)) != NO_ERROR)
 		return data[0];
 	return data[2];
+}
+
+/**********系统喇叭服务相关**********/
+#define SRV_SPK_PORT	7	/*系统喇叭服务端口*/
+
+#define SPK_API_SOUND	0	/*发声功能号*/
+#define SPK_API_NOSOUND	1	/*停止发声功能号*/
+
+/*发声*/
+static inline long SpkSound(THREAD_ID ptid, DWORD freq)
+{
+	DWORD data[MSG_DATA_LEN];
+	data[0] = MSG_ATTR_USER;
+	data[1] = SPK_API_SOUND;
+	data[2] = freq;
+	return KSendMsg(&ptid, data, 0);
+}
+
+/*停止发声*/
+static inline long SpkNosound(THREAD_ID ptid)
+{
+	DWORD data[MSG_DATA_LEN];
+	data[0] = MSG_ATTR_USER;
+	data[1] = SPK_API_NOSOUND;
+	return KSendMsg(&ptid, data, 0);
 }
 
 #endif

@@ -20,7 +20,7 @@ typedef struct _BLK_DESC
 #define THED_ATTR_APPS		0x0004	/*0:系统调用态1:应用程序态*/
 #define THED_ATTR_DEL		0x0008	/*0:正常状态1:正在被删除*/
 #define THED_ATTR_KILLED	0x0010	/*0:正常状态1:被杀死标志*/
-#define KSTK_LEN			474		/*内核堆栈双字数*/
+#define KSTK_LEN			512		/*内核堆栈双字数*/
 #define THEDSTK_SIZ			0x00100000	/*线程默认堆栈大小*/
 typedef struct _THREAD_DESC
 {
@@ -50,7 +50,6 @@ typedef struct _PROCESS_DESC
 	struct _PROCESS_DESC *pre, *nxt;	/*前后指针*/
 	WORD par, attr;				/*父进程ID,属性*/
 
-	DWORD MemSiz;				/*已占用内存字节数*/
 	EXEC_DESC *exec;			/*可执行体指针*/
 	MAPBLK_DESC *map;			/*映射结构链表*/
 	MAPBLK_DESC *map2;			/*被映射结构链表*/

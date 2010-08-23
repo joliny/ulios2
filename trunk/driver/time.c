@@ -134,27 +134,27 @@ int main()
 			case TIME_API_CURSECOND:	/*取得1970年经过的秒*/
 				KGetClock(&clk);
 				data[1] = bootsec + clk / 100;
-				KSendMsg(ptid, data, 0);
+				KSendMsg(&ptid, data, 0);
 				break;
 			case TIME_API_CURTIME:		/*取得当前时间*/
 				KGetClock(&clk);
 				Sec2Tm(bootsec + clk / 100, (TM*)&data[1]);
 				((TM*)&data[1])->mil = (clk % 100) * 10;
-				KSendMsg(ptid, data, 0);
+				KSendMsg(&ptid, data, 0);
 				break;
 			case TIME_API_MKTIME:		/*TM结构转换为秒*/
 				if ((res = Tm2Sec(&data[1], (TM*)&data[2])) != NO_ERROR)
 					data[1] = res;
-				KSendMsg(ptid, data, 0);
+				KSendMsg(&ptid, data, 0);
 				break;
 			case TIME_API_LOCALTIME:	/*秒转换为TM结构*/
 				Sec2Tm(data[2], (TM*)&data[1]);
 				((TM*)&data[1])->mil = 0;
-				KSendMsg(ptid, data, 0);
+				KSendMsg(&ptid, data, 0);
 				break;
 			case TIME_API_GETRAND:	/*取得随机数*/
 				data[1] = RandSeed = RandSeed * 1103515245 + 12345;
-				KSendMsg(ptid, data, 0);
+				KSendMsg(&ptid, data, 0);
 				break;
 			}
 		}

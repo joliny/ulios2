@@ -12,6 +12,8 @@ typedef unsigned char		BYTE;	/*8位*/
 typedef unsigned short		WORD;	/*16位*/
 typedef unsigned long		DWORD;	/*32位*/
 typedef unsigned long		BOOL;
+typedef unsigned long long	QWORD;	/*64位*/
+typedef long long			SQWORD;	/*有符号64位*/
 
 typedef struct _THREAD_ID
 {
@@ -71,6 +73,7 @@ typedef struct _THREAD_ID
 #define MSG_ATTR_CNLMAP		0x00080000	/*取消页映射消息*/
 
 #define MSG_ATTR_USER		0x01000000	/*用户自定义消息最小值*/
+#define MSG_ATTR_EXITREQ	0x01010000	/*建议:退出请求消息*/
 
 /**********基本操作**********/
 
@@ -300,10 +303,10 @@ static inline long KUnregIrq(DWORD irq)
 }
 
 /*发送消息*/
-static inline long KSendMsg(THREAD_ID ptid, DWORD data[MSG_DATA_LEN], DWORD CentiSeconds)
+static inline long KSendMsg(THREAD_ID *ptid, DWORD data[MSG_DATA_LEN], DWORD CentiSeconds)
 {
 	register long res;
-	__asm__ __volatile__("int $0xF0": "=a"(res): "0"(0x0E0000), "b"(ptid), "c"(CentiSeconds), "S"(data): "memory");
+	__asm__ __volatile__("int $0xF0": "=a"(res), "=b"(*ptid): "0"(0x0E0000), "1"(*ptid), "c"(CentiSeconds), "S"(data): "memory");
 	return res;
 }
 
@@ -311,7 +314,15 @@ static inline long KSendMsg(THREAD_ID ptid, DWORD data[MSG_DATA_LEN], DWORD Cent
 static inline long KRecvMsg(THREAD_ID *ptid, DWORD data[MSG_DATA_LEN], DWORD CentiSeconds)
 {
 	register long res;
-	__asm__ __volatile__("int $0xF0": "=a"(res), "=b"(*ptid): "0"(0x0F0000), "1"(CentiSeconds), "S"(data): "memory");
+	__asm__ __volatile__("int $0xF0": "=a"(res), "=b"(*ptid): "0"(0x0F0000), "c"(CentiSeconds), "S"(data): "memory");
+	return res;
+}
+
+/*接收指定进程的消息*/
+static inline long KRecvProcMsg(THREAD_ID *ptid, DWORD data[MSG_DATA_LEN], DWORD CentiSeconds)
+{
+	register long res;
+	__asm__ __volatile__("int $0xF0": "=a"(res), "=b"(*ptid): "0"(0x100000), "1"(*ptid), "c"(CentiSeconds), "S"(data): "memory");
 	return res;
 }
 
@@ -319,7 +330,7 @@ static inline long KRecvMsg(THREAD_ID *ptid, DWORD data[MSG_DATA_LEN], DWORD Cen
 static inline long KMapPhyAddr(void **addr, DWORD PhyAddr, DWORD siz)
 {
 	register long res;
-	__asm__ __volatile__("int $0xF0": "=a"(res), "=S"(*addr): "0"(0x100000), "b"(PhyAddr), "c"(siz): "memory");
+	__asm__ __volatile__("int $0xF0": "=a"(res), "=S"(*addr): "0"(0x110000), "b"(PhyAddr), "c"(siz): "memory");
 	return res;
 }
 
@@ -327,7 +338,7 @@ static inline long KMapPhyAddr(void **addr, DWORD PhyAddr, DWORD siz)
 static inline long KMapUserAddr(void **addr, DWORD siz)
 {
 	register long res;
-	__asm__ __volatile__("int $0xF0": "=a"(res), "=S"(*addr): "0"(0x110000), "c"(siz));
+	__asm__ __volatile__("int $0xF0": "=a"(res), "=S"(*addr): "0"(0x120000), "c"(siz));
 	return res;
 }
 
@@ -335,23 +346,23 @@ static inline long KMapUserAddr(void **addr, DWORD siz)
 static inline long KFreeAddr(void *addr)
 {
 	register long res;
-	__asm__ __volatile__("int $0xF0": "=a"(res): "0"(0x120000), "S"(addr): "memory");
+	__asm__ __volatile__("int $0xF0": "=a"(res): "0"(0x130000), "S"(addr): "memory");
 	return res;
 }
 
 /*映射进程地址读取*/
-static inline long KReadProcAddr(void *addr, DWORD siz, THREAD_ID ptid, DWORD data[MSG_DATA_LEN], DWORD CentiSeconds)
+static inline long KReadProcAddr(void *addr, DWORD siz, THREAD_ID *ptid, DWORD data[MSG_DATA_LEN], DWORD CentiSeconds)
 {
 	register long res;
-	__asm__ __volatile__("int $0xF0": "=a"(res): "0"(0x130000), "b"(ptid), "c"(siz), "d"(CentiSeconds), "S"(data), "D"(addr): "memory");
+	__asm__ __volatile__("int $0xF0": "=a"(res), "=b"(*ptid): "0"(0x140000), "1"(*ptid), "c"(siz), "d"(CentiSeconds), "S"(data), "D"(addr): "memory");
 	return res;
 }
 
 /*映射进程地址写入*/
-static inline long KWriteProcAddr(void *addr, DWORD siz, THREAD_ID ptid, DWORD data[MSG_DATA_LEN], DWORD CentiSeconds)
+static inline long KWriteProcAddr(void *addr, DWORD siz, THREAD_ID *ptid, DWORD data[MSG_DATA_LEN], DWORD CentiSeconds)
 {
 	register long res;
-	__asm__ __volatile__("int $0xF0": "=a"(res): "0"(0x140000), "b"(ptid), "c"(siz), "d"(CentiSeconds), "S"(data), "D"(addr): "memory");
+	__asm__ __volatile__("int $0xF0": "=a"(res), "=b"(*ptid): "0"(0x150000), "1"(*ptid), "c"(siz), "d"(CentiSeconds), "S"(data), "D"(addr): "memory");
 	return res;
 }
 
@@ -359,7 +370,7 @@ static inline long KWriteProcAddr(void *addr, DWORD siz, THREAD_ID ptid, DWORD d
 static inline long KUnmapProcAddr(void *addr, const DWORD data[MSG_DATA_LEN - 2])
 {
 	register long res;
-	__asm__ __volatile__("int $0xF0": "=a"(res): "0"(0x150000), "S"(data), "D"(addr): "memory");
+	__asm__ __volatile__("int $0xF0": "=a"(res): "0"(0x160000), "S"(data), "D"(addr): "memory");
 	return res;
 }
 
@@ -367,7 +378,7 @@ static inline long KUnmapProcAddr(void *addr, const DWORD data[MSG_DATA_LEN - 2]
 static inline long KCnlmapProcAddr(void *addr, const DWORD data[MSG_DATA_LEN - 2])
 {
 	register long res;
-	__asm__ __volatile__("int $0xF0": "=a"(res): "0"(0x160000), "S"(data), "D"(addr): "memory");
+	__asm__ __volatile__("int $0xF0": "=a"(res): "0"(0x170000), "S"(data), "D"(addr): "memory");
 	return res;
 }
 
@@ -375,7 +386,7 @@ static inline long KCnlmapProcAddr(void *addr, const DWORD data[MSG_DATA_LEN - 2
 static inline long KGetClock(DWORD *clock)
 {
 	register long res;
-	__asm__ __volatile__("int $0xF0": "=a"(res), "=b"(*clock): "0"(0x170000));
+	__asm__ __volatile__("int $0xF0": "=a"(res), "=b"(*clock): "0"(0x180000));
 	return res;
 }
 
@@ -395,6 +406,14 @@ static inline void lock(volatile DWORD *l)
 static inline void ulock(volatile DWORD *l)
 {
 	*l = FALSE;
+}
+
+/*发送退出请求*/
+static inline long SendExitReq(THREAD_ID ptid)
+{
+	DWORD data[MSG_DATA_LEN];
+	data[0] = MSG_ATTR_EXITREQ;
+	return KSendMsg(&ptid, data, 0);
 }
 
 #endif

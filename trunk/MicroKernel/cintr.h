@@ -130,6 +130,9 @@ void ApiSendMsg(DWORD *argv);
 /*接收消息*/
 void ApiRecvMsg(DWORD *argv);
 
+/*接收指定进程的消息*/
+void ApiRecvProcMsg(DWORD *argv);
+
 /*映射物理地址*/
 void ApiMapPhyAddr(DWORD *argv);
 

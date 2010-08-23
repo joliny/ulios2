@@ -78,7 +78,7 @@ long SendMsg(MESSAGE_DESC *msg)
 		return ERROR_WRONG_PROCID;
 	if (ptid.ThedID >= TMT_LEN)
 		return ERROR_WRONG_THEDID;
-	CurThed = CurPmd ? CurPmd->CurTmd : NULL;
+	CurThed = (msg->data[0] == MSG_ATTR_IRQ) ? NULL : CurPmd->CurTmd;	/*IRQ消息可能在任何线程中发出,所以消息发送者是无效的*/
 	cli();	/*要访问其他进程的信息,所以防止任务切换*/
 	DstProc = pmt[ptid.ProcID];
 	if (DstProc == NULL || (DstProc->attr & PROC_ATTR_DEL))
@@ -142,8 +142,8 @@ getmsg:
 	return NO_ERROR;
 }
 
-/*阻塞并等待指定进程的消息*/
-long WaitThedMsg(MESSAGE_DESC **msg, THREAD_ID ptid, DWORD cs)
+/*接收指定进程的消息*/
+long RecvProcMsg(MESSAGE_DESC **msg, THREAD_ID ptid, DWORD cs)
 {
 	THREAD_DESC *CurThed;
 	MESSAGE_DESC *PreMsg, *CurMsg;
@@ -154,47 +154,41 @@ long WaitThedMsg(MESSAGE_DESC **msg, THREAD_ID ptid, DWORD cs)
 		if (CurMsg->ptid.ProcID == ptid.ProcID)
 			goto getmsg;
 	CurThed->WaitId = ptid;	/*设置等待消息线程*/
-	if (cs != INVALID)
-		for (;;)	/*等待一定时间*/
-		{
-			DWORD CurClock;
+	for (;;)	/*等待消息*/
+	{
+		DWORD CurClock;
 
+		CurClock = 0;
+		if (cs != INVALID)
 			CurClock = clock;
-			sleep(cs);
-			if (PreMsg)
-				CurMsg = PreMsg->nxt;
-			else
-				CurMsg = CurThed->msg;
-			if (CurMsg == NULL)	/*超时无消息*/
-			{
-				*(DWORD*)(&CurThed->WaitId) = INVALID;
-				sti();
-				return ERROR_OUT_OF_TIME;
-			}
-			if (CurMsg->ptid.ProcID == ptid.ProcID)
-				break;
-			if (clock - CurClock >= cs)
+		sleep(cs);
+		if (PreMsg)
+			CurMsg = PreMsg->nxt;
+		else
+			CurMsg = CurThed->msg;
+		if (CurMsg == NULL)	/*超时无消息*/
+		{
+			*(DWORD*)(&CurThed->WaitId) = INVALID;
+			sti();
+			return ERROR_OUT_OF_TIME;
+		}
+		if (CurMsg->ptid.ProcID == ptid.ProcID)
+		{
+			*(DWORD*)(&CurThed->WaitId) = INVALID;
+			break;
+		}
+		if (cs != INVALID)
+		{
+			if (clock - CurClock >= cs)	/*检查非等待发送者*/
 			{
 				*(DWORD*)(&CurThed->WaitId) = INVALID;
 				sti();
 				return ERROR_OUT_OF_TIME;
 			}
 			cs -= clock - CurClock;
-			PreMsg = CurMsg;
 		}
-	else
-		for (;;)	/*无限等待*/
-		{
-			sleep(INVALID);
-			if (PreMsg)
-				CurMsg = PreMsg->nxt;
-			else
-				CurMsg = CurThed->msg;
-			if (CurMsg->ptid.ProcID == ptid.ProcID)
-				break;
-			PreMsg = CurMsg;
-		}
-	*(DWORD*)(&CurThed->WaitId) = INVALID;
+		PreMsg = CurMsg;
+	}
 getmsg:
 	if (PreMsg)
 		PreMsg->nxt = CurMsg->nxt;

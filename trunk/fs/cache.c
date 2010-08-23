@@ -55,7 +55,7 @@ long RwCache(DWORD drv, BOOL isWrite, DWORD sec, DWORD cou, void *buf)
 			}
 			else	/*读操作,读入缓存并复制*/
 			{
-				for (PreBmd = CurBmd + 1; PreBmd - CurBmd < MAXPROC_COU && PreBmd < &bmt[BMT_LEN] && !(PreBmd->BlkID & CACHE_ATTR_DIRTY) && (PreBmd->BlkID & CACHE_ATTR_TIMES) > 1; PreBmd++)
+				for (PreBmd = CurBmd + 1; PreBmd - CurBmd < MAXPROC_COU && PreBmd < &bmt[BMT_LEN] && !(PreBmd->BlkID & CACHE_ATTR_DIRTY) && (PreBmd->BlkID & CACHE_ATTR_TIMES) <= 1; PreBmd++)
 				{
 					PreBmd->DrvID = drv;
 					PreBmd->BlkID = sec & BLKID_MASK;

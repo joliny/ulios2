@@ -173,7 +173,7 @@ void CloseFS()
 	PART_DESC *CurPart;
 
 	for (CurPart = part; CurPart < &part[PART_LEN]; CurPart++)	/*卸载分区*/
-		if (CurPart->data)
+		if (CurPart->FsID != INVALID && CurPart->data)
 			fsuit[CurPart->FsID].UmntPart(CurPart);
 	SaveCache();	/*高速缓存回写*/
 	KFreeAddr(cache);
@@ -439,19 +439,32 @@ static long CreateFild(PROCRES_DESC *pres, const char *path, DWORD attr, FILE_DE
 		name++;
 	while (name > path && *name != '/')
 		name--;
-	if (name == path && *name == '/')	/*/name格式,路径格式错误*/
-		return FS_ERR_PATH_FORMAT;
-	if (*(name + 1) == 0)	/*/path/格式,没有指定名称*/
-		return FS_ERR_PATH_FORMAT;
-	if (*(name + 1) == '.')
+	if (name == path)
 	{
-		if (*(name + 2) == 0)	/*/path/.格式,名称错误*/
+		if (*name == '/')	/*/name格式,路径格式错误*/
 			return FS_ERR_PATH_FORMAT;
-		if (*(name + 2) == '.' && *(name + 3) == 0)	/*/path/..格式,名称错误*/
+		if (*name == '.')
+		{
+			if (*(name + 1) == '\0')	/*.格式,名称错误*/
+				return FS_ERR_PATH_FORMAT;
+			if (*(name + 1) == '.' && *(name + 2) == '\0')	/*..格式,名称错误*/
+				return FS_ERR_PATH_FORMAT;
+		}
+	}
+	else
+	{
+		if (*(name + 1) == '\0')	/*/path/格式,没有指定名称*/
 			return FS_ERR_PATH_FORMAT;
+		if (*(name + 1) == '.')
+		{
+			if (*(name + 2) == '\0')	/*/path/.格式,名称错误*/
+				return FS_ERR_PATH_FORMAT;
+			if (*(name + 2) == '.' && *(name + 3) == '\0')	/*/path/..格式,名称错误*/
+				return FS_ERR_PATH_FORMAT;
+		}
 	}
 	memcpy8(DirPath, path, name - path);	/*复制路径*/
-	DirPath[name - path] = 0;
+	DirPath[name - path] = '\0';
 	if ((res = SetFildLn(pres, DirPath, FALSE, &CurFile)) != NO_ERROR)	/*检查所在目录是否存在*/
 		return res;
 	if (!(CurFile->file.attr & FILE_ATTR_DIREC))	/*搜索到的是文件*/
@@ -689,25 +702,33 @@ long ProcExit(PROCRES_DESC *pres)
 }
 
 /*枚举分区*/
-long EnumPart(PROCRES_DESC *pres, DWORD *pid)
+long EnumPart(DWORD *pid)
 {
 	while (*pid < PART_LEN)
 	{
-		if (part[*pid].data)
+		if (part[*pid].FsID != INVALID && part[*pid].data)
 			return NO_ERROR;
 		(*pid)++;
 	}
-	return FS_ERR_HAVENO_PART;
+	return FS_ERR_END_OF_FILE;
 }
 
 /*取得分区信息*/
-long GetPart(PROCRES_DESC *pres, DWORD pid, PART_INFO *pi)
+long GetPart(DWORD pid, PART_INFO *pi)
 {
 	if (pid >= PART_LEN || part[pid].data == NULL)
 		return FS_ERR_WRONG_PARTID;
 	memcpy32(pi, &part[pid].part, sizeof(PART_INFO) / sizeof(DWORD));
 	memcpy32((void*)pi + sizeof(PART_INFO), fsuit[part[pid].FsID].name, 2);
 	return NO_ERROR;
+}
+
+/*设置分区信息*/
+long SetPart(DWORD pid, PART_INFO *pi)
+{
+	if (pid >= PART_LEN || part[pid].data == NULL)
+		return FS_ERR_WRONG_PARTID;
+	return fsuit[part[pid].FsID].SetPart(&part[pid], pi);
 }
 
 /*创建文件*/
@@ -852,16 +873,19 @@ long seek(PROCRES_DESC *pres, DWORD fhi, SQWORD seek, DWORD from)
 		if (seek < 0)
 			return FS_ERR_WRONG_ARGS;
 		fh->seek = seek;
+		fh->avl = 0;
 		break;
 	case FS_SEEK_CUR:
 		if ((SQWORD)fh->seek + seek < 0)
 			return FS_ERR_WRONG_ARGS;
 		fh->seek = (SQWORD)fh->seek + seek;
+		fh->avl = 0;
 		break;
 	case FS_SEEK_END:
 		if ((SQWORD)CurFile->file.size + seek < 0)
 			return FS_ERR_WRONG_ARGS;
 		fh->seek = (SQWORD)CurFile->file.size + seek;
+		fh->avl = 0;
 		break;
 	default:
 		return FS_ERR_WRONG_ARGS;
@@ -885,6 +909,8 @@ long SetSize(PROCRES_DESC *pres, DWORD fhi, QWORD siz)
 		return FS_ERR_PATH_NOT_FILE;	/*是目录句柄*/
 	if (!(CurFile->flag & FILE_FLAG_WRITE))
 		return FS_ERR_PATH_READED;	/*尝试写打开读的文件*/
+	if (siz < fh->seek)	/*缩小文件到当前读写指针之前时重设avl*/
+		fh->avl = 0;
 	if ((res = fsuit[CurFile->part->FsID].SetSize(CurFile, siz)) != NO_ERROR)
 		return res;
 	return NO_ERROR;
@@ -1096,4 +1122,19 @@ long SetTime(PROCRES_DESC *pres, const char *path, DWORD time, DWORD cma)
 	res = fsuit[CurFile->part->FsID].SetFile(CurFile, &fi);
 	DecFildLn(CurFile);
 	return res;
+}
+
+/*取得进程信息*/
+long ProcInfo(DWORD *pid, FILE_INFO *fi)
+{
+	while (*pid < PRET_LEN)
+	{
+		if (pret[*pid] && pret[*pid]->exec)
+		{
+			memcpy32(fi, &pret[*pid]->exec->file, sizeof(FILE_INFO) / sizeof(DWORD));
+			return NO_ERROR;
+		}
+		(*pid)++;
+	}
+	return FS_ERR_END_OF_FILE;
 }
