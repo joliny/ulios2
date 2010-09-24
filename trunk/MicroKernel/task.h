@@ -70,12 +70,6 @@ typedef struct _PROCESS_DESC
 	volatile DWORD Page_l;		/*分页管理锁*/
 }PROCESS_DESC;	/*进程结构*/
 
-/*初始化进程管理表*/
-void InitPMT();
-
-/*初始化内核进程*/
-void InitKnlProc();
-
 /*唤醒线程*/
 void wakeup(THREAD_DESC *thed);
 

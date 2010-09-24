@@ -124,15 +124,15 @@ SOURCE=.\driver\rep.c
 # End Source File
 # Begin Source File
 
-SOURCE=.\driver\serial.c
-# End Source File
-# Begin Source File
-
 SOURCE=.\driver\speaker.c
 # End Source File
 # Begin Source File
 
 SOURCE=.\driver\time.c
+# End Source File
+# Begin Source File
+
+SOURCE=.\driver\uart.c
 # End Source File
 # Begin Source File
 
@@ -232,6 +232,10 @@ SOURCE=.\MicroKernel\task.h
 # Begin Source File
 
 SOURCE=.\MicroKernel\ulidef.h
+# End Source File
+# Begin Source File
+
+SOURCE=.\MicroKernel\ulios.h
 # End Source File
 # Begin Source File
 

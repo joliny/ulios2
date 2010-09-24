@@ -135,7 +135,7 @@ void ApiSetPart(DWORD *argv)
 	{
 		argv[0] = FS_ERR_WRONG_ARGS;
 		KUnmapProcAddr((void*)argv[ADDR_ID], argv);
-		return; 
+		return;
 	}
 	argv[0] = SetPart(argv[API_ID + 1], (PART_INFO*)argv[ADDR_ID]);
 	KUnmapProcAddr((void*)argv[ADDR_ID], argv);
@@ -421,7 +421,7 @@ void ApiProc(DWORD *argv)
 				argv[0] = FS_ERR_HAVENO_MEMORY;
 				KUnmapProcAddr((void*)argv[ADDR_ID], argv);
 			}
-			else if (argv[ATTR_ID] == MSG_ATTR_USER)
+			else if ((argv[ATTR_ID] & 0xFFFF0000) == MSG_ATTR_USER)
 			{
 				argv[0] = MSG_ATTR_USER;
 				argv[1] = FS_ERR_HAVENO_MEMORY;
@@ -454,11 +454,11 @@ int main()
 
 		if ((res = KRecvMsg((THREAD_ID*)&data[PTID_ID], data, INVALID)) != NO_ERROR)	/*µÈ´ýÏûÏ¢*/
 			break;
-		if (data[ATTR_ID] == MSG_ATTR_PROCEXIT)
+		if ((data[ATTR_ID] & 0xFFFF0000) == MSG_ATTR_PROCEXIT)
 			data[API_ID] = FS_API_PROCEXIT;
-		else if (data[ATTR_ID] == MSG_ATTR_EXITREQ)
+		else if ((data[ATTR_ID] & 0xFFFF0000) == MSG_ATTR_EXITREQ)
 			break;
-		if (((data[ATTR_ID] & 0xFFFF0000) == MSG_ATTR_MAP || data[ATTR_ID] == MSG_ATTR_USER || data[ATTR_ID] == MSG_ATTR_PROCEXIT) && data[API_ID] < sizeof(ApiTable) / sizeof(void*))
+		if (((data[ATTR_ID] & 0xFFFF0000) == MSG_ATTR_MAP || (data[ATTR_ID] & 0xFFFF0000) == MSG_ATTR_USER || (data[ATTR_ID] & 0xFFFF0000) == MSG_ATTR_PROCEXIT) && data[API_ID] < sizeof(ApiTable) / sizeof(void*))
 		{
 			DWORD *buf;
 
@@ -469,7 +469,7 @@ int main()
 					data[0] = FS_ERR_HAVENO_MEMORY;
 					KUnmapProcAddr((void*)data[ADDR_ID], data);
 				}
-				else if (data[ATTR_ID] == MSG_ATTR_USER)
+				else if ((data[ATTR_ID] & 0xFFFF0000) == MSG_ATTR_USER)
 				{
 					data[0] = MSG_ATTR_USER;
 					data[1] = FS_ERR_HAVENO_MEMORY;

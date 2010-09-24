@@ -157,7 +157,7 @@ int main()
 
 		if ((res = KRecvMsg(&ptid, data, INVALID)) != NO_ERROR)	/*等待消息*/
 			break;
-		if (data[0] == MSG_ATTR_IRQ && data[1] == ATHD_IRQ)	/*磁盘中断请求消息*/
+		if ((data[0] & 0xFFFF0000) == MSG_ATTR_IRQ && data[1] == ATHD_IRQ)	/*磁盘中断请求消息*/
 		{
 			ATHD_REQ *CurReq;
 

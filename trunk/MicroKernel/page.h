@@ -24,12 +24,6 @@ typedef struct _MAPBLK_DESC
 
 #define PAGE_SIZE	0x00001000
 
-/*初始化物理内存管理*/
-long InitPMM();
-
-/*初始化地址映射管理*/
-long InitMap();
-
 /*分配物理页,返回物理地址,无法分配返回0*/
 DWORD AllocPage();
 

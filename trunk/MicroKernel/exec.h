@@ -32,9 +32,6 @@ typedef struct _EXEC_DESC
 	volatile DWORD Page_l;	/*分页管理锁*/
 }EXEC_DESC;	/*可执行体结构*/
 
-/*初始化可执行体管理表*/
-void InitEXMT();
-
 /*分配空可执行体ID*/
 long AllocExid(EXEC_DESC *exec);
 

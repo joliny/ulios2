@@ -6,30 +6,6 @@
 
 #include "knldef.h"
 
-/*初始化进程管理表*/
-void InitPMT()
-{
-	memset32(pmt, 0, PMT_LEN * sizeof(PROCESS_DESC*) / sizeof(DWORD));
-	EndPmd = FstPmd = pmt;
-	CurPmd = NULL;
-	PmdCou = 0;
-	clock = 0;
-	SleepList = NULL;
-	LastI387 = NULL;
-}
-
-/*初始化内核进程*/
-void InitKnlProc()
-{
-	memset32(&KnlTss, 0, sizeof(TSS) / sizeof(DWORD));
-	KnlTss.cr3 = (DWORD)kpdt;
-	KnlTss.io = sizeof(TSS);
-	SetSegDesc(&gdt[UCODE_SEL >> 3], 0, 0xFFFFF, DESC_ATTR_P | DESC_ATTR_DPL3 | DESC_ATTR_DT | STOSEG_ATTR_T_E | STOSEG_ATTR_T_A | SEG_ATTR_G | STOSEG_ATTR_D);	/*初始化用户GDT项*/
-	SetSegDesc(&gdt[UDATA_SEL >> 3], 0, 0xFFFFF, DESC_ATTR_P | DESC_ATTR_DPL3 | DESC_ATTR_DT | STOSEG_ATTR_T_D_W | STOSEG_ATTR_T_A | SEG_ATTR_G | STOSEG_ATTR_D);
-	SetSegDesc(&gdt[TSS_SEL >> 3], (DWORD)&KnlTss, sizeof(TSS) - 1, DESC_ATTR_P | SYSSEG_ATTR_T_TSS);
-	__asm__("ltr %%ax":: "a"(TSS_SEL));
-}
-
 /*任务切换*/
 static void SwitchTS()
 {

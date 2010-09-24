@@ -4,7 +4,7 @@
 	最后修改日期：2009-05-28
 */
 
-#include "knldef.h"
+#include "ulios.h"
 
 int main()
 {

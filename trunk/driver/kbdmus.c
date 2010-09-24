@@ -123,7 +123,7 @@ int main()
 
 		if ((res = KRecvMsg(&ptid, data, INVALID)) != NO_ERROR)	/*等待消息*/
 			break;
-		if (data[0] == MSG_ATTR_IRQ)
+		if ((data[0] & 0xFFFF0000) == MSG_ATTR_IRQ)
 		{
 			code = inb(0x60);
 			if (data[1] == KBD_IRQ)	/*键盘中断消息*/
