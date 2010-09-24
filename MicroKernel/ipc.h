@@ -31,9 +31,6 @@ typedef struct _MESSAGE_DESC
 	struct _MESSAGE_DESC *nxt;	/*后一项*/
 }MESSAGE_DESC;	/*消息描述符*/
 
-/*初始化消息管理*/
-long InitMsg();
-
 /*分配消息结构*/
 MESSAGE_DESC *AllocMsg();
 

@@ -6,17 +6,6 @@
 
 #include "knldef.h"
 
-/*初始化消息管理*/
-long InitMsg()
-{
-	if ((msgmt = (MESSAGE_DESC*)kmalloc(MSGMT_LEN * sizeof(MESSAGE_DESC))) == NULL)
-		return ERROR_HAVENO_KMEM;
-	memset32(msgmt, 0, MSGMT_LEN * sizeof(MESSAGE_DESC) / sizeof(DWORD));
-	FstMsg = msgmt;
-
-	return NO_ERROR;
-}
-
 /*分配消息结构*/
 MESSAGE_DESC *AllocMsg()
 {

@@ -263,7 +263,7 @@ long GDIFillRect(long x, long y, long w, long h, DWORD c)
 {
 	void *tmpvm;
 	long tx, ty, tw, th;	/*实际位置尺寸*/
-	
+
 	if (x >= GDIwidth || y >= GDIheight)
 		return VESA_ERR_LOCATION;	/*位置越界*/
 	if (w <= 0 || h <= 0)

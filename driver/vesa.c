@@ -58,7 +58,7 @@ int main()
 
 		if ((res = KRecvMsg(&ptid, data, INVALID)) != NO_ERROR)	/*µÈ´ýÏûÏ¢*/
 			break;
-		if (data[0] == MSG_ATTR_USER)
+		if ((data[0] & 0xFFFF0000) == MSG_ATTR_USER)
 		{
 			switch (data[3])
 			{

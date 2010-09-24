@@ -227,13 +227,13 @@ void ren(char *args)
 /*显示分区列表*/
 void partlist(char *args)
 {
-	struct _PiInfo 
+	struct _PI_INFO
 	{
 		PART_INFO info;
 		char fstype[8];
 	}pi;
 	DWORD pid;
-	
+
 	pid = 0;
 	while (FSEnumPart(FsPtid, &pid) == NO_ERROR)
 	{
@@ -244,7 +244,7 @@ void partlist(char *args)
 		Sprintf(buf, "/%u\t容量:%uMB\t剩余:%uMB\t格式:%s\t卷标:%s\n", pid, (DWORD)(pi.info.size / 0x100000), (DWORD)(pi.info.remain / 0x100000), pi.fstype, pi.info.label);
 		CUIPutS(CuiPtid, buf);
 		ptid = KbdPtid;
-		if (KRecvProcMsg(&ptid, (DWORD*)buf, 0) == NO_ERROR && ((DWORD*)buf)[0] == MSG_ATTR_KBD && buf[4] == 27)
+		if (KRecvProcMsg(&ptid, (DWORD*)buf, 0) == NO_ERROR && (((DWORD*)buf)[0] & 0xFFFF0000) == MSG_ATTR_KBD && buf[4] == 27)
 		{
 			CUIPutS(CuiPtid, "用户取消！\n");
 			break;
@@ -274,7 +274,7 @@ void dir(char *args)
 		Sprintf(buf, "%d-%d-%d\t%d:%d:%d   \t%s\t%d\t%s\n", tm.yer, tm.mon, tm.day, tm.hor, tm.min, tm.sec, (fi.attr & FILE_ATTR_DIREC) ? "目录" : "文件", (DWORD)fi.size, fi.name);
 		CUIPutS(CuiPtid, buf);
 		ptid = KbdPtid;
-		if (KRecvProcMsg(&ptid, (DWORD*)buf, 0) == NO_ERROR && ((DWORD*)buf)[0] == MSG_ATTR_KBD && buf[4] == 27)
+		if (KRecvProcMsg(&ptid, (DWORD*)buf, 0) == NO_ERROR && (((DWORD*)buf)[0] & 0xFFFF0000) == MSG_ATTR_KBD && buf[4] == 27)
 		{
 			CUIPutS(CuiPtid, "用户取消！\n");
 			break;
@@ -300,10 +300,11 @@ void md(char *args)
 /*显示时间*/
 void showtim(char *args)
 {
+	static const char *WeekName[7] = {"日", "一", "二", "三", "四", "五", "六"};
 	TM tm;
 	char buf[40];
 	TMCurTime(TimePtid, &tm);
-	Sprintf(buf, "现在时刻:%d年%d月%d日 %d时%d分%d秒\n", tm.yer, tm.mon, tm.day, tm.hor, tm.min, tm.sec);
+	Sprintf(buf, "现在时刻:%d年%d月%d日 星期%s %d时%d分%d秒\n", tm.yer, tm.mon, tm.day, WeekName[tm.wday], tm.hor, tm.min, tm.sec);
 	CUIPutS(CuiPtid, buf);
 }
 
@@ -322,7 +323,7 @@ void proclist(char *args)
 		Sprintf(buf, "PID:%d\t%s\n", pid, fi.name);
 		CUIPutS(CuiPtid, buf);
 		ptid = KbdPtid;
-		if (KRecvProcMsg(&ptid, (DWORD*)buf, 0) == NO_ERROR && ((DWORD*)buf)[0] == MSG_ATTR_KBD && buf[4] == 27)
+		if (KRecvProcMsg(&ptid, (DWORD*)buf, 0) == NO_ERROR && (((DWORD*)buf)[0] & 0xFFFF0000) == MSG_ATTR_KBD && buf[4] == 27)
 		{
 			CUIPutS(CuiPtid, "用户取消！\n");
 			break;
@@ -338,13 +339,16 @@ void killproc(char *args)
 		CUIPutS(CuiPtid, "强行结束进程失败！\n");
 }
 
-/*杀死进程*/
+/*发声*/
 void sound(char *args)
 {
 	THREAD_ID SpkPtid;
 
 	if (KGetKptThed(SRV_SPK_PORT, &SpkPtid) != NO_ERROR)
-		CUIPutS(CuiPtid, "未发现扬声器驱动！\n");
+	{
+		CUIPutS(CuiPtid, "扬声器驱动未启动！\n");
+		return;
+	}
 	SpkSound(SpkPtid, Atoi10(args));
 	KSleep(100);
 	SpkNosound(SpkPtid);
@@ -353,7 +357,7 @@ void sound(char *args)
 /*帮助*/
 void help(char *args)
 {
-	CUIPutS(CuiPtid, 
+	CUIPutS(CuiPtid,
 		"cls:清屏\n"
 		"color rrggbb rrggbb:设置前景和背景色\n"
 		"exit:退出\n"
@@ -501,7 +505,7 @@ int main()
 
 		if ((res = KRecvMsg(&ptid, data, INVALID)) != NO_ERROR)
 			break;
-		if (ptid.ProcID == KbdPtid.ProcID && data[0] == MSG_ATTR_KBD)	/*键盘消息*/
+		if (ptid.ProcID == KbdPtid.ProcID && (data[0] & 0xFFFF0000) == MSG_ATTR_KBD)	/*键盘消息*/
 			KeyProc(data[1]);
 	}
 	return NO_ERROR;

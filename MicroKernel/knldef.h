@@ -118,12 +118,6 @@ extern BYTE pg0[];			/*当前页副本4MB*/
 
 /**********工具函数**********/
 
-/*初始化内核变量*/
-void InitKnlVal();
-
-/*初始化基础服务*/
-long InitBaseSrv();
-
 /*注册内核端口对应线程*/
 long RegKnlPort(DWORD PortN);
 
@@ -135,12 +129,6 @@ long GetKptThed(DWORD PortN, THREAD_ID *ptid);
 
 /*注销线程的所有内核端口*/
 long UnregAllKnlPort();
-
-/*内核内存初始化*/
-static inline void InitKFMT()
-{
-	InitFbt(kmmt, FMT_LEN, kdat, KDAT_SIZ);
-}
 
 /*内核内存分配*/
 static inline void *kmalloc(DWORD siz)

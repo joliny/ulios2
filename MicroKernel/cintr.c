@@ -6,30 +6,6 @@
 
 #include "knldef.h"
 
-/*异常IDT表副本(函数地址无法进行位运算,只好用加减了)*/
-SEG_GATE_DESC IsrIdtTable[] = {
-	{(DWORD)AsmIsr00 - 0x00010000 + (KCODE_SEL << 16), 0x00010000 | DESC_ATTR_P | DESC_ATTR_DPL0 | GATE_ATTR_T_TRAP},
-	{(DWORD)AsmIsr01 - 0x00010000 + (KCODE_SEL << 16), 0x00010000 | DESC_ATTR_P | DESC_ATTR_DPL0 | GATE_ATTR_T_TRAP},
-	{(DWORD)AsmIsr02 - 0x00010000 + (KCODE_SEL << 16), 0x00010000 | DESC_ATTR_P | DESC_ATTR_DPL0 | GATE_ATTR_T_TRAP},
-	{(DWORD)AsmIsr03 - 0x00010000 + (KCODE_SEL << 16), 0x00010000 | DESC_ATTR_P | DESC_ATTR_DPL3 | GATE_ATTR_T_TRAP},
-	{(DWORD)AsmIsr04 - 0x00010000 + (KCODE_SEL << 16), 0x00010000 | DESC_ATTR_P | DESC_ATTR_DPL3 | GATE_ATTR_T_TRAP},
-	{(DWORD)AsmIsr05 - 0x00010000 + (KCODE_SEL << 16), 0x00010000 | DESC_ATTR_P | DESC_ATTR_DPL3 | GATE_ATTR_T_TRAP},
-	{(DWORD)AsmIsr06 - 0x00010000 + (KCODE_SEL << 16), 0x00010000 | DESC_ATTR_P | DESC_ATTR_DPL0 | GATE_ATTR_T_TRAP},
-	{(DWORD)AsmIsr07 - 0x00010000 + (KCODE_SEL << 16), 0x00010000 | DESC_ATTR_P | DESC_ATTR_DPL0 | GATE_ATTR_T_TRAP},
-	{(DWORD)AsmIsr08 - 0x00010000 + (KCODE_SEL << 16), 0x00010000 | DESC_ATTR_P | DESC_ATTR_DPL0 | GATE_ATTR_T_TRAP},
-	{(DWORD)AsmIsr09 - 0x00010000 + (KCODE_SEL << 16), 0x00010000 | DESC_ATTR_P | DESC_ATTR_DPL0 | GATE_ATTR_T_TRAP},
-	{(DWORD)AsmIsr0A - 0x00010000 + (KCODE_SEL << 16), 0x00010000 | DESC_ATTR_P | DESC_ATTR_DPL0 | GATE_ATTR_T_TRAP},
-	{(DWORD)AsmIsr0B - 0x00010000 + (KCODE_SEL << 16), 0x00010000 | DESC_ATTR_P | DESC_ATTR_DPL0 | GATE_ATTR_T_TRAP},
-	{(DWORD)AsmIsr0C - 0x00010000 + (KCODE_SEL << 16), 0x00010000 | DESC_ATTR_P | DESC_ATTR_DPL0 | GATE_ATTR_T_TRAP},
-	{(DWORD)AsmIsr0D - 0x00010000 + (KCODE_SEL << 16), 0x00010000 | DESC_ATTR_P | DESC_ATTR_DPL0 | GATE_ATTR_T_TRAP},
-	{(DWORD)AsmIsr0E - 0x00010000 + (KCODE_SEL << 16), 0x00010000 | DESC_ATTR_P | DESC_ATTR_DPL0 | GATE_ATTR_T_INTR},
-	{(DWORD)AsmIsr0F - 0x00010000 + (KCODE_SEL << 16), 0x00010000 | DESC_ATTR_P | DESC_ATTR_DPL0 | GATE_ATTR_T_TRAP},
-	{(DWORD)AsmIsr10 - 0x00010000 + (KCODE_SEL << 16), 0x00010000 | DESC_ATTR_P | DESC_ATTR_DPL0 | GATE_ATTR_T_TRAP},
-	{(DWORD)AsmIsr11 - 0x00010000 + (KCODE_SEL << 16), 0x00010000 | DESC_ATTR_P | DESC_ATTR_DPL0 | GATE_ATTR_T_TRAP},
-	{(DWORD)AsmIsr12 - 0x00010000 + (KCODE_SEL << 16), 0x00010000 | DESC_ATTR_P | DESC_ATTR_DPL0 | GATE_ATTR_T_TRAP},
-	{(DWORD)AsmIsr13 - 0x00010000 + (KCODE_SEL << 16), 0x00010000 | DESC_ATTR_P | DESC_ATTR_DPL0 | GATE_ATTR_T_TRAP}
-};
-
 /*C异常表*/
 void (*IsrCallTable[])(DWORD edi, DWORD esi, DWORD ebp, DWORD esp, DWORD ebx, DWORD edx, DWORD ecx, DWORD eax, WORD gs, WORD fs, WORD es, WORD ds, DWORD IsrN, DWORD ErrCode, DWORD eip, WORD cs, DWORD eflags) = {
 	IsrProc, IsrProc, IsrProc, IsrProc, IsrProc, IsrProc, IsrProc, FpuFaultProc,
@@ -50,18 +26,6 @@ void (*ApiCallTable[])(DWORD *argv) = {
 	ApiRecvProcMsg, ApiMapPhyAddr, ApiMapUserAddr, ApiFreeAddr, ApiReadProcAddr, ApiWriteProcAddr, ApiUnmapProcAddr, ApiCnlmapProcAddr,
 	ApiGetClock
 };
-
-/*中断处理初始化*/
-void InitINTR()
-{
-	memcpy32(idt, IsrIdtTable, sizeof(IsrIdtTable) / sizeof(DWORD));	/*复制20个ISR的门描述符*/
-	SetGate(&idt[INTN_APICALL], KCODE_SEL, (DWORD)AsmApiCall, DESC_ATTR_P | DESC_ATTR_DPL3 | GATE_ATTR_T_TRAP);	/*系统调用*/
-	memset32(IrqPort, INVALID, IRQ_LEN * sizeof(THREAD_ID) / sizeof(DWORD));	/*初始化IRQ端口注册表*/
-	/*开时钟和从片8259中断*/
-	SetGate(&idt[0x20 + IRQN_TIMER], KCODE_SEL, (DWORD)AsmIrq0, DESC_ATTR_P | DESC_ATTR_DPL0 | GATE_ATTR_T_INTR);
-	SetGate(&idt[0x20 + IRQN_SLAVE8259], KCODE_SEL, (DWORD)AsmIrq2, DESC_ATTR_P | DESC_ATTR_DPL0 | GATE_ATTR_T_INTR);
-	outb(0x21, IRQ_INIT_MASK);
-}
 
 /*注册IRQ信号的响应线程*/
 long RegIrq(DWORD IrqN)
@@ -84,15 +48,15 @@ long RegIrq(DWORD IrqN)
 	IrqPort[IrqN] = CurProc->CurTmd->id;
 	if (IrqN < 8)
 	{
-		mask = inb(0x21);	/*主片*/
+		mask = inb(MASTER8259_PORT);	/*主片*/
 		mask &= (~(1ul << IrqN));
-		outb(0x21, mask);
+		outb(MASTER8259_PORT, mask);
 	}
 	else
 	{
-		mask = inb(0xA1);	/*从片*/
+		mask = inb(SLAVE8259_PORT);	/*从片*/
 		mask &= (~(1ul << (IrqN & 7)));
-		outb(0xA1, mask);
+		outb(SLAVE8259_PORT, mask);
 	}
 	sti();
 	return NO_ERROR;
@@ -122,15 +86,15 @@ long UnregIrq(DWORD IrqN)
 	}
 	if (IrqN < 8)
 	{
-		mask = inb(0x21);	/*主片*/
+		mask = inb(MASTER8259_PORT);	/*主片*/
 		mask |= (1ul << IrqN);
-		outb(0x21, mask);
+		outb(MASTER8259_PORT, mask);
 	}
 	else
 	{
-		mask = inb(0xA1);	/*从片*/
+		mask = inb(SLAVE8259_PORT);	/*从片*/
 		mask |= (1ul << (IrqN & 7));
-		outb(0xA1, mask);
+		outb(SLAVE8259_PORT, mask);
 	}
 	*(DWORD*)(&IrqPort[IrqN]) = INVALID;
 	idt[0x20 + IrqN].d1 = 0;
@@ -156,15 +120,15 @@ void UnregAllIrq()
 		{
 			if (i < 8)
 			{
-				mask = inb(0x21);	/*主片*/
+				mask = inb(MASTER8259_PORT);	/*主片*/
 				mask |= (1ul << i);
-				outb(0x21, mask);
+				outb(MASTER8259_PORT, mask);
 			}
 			else
 			{
-				mask = inb(0xA1);	/*从片*/
+				mask = inb(SLAVE8259_PORT);	/*从片*/
 				mask |= (1ul << (i & 7));
-				outb(0xA1, mask);
+				outb(SLAVE8259_PORT, mask);
 			}
 			*(DWORD*)(&IrqPort[i]) = INVALID;
 			idt[0x20 + i].d1 = 0;
@@ -454,7 +418,7 @@ void ApiRecvMsg(DWORD *argv)
 	MESSAGE_DESC *msg;
 	void *addr;
 	DWORD data[MSG_DATA_LEN];
-	
+
 	addr = (void*)argv[ESI_ID];
 	if (addr < UADDR_OFF || addr > (void*)(0 - sizeof(data)))
 		addr = NULL;
@@ -475,7 +439,7 @@ void ApiRecvProcMsg(DWORD *argv)
 	MESSAGE_DESC *msg;
 	void *addr;
 	DWORD data[MSG_DATA_LEN];
-	
+
 	addr = (void*)argv[ESI_ID];
 	if (addr < UADDR_OFF || addr > (void*)(0 - sizeof(data)))
 		addr = NULL;

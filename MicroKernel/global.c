@@ -27,9 +27,6 @@ BYTE KnlValue[KVAL_LEN];	/*内核零散变量区4KB*/
 /**********实模式设置的变量**********/
 
 PHYBLK_DESC BaseSrv[16];	/*8 * 16字节基础服务程序段表*/
-DWORD VesaMode;			/*启动VESA模式号*/
-DWORD VesaInfo[64];		/*VESA模式信息*/
-DWORD HdInfo[8];		/*两个硬盘参数*/
 DWORD MemEnd;			/*内存上限*/
 MEM_ARDS ards[1];		/*20 * N字节内存结构体*/
 
@@ -48,26 +45,6 @@ PAGE_DESC pt[PT_LEN];		/*当前进程页表4MB*/
 PAGE_DESC pt0[PT_LEN];		/*当前进程副本页表4MB*/
 PAGE_DESC pt2[PT_LEN];		/*关系进程页表4MB*/
 BYTE pg0[PG_LEN];			/*当前页副本4MB*/
-
-/*初始化内核变量*/
-void InitKnlVal()
-{
-	memset32(kpt, INVALID, sizeof(kpt) / sizeof(DWORD));	/*初始化内核端口注册表*/
-	memset32(KnlValue, 0, sizeof(KnlValue) / sizeof(DWORD));	/*清空零散变量*/
-}
-
-/*初始化基础服务*/
-long InitBaseSrv()
-{
-	PHYBLK_DESC *CurSeg;
-	THREAD_ID ptid;
-	long res;
-
-	for (CurSeg = &BaseSrv[1]; CurSeg->addr; CurSeg++)
-		if ((res = CreateProc(EXEC_ARGV_BASESRV | EXEC_ARGV_DRIVER, CurSeg->addr, CurSeg->siz, &ptid)) != NO_ERROR)
-			return res;
-	return NO_ERROR;
-}
 
 /*注册内核端口对应线程*/
 long RegKnlPort(DWORD PortN)

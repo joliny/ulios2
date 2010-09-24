@@ -117,7 +117,7 @@ int main()
 
 		if ((res = KRecvMsg(&ptid, data, INVALID)) != NO_ERROR)	/*等待消息*/
 			break;
-		if (data[0] == MSG_ATTR_USER)	/*普通服务消息*/
+		if ((data[0] & 0xFFFF0000) == MSG_ATTR_USER)	/*普通服务消息*/
 		{
 			switch (data[3])
 			{

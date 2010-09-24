@@ -6,13 +6,6 @@
 
 #include "knldef.h"
 
-/*初始化可执行体管理表*/
-void InitEXMT()
-{
-	memset32(exmt, 0, EXMT_LEN * sizeof(EXEC_DESC*) / sizeof(DWORD));
-	EndExmd = FstExmd = exmt;
-}
-
 /*分配空可执行体ID*/
 long AllocExid(EXEC_DESC *exec)
 {

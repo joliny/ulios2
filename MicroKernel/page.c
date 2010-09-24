@@ -6,67 +6,6 @@
 
 #include "knldef.h"
 
-/*初始化物理内存管理*/
-long InitPMM()
-{
-	DWORD i;
-	MEM_ARDS *CurArd;
-
-	i = (((MemEnd - UPHYMEM_ADDR) + 0x0001FFFF) >> 17);	/*取得进程物理页管理表长度*/
-	if ((pmmap = (DWORD*)kmalloc(i * sizeof(DWORD))) == NULL)	/*建立用户内存位图,以4字节为单位*/
-		return ERROR_HAVENO_KMEM;
-	memset32(pmmap, 0xFFFFFFFF, i);	/*先标记为已用*/
-	PmmLen = (i << 5);	/*用户内存总页数*/
-	PmpID = INVALID;
-	RemmSiz = 0;
-	for (CurArd = ards; CurArd->addr != INVALID; CurArd++)
-		if (CurArd->type == ARDS_TYPE_RAM && CurArd->addr + CurArd->siz > UPHYMEM_ADDR)	/*内存区有效且包含了进程内存页面*/
-		{
-			DWORD fst, cou, end, tcu;	/*页面起始块,数量,循环结束值,临时数量*/
-
-			if (CurArd->addr < UPHYMEM_ADDR)	/*地址转换为进程内存相对地址*/
-			{
-				fst = 0;
-				cou = (CurArd->addr + CurArd->siz - UPHYMEM_ADDR) >> 12;
-			}
-			else
-			{
-				fst = (CurArd->addr + 0x00000FFF - UPHYMEM_ADDR) >> 12;	/*从字节地址高端的页面起始*/
-				cou = CurArd->siz >> 12;
-			}
-			if (PmpID > fst)
-				PmpID = fst;
-			RemmSiz += (cou << 12);
-			end = (fst + 0x0000001F) & 0xFFFFFFE0;
-			tcu = end - fst;
-			if (fst + cou < end)	/*32页边界内的小整块*/
-			{
-				cou = (fst + cou) & 0x0000001F;
-				pmmap[fst >> 5] &= ((0xFFFFFFFF >> tcu) | (0xFFFFFFFF << cou));
-				continue;
-			}
-			pmmap[fst >> 5] &= (0xFFFFFFFF >> tcu);	/*32页边界开始的零碎块*/
-			fst = end;
-			cou -= tcu;
-			memset32(&pmmap[fst >> 5], 0, cou >> 5);	/*大整块*/
-			fst += (cou & 0xFFFFFFE0);
-			cou &= 0x0000001F;
-			if (cou)	/*32页边界结束的零碎块*/
-				pmmap[fst >> 5] &= (0xFFFFFFFF << cou);
-		}
-	return NO_ERROR;
-}
-
-/*初始化地址映射管理*/
-long InitMap()
-{
-	if ((mapmt = (MAPBLK_DESC*)kmalloc(MAPMT_LEN * sizeof(MAPBLK_DESC))) == NULL)
-		return ERROR_HAVENO_KMEM;
-	memset32(mapmt, 0, MAPMT_LEN * sizeof(MAPBLK_DESC) / sizeof(DWORD));
-	FstMap = mapmt;
-	return NO_ERROR;
-}
-
 /*分配物理页*/
 DWORD AllocPage()
 {

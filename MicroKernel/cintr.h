@@ -9,6 +9,9 @@
 
 #include "ulidef.h"
 
+#define MASTER8259_PORT	0x21	/*主8259端口*/
+#define SLAVE8259_PORT	0xA1	/*从8259端口*/
+
 #define IRQN_TIMER		0		/*时钟中断信号*/
 #define IRQN_SLAVE8259	2		/*从片8259信号*/
 #define IRQ_INIT_MASK	0xFA	/*开启时钟和从片8259中断的掩码*/
@@ -55,9 +58,6 @@ extern void AsmIrqE();
 extern void AsmIrqF();
 
 extern void AsmApiCall();
-
-/*中断处理初始化*/
-void InitINTR();
 
 /*注册IRQ信号的响应线程*/
 long RegIrq(DWORD IrqN);

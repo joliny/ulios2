@@ -750,7 +750,7 @@ startScan:
 										bn = (int)gn;
 										it = 0;
 										bno = bitIdx;
-										for (;;) 
+										for (;;)
 										{
 											NEXT_BYTE
 											if (bn <= 0 || it >= 4)

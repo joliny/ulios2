@@ -873,23 +873,21 @@ long seek(PROCRES_DESC *pres, DWORD fhi, SQWORD seek, DWORD from)
 		if (seek < 0)
 			return FS_ERR_WRONG_ARGS;
 		fh->seek = seek;
-		fh->avl = 0;
 		break;
 	case FS_SEEK_CUR:
 		if ((SQWORD)fh->seek + seek < 0)
 			return FS_ERR_WRONG_ARGS;
 		fh->seek = (SQWORD)fh->seek + seek;
-		fh->avl = 0;
 		break;
 	case FS_SEEK_END:
 		if ((SQWORD)CurFile->file.size + seek < 0)
 			return FS_ERR_WRONG_ARGS;
 		fh->seek = (SQWORD)CurFile->file.size + seek;
-		fh->avl = 0;
 		break;
 	default:
 		return FS_ERR_WRONG_ARGS;
 	}
+	fh->avl = 0;
 	return NO_ERROR;
 }
 

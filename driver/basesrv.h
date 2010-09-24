@@ -279,13 +279,13 @@ long GDIDrawStr(long x, long y, const char *str, DWORD c);
 /**********CUI字符界面服务相关**********/
 #define SRV_CUI_PORT	6	/*CUI字符界面服务端口*/
 
-#define CUI_ERR_ARGS	-1536	/*参数错误*/
-
 #define CUI_API_SETCOL	0	/*设置字符界面颜色功能号*/
 #define CUI_API_SETCUR	1	/*设置光标位置功能号*/
 #define CUI_API_CLRSCR	2	/*清屏功能号*/
 #define CUI_API_PUTC	3	/*输出字符功能号*/
 #define CUI_API_PUTS	4	/*输出字符串功能号*/
+
+#define CUI_ERR_ARGS	-1536	/*参数错误*/
 
 /*设置字符界面颜色*/
 static inline long CUISetCol(THREAD_ID ptid, DWORD CharColor, DWORD BgColor)
@@ -362,5 +362,16 @@ static inline long SpkNosound(THREAD_ID ptid)
 	data[1] = SPK_API_NOSOUND;
 	return KSendMsg(&ptid, data, 0);
 }
+
+/**********COM串口服务相关**********/
+#define SRV_UART_PORT	8	/*COM串口服务端口*/
+
+#define UART_API_OPENCOM	0	/*打开串口功能号*/
+#define UART_API_CLOSECOM	1	/*关闭串口功能号*/
+#define UART_API_READCOM	2	/*读串口功能号*/
+#define UART_API_WRITECOM	3	/*写串口功能号*/
+
+#define UART_ERR_NOPORT	-2048	/*COM端口不存在*/
+#define UART_ERR_BAUD	-2049	/*波特率错误*/
 
 #endif

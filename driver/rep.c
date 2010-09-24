@@ -11,7 +11,7 @@ char *Itoa(char *buf, DWORD n, DWORD r)
 {
 	static char num[] = {'0','1','2','3','4','5','6','7','8','9','A','B','C','D','E','F'};
 	char *p, *q;
-	
+
 	q = p = buf;
 	for (;;)
 	{
@@ -36,7 +36,7 @@ void Sprintf(char *buf, const char *fmtstr, ...)
 {
 	long num;
 	const DWORD *args = (DWORD*)(&fmtstr);
-	
+
 	while (*fmtstr)
 	{
 		if (*fmtstr == '%')
@@ -83,12 +83,14 @@ void Sprintf(char *buf, const char *fmtstr, ...)
 
 int main()
 {
-	THREAD_ID CuiPtid;
+	THREAD_ID CuiPtid, SpkPtid;
 	long res;
 
 	if ((res = KRegKnlPort(SRV_REP_PORT)) != NO_ERROR)	/*注册服务端口号*/
 		return res;
 	if ((res = KGetKptThed(SRV_CUI_PORT, &CuiPtid)) != NO_ERROR)
+		return res;
+	if ((res = KGetKptThed(SRV_SPK_PORT, &SpkPtid)) != NO_ERROR)
 		return res;
 	for (;;)
 	{
@@ -98,16 +100,19 @@ int main()
 
 		if ((res = KRecvMsg(&ptid, data, INVALID)) != NO_ERROR)	/*等待消息*/
 			break;
-		if (data[0] == MSG_ATTR_ISR)
+		SpkSound(SpkPtid, 1000);	/*发出报警声音*/
+		if ((data[0] & 0xFFFF0000) == MSG_ATTR_ISR)
 		{
 			Sprintf(buf, "报告：线程(pid=%d tid=%d)出现不可恢复的异常。ISR=%u，错误码=0x%X，程序地址EIP=0x%X\n", ptid.ProcID, ptid.ThedID, data[1], data[2], data[3]);
 			CUIPutS(CuiPtid, buf);
 		}
-		else if (data[0] == MSG_ATTR_EXCEP)
+		else if ((data[0] & 0xFFFF0000) == MSG_ATTR_EXCEP)
 		{
 			Sprintf(buf, "报告：线程(pid=%d tid=%d)不正常退出。错误=%d，异常地址=0x%X，程序地址EIP=0x%X\n", ptid.ProcID, ptid.ThedID, data[1], data[2], data[3]);
 			CUIPutS(CuiPtid, buf);
 		}
+		KSleep(20);
+		SpkNosound(SpkPtid);
 	}
 	return NO_ERROR;
 }
