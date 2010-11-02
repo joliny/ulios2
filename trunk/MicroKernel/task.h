@@ -68,6 +68,7 @@ typedef struct _PROCESS_DESC
 	FREE_BLK_DESC ufdmt[UFDMT_LEN];	/*用户自由数据区管理表*/
 	volatile DWORD Ufdmt_l;		/*用户自由数据区锁*/
 	volatile DWORD Page_l;		/*分页管理锁*/
+	void *PageReadAddr;			/*缺页读取地址*/
 }PROCESS_DESC;	/*进程结构*/
 
 /*唤醒线程*/

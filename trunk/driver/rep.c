@@ -9,7 +9,7 @@
 /*双字转化为数字*/
 char *Itoa(char *buf, DWORD n, DWORD r)
 {
-	static char num[] = {'0','1','2','3','4','5','6','7','8','9','A','B','C','D','E','F'};
+	static const char num[] = {'0','1','2','3','4','5','6','7','8','9','A','B','C','D','E','F'};
 	char *p, *q;
 
 	q = p = buf;
@@ -83,6 +83,29 @@ void Sprintf(char *buf, const char *fmtstr, ...)
 
 int main()
 {
+	static const char *IsrStr[20] =
+	{
+		"被零除故障",
+		"调试异常",
+		"不可屏蔽中断",
+		"调试断点",
+		"INTO陷阱",
+		"边界检查越界",
+		"非法操作码",
+		"协处理器不可用",
+		"双重故障",
+		"协处理器段越界",
+		"无效TSS异常",
+		"段不存在",
+		"堆栈段异常",
+		"通用保护异常",
+		"页异常",
+		"未知异常",
+		"协处理器浮点运算出错",
+		"对齐检验错",
+		"Machine Check",
+		"SIMD浮点异常"
+	};
 	THREAD_ID CuiPtid, SpkPtid;
 	long res;
 
@@ -100,10 +123,10 @@ int main()
 
 		if ((res = KRecvMsg(&ptid, data, INVALID)) != NO_ERROR)	/*等待消息*/
 			break;
-		SpkSound(SpkPtid, 1000);	/*发出报警声音*/
+		SPKSound(SpkPtid, 1000);	/*发出报警声音*/
 		if ((data[0] & 0xFFFF0000) == MSG_ATTR_ISR)
 		{
-			Sprintf(buf, "报告：线程(pid=%d tid=%d)出现不可恢复的异常。ISR=%u，错误码=0x%X，程序地址EIP=0x%X\n", ptid.ProcID, ptid.ThedID, data[1], data[2], data[3]);
+			Sprintf(buf, "报告：线程(pid=%d tid=%d)出现不可恢复的异常。ISR=%u：%s，错误码=0x%X，程序地址EIP=0x%X\n", ptid.ProcID, ptid.ThedID, data[1], IsrStr[data[1]], data[2], data[3]);
 			CUIPutS(CuiPtid, buf);
 		}
 		else if ((data[0] & 0xFFFF0000) == MSG_ATTR_EXCEP)
@@ -112,7 +135,7 @@ int main()
 			CUIPutS(CuiPtid, buf);
 		}
 		KSleep(20);
-		SpkNosound(SpkPtid);
+		SPKNosound(SpkPtid);
 	}
 	return NO_ERROR;
 }

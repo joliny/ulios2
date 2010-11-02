@@ -825,7 +825,7 @@ long Fat32DelFile(FILE_DESC *fd)
 	if (data->attr & FAT32_FILE_ATTR_DIREC)
 	{
 		FAT32_DIR dir;
-		for(seek = sizeof(FAT32_DIR) * 2, curc = 0;; seek += sizeof(FAT32_DIR))	/*检查目录是否空*/
+		for (seek = sizeof(FAT32_DIR) * 2, curc = 0;; seek += sizeof(FAT32_DIR))	/*检查目录是否空*/
 		{
 			if ((res = Fat32RwFile(fd, FALSE, seek, sizeof(FAT32_DIR), &dir, &curc)) != NO_ERROR)
 				return res;

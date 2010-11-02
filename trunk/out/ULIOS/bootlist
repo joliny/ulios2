@@ -6,6 +6,7 @@ Fulios/kbdmus.bin
 Fulios/vesa.bin
 Fulios/cui.bin
 Fulios/speaker.bin
+Fulios/uart.bin
 Fulios/rep.bin
 Fulios/loader.bin
 S/0/ulios

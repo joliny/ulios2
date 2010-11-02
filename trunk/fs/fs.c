@@ -46,6 +46,7 @@ FILE_DESC** FstFd;			/*第一个空文件描述符指针*/
 FILE_DESC** EndFd;			/*最后非空文件描述符下一项指针*/
 DWORD filtl;				/*文件管理表锁*/
 PROCRES_DESC* pret[PRET_LEN];	/*进程资源表*/
+DWORD prel;					/*进程资源表管理锁*/
 
 /*初始化文件系统,如果不成功必须退出*/
 long InitFS()
@@ -76,6 +77,7 @@ long InitFS()
 	EndFd = FstFd = filt;
 	filtl = FALSE;
 	memset32(pret, 0, PRET_LEN * sizeof(PROCRES_DESC*) / sizeof(DWORD));	/*初始化进程资源表*/
+	prel = FALSE;
 	return NO_ERROR;
 }
 

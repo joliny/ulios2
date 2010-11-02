@@ -21,7 +21,7 @@ DASMFLAGS	= -u -o $(ENTRYPOINT) -e $(ENTRYOFFSET)
 
 # This Program
 HEADS		= ../MkApi/ulimkapi.h basesrv.h
-OBJS		= ../objs/athd.o ../objs/time.o ../objs/kbdmus.o ../objs/vesa.o ../objs/gdi.o ../objs/cui.o ../objs/rep.o ../objs/speaker.o
+OBJS		= ../objs/athd.o ../objs/time.o ../objs/kbdmus.o ../objs/vesa.o ../objs/gdi.o ../objs/cui.o ../objs/rep.o ../objs/speaker.o ../objs/uart.o
 HEADOBJ		= ../objs/apphead.o
 
 # All Phony Targets
@@ -29,7 +29,7 @@ HEADOBJ		= ../objs/apphead.o
 
 # Default starting position
 
-all : ../out/ulios/athd.bin ../out/ulios/time.bin ../out/ulios/kbdmus.bin ../out/ulios/vesa.bin ../out/ulios/cui.bin ../out/ulios/rep.bin ../out/ulios/speaker.bin
+all : ../out/ulios/athd.bin ../out/ulios/time.bin ../out/ulios/kbdmus.bin ../out/ulios/vesa.bin ../out/ulios/cui.bin ../out/ulios/rep.bin ../out/ulios/speaker.bin ../out/ulios/uart.bin
 
 redo : clean all
 
@@ -57,6 +57,9 @@ clean :
 ../out/ulios/speaker.bin : ../objs/speaker.o $(HEADOBJ) $(LDFILE)
 	$(LD) $(LDFLAGS) -o $@ $(HEADOBJ) ../objs/speaker.o
 
+../out/ulios/uart.bin : ../objs/uart.o $(HEADOBJ) $(LDFILE)
+	$(LD) $(LDFLAGS) -o $@ $(HEADOBJ) ../objs/uart.o
+
 ../objs/apphead.o : ../MkApi/apphead.c
 	$(CC) $(CFLAGS) -o $@ $<
 
@@ -82,4 +85,7 @@ clean :
 	$(CC) $(CFLAGS) -o $@ $<
 
 ../objs/speaker.o : speaker.c $(HEADS)
+	$(CC) $(CFLAGS) -o $@ $<
+
+../objs/uart.o : uart.c $(HEADS)
 	$(CC) $(CFLAGS) -o $@ $<

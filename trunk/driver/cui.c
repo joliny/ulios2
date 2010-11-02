@@ -121,11 +121,21 @@ int main()
 		{
 			switch (data[3])
 			{
-			case CUI_API_SETCOL:
+			case CUI_API_GETCOL:	/*取得字符界面颜色*/
+				data[1] = CharColor;
+				data[2] = BgColor;
+				KSendMsg(&ptid, data, 0);
+				break;
+			case CUI_API_SETCOL:	/*设置字符界面颜色*/
 				CharColor = data[1];
 				BgColor = data[2];
 				break;
-			case CUI_API_SETCUR:
+			case CUI_API_GETCUR:	/*取得光标位置功能号*/
+				data[1] = CursX;
+				data[2] = CursY;
+				KSendMsg(&ptid, data, 0);
+				break;
+			case CUI_API_SETCUR:	/*设置光标位置*/
 				GDIFillRect(GDICharWidth * CursX, GDICharHeight * CursY + GDICharHeight - CURS_WIDTH, GDICharWidth, CURS_WIDTH, BgColor);	/*清除光标*/
 				if (data[1] < width)
 					CursX = data[1];
@@ -133,10 +143,10 @@ int main()
 					CursY = data[2];
 				GDIFillRect(GDICharWidth * CursX, GDICharHeight * CursY + GDICharHeight - CURS_WIDTH, GDICharWidth, CURS_WIDTH, CharColor);	/*画光标*/
 				break;
-			case CUI_API_CLRSCR:
+			case CUI_API_CLRSCR:	/*清屏*/
 				ClearScr();
 				break;
-			case CUI_API_PUTC:
+			case CUI_API_PUTC:		/*输出字符*/
 				if (data[1] == '\b')
 					BackSp();
 				else
@@ -148,11 +158,14 @@ int main()
 		{
 			switch (data[3])
 			{
-			case CUI_API_PUTS:
+			case CUI_API_PUTS:	/*输出字符串*/
 				if (((const char*)data[2])[data[1] - 1])
 					data[0] = CUI_ERR_ARGS;
 				else
+				{
 					PutStr((const char*)data[2]);
+					data[0] = NO_ERROR;
+				}
 				break;
 			}
 			KUnmapProcAddr((void*)data[2], data);
