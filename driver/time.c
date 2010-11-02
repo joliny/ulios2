@@ -38,7 +38,7 @@ void Sec2Tm(DWORD sec, TM *tm)	/*1970以来年经过的秒数转换为时间结构*/
 		sec -= day;
 		if (++i == 2)
 			day = (((tm->yer & 3) == 0 && tm->yer % 100 != 0) || tm->yer % 400 == 0) ? 29 : 28;
-		else if(i < 8)
+		else if (i < 8)
 			day = (i & 1) ? 31 : 30;
 		else
 			day = (i & 1) ? 30 : 31;

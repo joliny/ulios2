@@ -184,6 +184,30 @@ SOURCE=.\fs\ulifs.c
 # PROP Default_Filter ""
 # Begin Source File
 
+SOURCE=.\gui\control.c
+# End Source File
+# Begin Source File
+
+SOURCE=.\gui\control.h
+# End Source File
+# Begin Source File
+
+SOURCE=.\gui\gui.h
+# End Source File
+# Begin Source File
+
+SOURCE=.\gui\guiapi.c
+# End Source File
+# Begin Source File
+
+SOURCE=.\gui\guiapi.h
+# End Source File
+# Begin Source File
+
+SOURCE=.\gui\guiobj.c
+# End Source File
+# Begin Source File
+
 SOURCE=.\gui\malloc.c
 # End Source File
 # End Group

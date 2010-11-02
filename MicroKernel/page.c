@@ -669,14 +669,21 @@ long MapProcAddr(void *addr, DWORD siz, THREAD_ID *ptid, BOOL isWrite, BOOL isCh
 	msg->data[1] = dsiz;
 	msg->data[2] = *((DWORD*)&MapAddr) | *((DWORD*)&daddr);
 	memcpy32(msg->data + 3, argv, MSG_DATA_LEN - 3);
+	if (!isChkExec)
+		CurProc->PageReadAddr = map->addr2;
 	if ((res = SendMsg(msg)) != NO_ERROR)	/*发送映射消息*/
 	{
+		if (!isChkExec)
+			CurProc->PageReadAddr = NULL;
 		FreeMsg(msg);
 		return res;
 	}
 	if (cs)	/*等待返回消息*/
 	{
-		if ((res = RecvProcMsg(&msg, *ptid, cs)) != NO_ERROR)
+		res = RecvProcMsg(&msg, *ptid, cs);
+		if (!isChkExec)
+			CurProc->PageReadAddr = NULL;
+		if (res != NO_ERROR)
 			return res;
 		*ptid = msg->ptid;
 		memcpy32(argv, msg->data, MSG_DATA_LEN);
@@ -706,7 +713,7 @@ long UnmapProcAddr(void *addr, const DWORD *argv)
 	FstPg = &pt[(DWORD)addr >> 12];
 	EndPg = &pt[((DWORD)addr + map->siz) >> 12];
 	FstPg2 = &pt2[(DWORD)addr2 >> 12];
-	if (map->ptid.ProcID != kpt[FS_KPORT].ProcID)
+	if (DstProc->PageReadAddr == NULL || DstProc->PageReadAddr != addr2)
 		lock(&DstProc->Page_l);
 	lockset(&pt[(PT_ID << 10) | PT2_ID], pddt[ptid.ProcID]);	/*映射关系进程的页表*/
 	while (FstPg < EndPg)	/*目录项对应的页表对应的每页分别回收*/
@@ -796,7 +803,7 @@ skip:		continue;
 	}
 skip2:
 	ulock(&pt[(PT_ID << 10) | PT2_ID]);	/*解除关系进程页表的映射*/
-	if (map->ptid.ProcID != kpt[FS_KPORT].ProcID)
+	if (DstProc->PageReadAddr == NULL || DstProc->PageReadAddr != addr2)
 		ulock(&DstProc->Page_l);
 	clisub(&DstProc->Map_l);	/*到此映射完成*/
 	lock(&CurProc->Page_l);

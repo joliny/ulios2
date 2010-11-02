@@ -104,6 +104,7 @@ extern FILE_DESC** FstFd;	/*第一个空文件描述符指针*/
 extern FILE_DESC** EndFd;	/*最后非空文件描述符下一项指针*/
 #define PRET_LEN	0x0400	/*进程资源1k个,与内核最多进程数相等*/
 extern PROCRES_DESC* pret[];/*进程资源表*/
+extern DWORD prel;			/*进程资源表管理锁*/
 
 typedef struct _FSUI
 {

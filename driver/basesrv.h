@@ -279,13 +279,28 @@ long GDIDrawStr(long x, long y, const char *str, DWORD c);
 /**********CUI字符界面服务相关**********/
 #define SRV_CUI_PORT	6	/*CUI字符界面服务端口*/
 
-#define CUI_API_SETCOL	0	/*设置字符界面颜色功能号*/
-#define CUI_API_SETCUR	1	/*设置光标位置功能号*/
-#define CUI_API_CLRSCR	2	/*清屏功能号*/
-#define CUI_API_PUTC	3	/*输出字符功能号*/
-#define CUI_API_PUTS	4	/*输出字符串功能号*/
+#define CUI_API_GETCOL	0	/*取得字符界面颜色功能号*/
+#define CUI_API_SETCOL	1	/*设置字符界面颜色功能号*/
+#define CUI_API_GETCUR	2	/*取得光标位置功能号*/
+#define CUI_API_SETCUR	3	/*设置光标位置功能号*/
+#define CUI_API_CLRSCR	4	/*清屏功能号*/
+#define CUI_API_PUTC	5	/*输出字符功能号*/
+#define CUI_API_PUTS	6	/*输出字符串功能号*/
 
 #define CUI_ERR_ARGS	-1536	/*参数错误*/
+
+/*取得字符界面颜色*/
+static inline long CUIGetCol(THREAD_ID ptid, DWORD *CharColor, DWORD *BgColor)
+{
+	DWORD data[MSG_DATA_LEN];
+	data[0] = MSG_ATTR_USER;
+	data[3] = CUI_API_GETCOL;
+	if ((data[0] = KSendMsg(&ptid, data, SRV_OUT_TIME)) != NO_ERROR)
+		return data[0];
+	*CharColor = data[1];
+	*BgColor = data[2];
+	return NO_ERROR;
+}
 
 /*设置字符界面颜色*/
 static inline long CUISetCol(THREAD_ID ptid, DWORD CharColor, DWORD BgColor)
@@ -296,6 +311,19 @@ static inline long CUISetCol(THREAD_ID ptid, DWORD CharColor, DWORD BgColor)
 	data[2] = BgColor;
 	data[3] = CUI_API_SETCOL;
 	return KSendMsg(&ptid, data, 0);
+}
+
+/*取得光标位置*/
+static inline long CUIGetCur(THREAD_ID ptid, DWORD *CursX, DWORD *CursY)
+{
+	DWORD data[MSG_DATA_LEN];
+	data[0] = MSG_ATTR_USER;
+	data[3] = CUI_API_GETCUR;
+	if ((data[0] = KSendMsg(&ptid, data, SRV_OUT_TIME)) != NO_ERROR)
+		return data[0];
+	*CursX = data[1];
+	*CursY = data[2];
+	return NO_ERROR;
 }
 
 /*设置光标位置*/
@@ -345,7 +373,7 @@ static inline long CUIPutS(THREAD_ID ptid, const char *str)
 #define SPK_API_NOSOUND	1	/*停止发声功能号*/
 
 /*发声*/
-static inline long SpkSound(THREAD_ID ptid, DWORD freq)
+static inline long SPKSound(THREAD_ID ptid, DWORD freq)
 {
 	DWORD data[MSG_DATA_LEN];
 	data[0] = MSG_ATTR_USER;
@@ -355,7 +383,7 @@ static inline long SpkSound(THREAD_ID ptid, DWORD freq)
 }
 
 /*停止发声*/
-static inline long SpkNosound(THREAD_ID ptid)
+static inline long SPKNosound(THREAD_ID ptid)
 {
 	DWORD data[MSG_DATA_LEN];
 	data[0] = MSG_ATTR_USER;
@@ -371,7 +399,66 @@ static inline long SpkNosound(THREAD_ID ptid)
 #define UART_API_READCOM	2	/*读串口功能号*/
 #define UART_API_WRITECOM	3	/*写串口功能号*/
 
+#define UART_ARGS_BITS_5		0x00	/*5个数据位*/
+#define UART_ARGS_BITS_6		0x01	/*6个数据位*/
+#define UART_ARGS_BITS_7		0x02	/*7个数据位*/
+#define UART_ARGS_BITS_8		0x03	/*8个数据位*/
+#define UART_ARGS_STOP_1		0x00	/*1个停止位*/
+#define UART_ARGS_STOP_1_5		0x04	/*5个数据位时1.5个停止位*/
+#define UART_ARGS_STOP_2		0x04	/*2个停止位*/
+#define UART_ARGS_PARITY_NONE	0x00	/*无奇偶校验*/
+#define UART_ARGS_PARITY_ODD	0x08	/*奇位校验*/
+#define UART_ARGS_PARITY_EVEN	0x18	/*偶位校验*/
+
 #define UART_ERR_NOPORT	-2048	/*COM端口不存在*/
 #define UART_ERR_BAUD	-2049	/*波特率错误*/
+#define UART_ERR_NOTIME	-2050	/*超时错误*/
+#define UART_ERR_BUSY	-2051	/*端口驱动正忙*/
+
+/*打开串口*/
+static inline long UARTOpenCom(THREAD_ID ptid, DWORD com, DWORD baud, DWORD args)
+{
+	DWORD data[MSG_DATA_LEN];
+	data[0] = MSG_ATTR_USER;
+	data[1] = com;
+	data[2] = baud;
+	data[3] = UART_API_OPENCOM;
+	data[4] = args;
+	return KSendMsg(&ptid, data, 0);
+}
+
+/*关闭串口*/
+static inline long UARTCloseCom(THREAD_ID ptid, DWORD com)
+{
+	DWORD data[MSG_DATA_LEN];
+	data[0] = MSG_ATTR_USER;
+	data[1] = com;
+	data[3] = UART_API_CLOSECOM;
+	return KSendMsg(&ptid, data, 0);
+}
+
+/*读串口*/
+static inline long UARTReadCom(THREAD_ID ptid, DWORD com, void *buf, DWORD siz, DWORD time)
+{
+	DWORD data[MSG_DATA_LEN];
+	data[0] = UART_API_READCOM;
+	data[1] = com;
+	data[2] = time;
+	if ((data[0] = KReadProcAddr(buf, siz, &ptid, data, INVALID)) != NO_ERROR)
+		return data[0];
+	return data[2];
+}
+
+/*写串口*/
+static inline long UARTWriteCom(THREAD_ID ptid, DWORD com, void *buf, DWORD siz, DWORD time)
+{
+	DWORD data[MSG_DATA_LEN];
+	data[0] = UART_API_WRITECOM;
+	data[1] = com;
+	data[2] = time;
+	if ((data[0] = KWriteProcAddr(buf, siz, &ptid, data, INVALID)) != NO_ERROR)
+		return data[0];
+	return data[2];
+}
 
 #endif

@@ -1,0 +1,51 @@
+/*	gui.h for ulios graphical user interface
+	作者：孙亮
+	功能：图形用户界面相关结构、常量定义
+	最后修改日期：2010-10-03
+*/
+
+#ifndef	_GUI_H_
+#define	_GUI_H_
+
+#include "../MkApi/ulimkapi.h"
+#include "../driver/basesrv.h"
+#include "guiapi.h"
+
+/**********动态内存管理相关**********/
+
+typedef struct _FREE_BLK_DESC
+{
+	void *addr;						/*起始地址*/
+	DWORD siz;						/*字节数,0表示空项*/
+	struct _FREE_BLK_DESC *nxt;		/*后一项*/
+}FREE_BLK_DESC;	/*自由块描述符*/
+
+#define FDAT_SIZ		0x03F00000	/*动态内存大小*/
+#define FMT_LEN			0x100		/*动态内存管理表长度*/
+extern FREE_BLK_DESC fmt[];			/*动态内存管理表*/
+extern DWORD fmtl;					/*动态内存管理锁*/
+
+/**********图形用户界面结构定义**********/
+
+typedef struct _GUIOBJ_DESC
+{
+	WORD id, type;					/*对象ID/类型*/
+	THREAD_ID ptid;					/*所属线程ID*/
+	long xpos, ypos;				/*相对父窗体的位置*/
+	long xend, yend;				/*窗口右/下边缘位置*/
+	struct _GUIOBJ_DESC *pre, *nxt;	/*前后对象指针*/
+	struct _GUIOBJ_DESC *par, *chl;	/*父对象/子对象链指针*/
+	DWORD *buf;						/*图形缓冲*/
+	DWORD attr;						/*属性*/
+}GUIOBJ_DESC;	/*GUI对象描述符*/
+
+#define GOBJT_LEN	0x1000		/*4k个GUI对象描述符*/
+extern GUIOBJ_DESC *gobjt[];	/*GUI对象描述符指针表*/
+
+/*自由块分配*/
+void *malloc(DWORD siz);
+
+/*自由块回收*/
+void free(void *addr, DWORD siz);
+
+#endif

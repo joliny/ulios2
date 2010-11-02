@@ -16,7 +16,7 @@ char cmd[CMD_LEN], *cmdp;	/*输入命令缓冲*/
 /*双字转化为数字*/
 char *Itoa(char *buf, DWORD n, DWORD r)
 {
-	static char num[] = {'0','1','2','3','4','5','6','7','8','9','A','B','C','D','E','F'};
+	static const char num[] = {'0','1','2','3','4','5','6','7','8','9','A','B','C','D','E','F'};
 	char *p, *q;
 
 	q = p = buf;
@@ -244,7 +244,7 @@ void partlist(char *args)
 		Sprintf(buf, "/%u\t容量:%uMB\t剩余:%uMB\t格式:%s\t卷标:%s\n", pid, (DWORD)(pi.info.size / 0x100000), (DWORD)(pi.info.remain / 0x100000), pi.fstype, pi.info.label);
 		CUIPutS(CuiPtid, buf);
 		ptid = KbdPtid;
-		if (KRecvProcMsg(&ptid, (DWORD*)buf, 0) == NO_ERROR && (((DWORD*)buf)[0] & 0xFFFF0000) == MSG_ATTR_KBD && buf[4] == 27)
+		if (KRecvProcMsg(&ptid, (DWORD*)buf, 0) == NO_ERROR && ((DWORD*)buf)[0] == MSG_ATTR_KBD && buf[4] == 27)
 		{
 			CUIPutS(CuiPtid, "用户取消！\n");
 			break;
@@ -271,10 +271,10 @@ void dir(char *args)
 		char buf[4096];
 
 		TMLocalTime(TimePtid, fi.ModifyTime, &tm);
-		Sprintf(buf, "%d-%d-%d\t%d:%d:%d   \t%s\t%d\t%s\n", tm.yer, tm.mon, tm.day, tm.hor, tm.min, tm.sec, (fi.attr & FILE_ATTR_DIREC) ? "目录" : "文件", (DWORD)fi.size, fi.name);
+		Sprintf(buf, "%d-%d-%d\t%d:%d:%d   \t%s\t%d\t%c%c%c%c%c%c\t%s\n", tm.yer, tm.mon, tm.day, tm.hor, tm.min, tm.sec, (fi.attr & FILE_ATTR_DIREC) ? "目录" : "文件", (DWORD)fi.size, (fi.attr & FILE_ATTR_RDONLY) ? 'R' : ' ', (fi.attr & FILE_ATTR_HIDDEN) ? 'H' : ' ', (fi.attr & FILE_ATTR_SYSTEM) ? 'S' : ' ', (fi.attr & FILE_ATTR_LABEL) ? 'L' : ' ', (fi.attr & FILE_ATTR_ARCH) ? 'A' : ' ', (fi.attr & FILE_ATTR_EXEC) ? 'X' : ' ', fi.name);
 		CUIPutS(CuiPtid, buf);
 		ptid = KbdPtid;
-		if (KRecvProcMsg(&ptid, (DWORD*)buf, 0) == NO_ERROR && (((DWORD*)buf)[0] & 0xFFFF0000) == MSG_ATTR_KBD && buf[4] == 27)
+		if (KRecvProcMsg(&ptid, (DWORD*)buf, 0) == NO_ERROR && ((DWORD*)buf)[0] == MSG_ATTR_KBD && buf[4] == 27)
 		{
 			CUIPutS(CuiPtid, "用户取消！\n");
 			break;
@@ -323,7 +323,7 @@ void proclist(char *args)
 		Sprintf(buf, "PID:%d\t%s\n", pid, fi.name);
 		CUIPutS(CuiPtid, buf);
 		ptid = KbdPtid;
-		if (KRecvProcMsg(&ptid, (DWORD*)buf, 0) == NO_ERROR && (((DWORD*)buf)[0] & 0xFFFF0000) == MSG_ATTR_KBD && buf[4] == 27)
+		if (KRecvProcMsg(&ptid, (DWORD*)buf, 0) == NO_ERROR && ((DWORD*)buf)[0] == MSG_ATTR_KBD && buf[4] == 27)
 		{
 			CUIPutS(CuiPtid, "用户取消！\n");
 			break;
@@ -349,9 +349,9 @@ void sound(char *args)
 		CUIPutS(CuiPtid, "扬声器驱动未启动！\n");
 		return;
 	}
-	SpkSound(SpkPtid, Atoi10(args));
+	SPKSound(SpkPtid, Atoi10(args));
 	KSleep(100);
-	SpkNosound(SpkPtid);
+	SPKNosound(SpkPtid);
 }
 
 /*帮助*/
@@ -371,7 +371,7 @@ void help(char *args)
 		"time:显示当前时间\n"
 		"ps:进程列表\n"
 		"kill ProcID:强行结束进程\n"
-		"sound freq:以一定频率发声一秒"
+		"sound freq:以一定频率发声一秒\n"
 		"help:帮助\n"
 		"输入可执行文件路径将运行该程序\n");
 }
@@ -505,7 +505,7 @@ int main()
 
 		if ((res = KRecvMsg(&ptid, data, INVALID)) != NO_ERROR)
 			break;
-		if (ptid.ProcID == KbdPtid.ProcID && (data[0] & 0xFFFF0000) == MSG_ATTR_KBD)	/*键盘消息*/
+		if (ptid.ProcID == KbdPtid.ProcID && data[0] == MSG_ATTR_KBD)	/*键盘消息*/
 			KeyProc(data[1]);
 	}
 	return NO_ERROR;
