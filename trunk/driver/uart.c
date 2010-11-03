@@ -73,7 +73,7 @@ void ReadCom(UART_REQ *req)
 	BYTE b;
 
 	BasePort = ComPort[req->com];
-	while (inb(BasePort + SER_LSR) & 0x01)
+	do
 	{
 		b = inb(ComPort[req->com] + SER_DR);
 		if (req->reader.addr)	/*放入读线程的空间*/
@@ -101,6 +101,7 @@ void ReadCom(UART_REQ *req)
 			ulock(&req->quel);
 		}
 	}
+	while (inb(BasePort + SER_LSR) & 0x01);
 }
 
 /*串口中断响应线程*/
@@ -216,6 +217,7 @@ static inline long OpenCom(UART_REQ *req, DWORD com, DWORD baud, DWORD args)
 	lock(&req->quel);
 	req->tail = req->head = req->que;	/*丢弃已存储的数据*/
 	ulock(&req->quel);
+	req->writer.addr = req->reader.addr = NULL;	/*撤销已有任务*/
 	return NO_ERROR;
 }
 

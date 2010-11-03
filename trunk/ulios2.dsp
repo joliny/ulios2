@@ -372,6 +372,10 @@ SOURCE=.\apps\cmd.c
 # End Source File
 # Begin Source File
 
+SOURCE=.\apps\comtest.c
+# End Source File
+# Begin Source File
+
 SOURCE=.\apps\jpg.c
 # End Source File
 # Begin Source File
