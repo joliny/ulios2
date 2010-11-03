@@ -44,6 +44,7 @@ BYTE KeyMapEx[] = {0,	/*美国英语键盘扩展键码表*/
 };
 
 #define VS_MODE_ADDR	0x90500	/*显卡模式信息物理地址*/
+#define RECVPTID_LEN	0x300	/*接收消息线程ID栈长度*/
 
 int main()
 {
@@ -51,7 +52,7 @@ int main()
 	DWORD KbdFlag, KbdState;	/*键码扫描码,前缀标志,控制键状态*/
 	DWORD MusId, MusCou, MusKey;		/*鼠标ID,鼠标数据包计数,键状态*/
 	long MusX, MusY, MusZ, MusMaxX, MusMaxY;	/*移动范围,位置*/
-	THREAD_ID RecvPtid;	/*接受键盘鼠标消息的线程ID*/
+	THREAD_ID RecvPtid[RECVPTID_LEN], *CurRecv;	/*接收消息线程ID栈*/
 	void *addr;
 	long res;	/*返回结果*/
 
@@ -115,7 +116,7 @@ int main()
 	KbdState = KbdFlag = 0;
 	MusKey = MusCou = 0;
 	MusZ = MusY = MusX = 0;
-	*((DWORD*)&RecvPtid) = INVALID;
+	CurRecv = NULL;
 	for (;;)
 	{
 		THREAD_ID ptid;
@@ -289,13 +290,17 @@ int main()
 					else
 						KbdKey = code << 8;	/*不能处理的键直接放入队列*/
 					KbdKey |= KbdState;
-					if (*((DWORD*)&RecvPtid) != INVALID)
+					data[0] = MSG_ATTR_KBD;
+					data[1] = KbdKey;
+					while (CurRecv)
 					{
-						DWORD data[MSG_DATA_LEN];
-
-						data[0] = MSG_ATTR_KBD;
-						data[1] = KbdKey;
-						KSendMsg(&RecvPtid, data, 0);
+						res = KSendMsg(CurRecv, data, 0);
+						if (res != ERROR_WRONG_PROCID && res != ERROR_WRONG_THEDID)
+							break;
+						if (CurRecv != RecvPtid)	/*无法发送到栈中的线程则忽略该线程*/
+							CurRecv--;
+						else
+							CurRecv = NULL;
 					}
 				}
 				KbdFlag = 0;
@@ -342,23 +347,33 @@ int main()
 					MusCou = 0;
 					break;
 				}
-				if (*((DWORD*)&RecvPtid) != INVALID)
+				data[0] = MSG_ATTR_MUS;
+				data[1] = MusKey;
+				data[2] = MusX;
+				data[3] = MusY;
+				data[4] = MusZ;
+				while (CurRecv)
 				{
-					DWORD data[MSG_DATA_LEN];
-
-					data[0] = MSG_ATTR_MUS;
-					data[1] = MusKey;
-					data[2] = MusX;
-					data[3] = MusY;
-					data[4] = MusZ;
-					KSendMsg(&RecvPtid, data, 0);
+					res = KSendMsg(CurRecv, data, 0);
+					if (res != ERROR_WRONG_PROCID && res != ERROR_WRONG_THEDID)
+						break;
+					if (CurRecv != RecvPtid)	/*无法发送到栈中的线程则忽略该线程*/
+						CurRecv--;
+					else
+						CurRecv = NULL;
 				}
 			}
 		}
 		else if ((data[0] & 0xFFFF0000) == MSG_ATTR_USER)	/*应用请求消息*/
 		{
-			if (data[1] == KBDMUS_API_SETRECV)	/*注册接收键盘鼠标消息的线程*/
-				RecvPtid = ptid;
+			if (data[1] == KBDMUS_API_SETRECV && CurRecv != &RecvPtid[RECVPTID_LEN - 1])	/*PTID栈不满时注册接收键盘鼠标消息的线程*/
+			{
+				if (CurRecv)
+					CurRecv++;
+				else
+					CurRecv = RecvPtid;
+				*CurRecv = ptid;
+			}
 		}
 	}
 	KUnregIrq(KBD_IRQ);

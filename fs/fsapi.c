@@ -48,7 +48,8 @@ static const char *CheckPathSize(const char *path, DWORD siz)
 		if (*path == 0)
 			return path;
 		path++;
-	} while (--siz);
+	}
+	while (--siz);
 	return NULL;
 }
 

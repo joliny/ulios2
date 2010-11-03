@@ -252,7 +252,8 @@ void ClearPage(PAGE_DESC *FstPg, PAGE_DESC *EndPg, BOOL isFree)
 					*FstPg = 0;
 					isRefreshTlb = TRUE;
 				}
-			} while (((DWORD)(++FstPg) & 0xFFF) && FstPg < EndPg);
+			}
+			while (((DWORD)(++FstPg) & 0xFFF) && FstPg < EndPg);
 			for (; (DWORD)TFstPg & 0xFFF; TFstPg--)	/*检查页表是否需要释放*/
 				if (*(TFstPg - 1) & PAGE_ATTR_P)
 					goto skip;
@@ -299,7 +300,8 @@ void ClearPageNoPt0(PAGE_DESC *FstPg, PAGE_DESC *EndPg)
 					*FstPg = 0;
 					isRefreshTlb = TRUE;
 				}
-			} while (((DWORD)(++FstPg0, ++FstPg) & 0xFFF) && FstPg < EndPg);
+			}
+			while (((DWORD)(++FstPg0, ++FstPg) & 0xFFF) && FstPg < EndPg);
 			for (; (DWORD)TFstPg & 0xFFF; TFstPg--)	/*检查页表是否需要释放*/
 				if (*(TFstPg - 1) & PAGE_ATTR_P)
 					goto skip;
@@ -637,7 +639,8 @@ long MapProcAddr(void *addr, DWORD siz, THREAD_ID *ptid, BOOL isWrite, BOOL isCh
 						*FstPg2 = (PgAddr & (~PAGE_ATTR_W)) | PAGE_ATTR_ROMAP;	/*关闭写权限,设置为映射只读*/
 					}
 				}
-			} while (((DWORD)(++FstPg2, ++FstPg) & 0xFFF) && FstPg < EndPg);
+			}
+			while (((DWORD)(++FstPg2, ++FstPg) & 0xFFF) && FstPg < EndPg);
 		}
 		else	/*源页目录表项空*/
 		{
@@ -741,7 +744,8 @@ long UnmapProcAddr(void *addr, const DWORD *argv)
 						*FstPg2 &= PAGE_ATTR_AVL;
 					}
 				}
-			} while (((DWORD)(++FstPg, ++FstPg2) & 0xFFF) && FstPg < EndPg);
+			}
+			while (((DWORD)(++FstPg, ++FstPg2) & 0xFFF) && FstPg < EndPg);
 			if (isSkip)
 				goto skip;
 			for (; (DWORD)TFstPg & 0xFFF; TFstPg--)	/*检查页表是否需要释放*/
@@ -790,7 +794,8 @@ skip:		continue;
 					if (!(*FstPg2 & PAGE_ATTR_P))	/*目的页不存在*/
 						*FstPg2 |= PAGE_ATTR_P | PAGE_ATTR_W | PAGE_ATTR_U | (PgAddr & 0xFFFFF000);	/*开启用户写权限*/
 				}
-			} while (((DWORD)(++FstPg2, ++FstPg) & 0xFFF) && FstPg < EndPg);
+			}
+			while (((DWORD)(++FstPg2, ++FstPg) & 0xFFF) && FstPg < EndPg);
 		}
 		else	/*源页目录表项空*/
 		{
@@ -868,7 +873,8 @@ long CnlmapProcAddr(void *addr, const DWORD *argv)
 						LockFreePage(PgAddr);	/*释放物理页*/
 					*FstPg2 = 0;
 				}
-			} while (((DWORD)(++FstPg, ++FstPg2) & 0xFFF) && FstPg < EndPg);
+			}
+			while (((DWORD)(++FstPg, ++FstPg2) & 0xFFF) && FstPg < EndPg);
 			for (; (DWORD)TFstPg & 0xFFF; TFstPg--)	/*检查页表是否需要释放*/
 				if (*(TFstPg - 1) & PAGE_ATTR_P)
 					goto skip;

@@ -105,7 +105,8 @@ int main()
 		tm.yer = ReadCmos(9);
 		if ((res = KGetClock(&clk)) != NO_ERROR)
 			return res;
-	} while (tm.sec != ReadCmos(0));
+	}
+	while (tm.sec != ReadCmos(0));
 	BCD2BIN(tm.sec);
 	BCD2BIN(tm.min);
 	BCD2BIN(tm.hor);
