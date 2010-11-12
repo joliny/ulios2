@@ -1,10 +1,10 @@
-/*	malloc.c for ulios graphical user interface
+/*	fsalloc.c for ulios file system
 	作者：孙亮
-	功能：图形用户界面动态内存管理
+	功能：文件系统动态内存管理
 	最后修改日期：2009-05-28
 */
 
-#include "gui.h"
+#include "fs.h"
 
 FREE_BLK_DESC fmt[FMT_LEN];
 DWORD fmtl;	/*动态内存管理锁*/

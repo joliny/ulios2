@@ -160,6 +160,10 @@ SOURCE=.\fs\fs.h
 # End Source File
 # Begin Source File
 
+SOURCE=.\fs\fsalloc.c
+# End Source File
+# Begin Source File
+
 SOURCE=.\fs\fsapi.c
 # End Source File
 # Begin Source File
@@ -169,10 +173,6 @@ SOURCE=.\fs\fsapi.h
 # Begin Source File
 
 SOURCE=.\fs\Makefile
-# End Source File
-# Begin Source File
-
-SOURCE=.\fs\malloc.c
 # End Source File
 # Begin Source File
 
@@ -196,6 +196,10 @@ SOURCE=.\gui\gui.h
 # End Source File
 # Begin Source File
 
+SOURCE=.\gui\guialloc.c
+# End Source File
+# Begin Source File
+
 SOURCE=.\gui\guiapi.c
 # End Source File
 # Begin Source File
@@ -208,7 +212,7 @@ SOURCE=.\gui\guiobj.c
 # End Source File
 # Begin Source File
 
-SOURCE=.\gui\malloc.c
+SOURCE=.\gui\Makefile
 # End Source File
 # End Group
 # Begin Group "MicroKernel"
@@ -369,10 +373,6 @@ SOURCE=.\apps\3dline.c
 # Begin Source File
 
 SOURCE=.\apps\cmd.c
-# End Source File
-# Begin Source File
-
-SOURCE=.\apps\comtest.c
 # End Source File
 # Begin Source File
 

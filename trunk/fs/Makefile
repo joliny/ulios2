@@ -22,7 +22,7 @@ DASMFLAGS	= -u -o $(ENTRYPOINT) -e $(ENTRYOFFSET)
 # This Program
 FSBIN		= ../out/ulios/fs.bin
 HEADS		= ../MkApi/ulimkapi.h ../driver/basesrv.h fs.h fsapi.h
-OBJS		= ../objs/apphead.o ../objs/fsapi.o ../objs/malloc.o ../objs/cache.o ../objs/fs.o ../objs/fat32.o ../objs/ulifs.o
+OBJS		= ../objs/apphead.o ../objs/fsapi.o ../objs/fsalloc.o ../objs/cache.o ../objs/fs.o ../objs/fat32.o ../objs/ulifs.o
 
 # All Phony Targets
 .PHONY : all redo clean
@@ -45,7 +45,7 @@ $(FSBIN) : $(OBJS) $(LDFILE)
 ../objs/fsapi.o : fsapi.c $(HEADS)
 	$(CC) $(CFLAGS) -o $@ $<
 
-../objs/malloc.o : malloc.c $(HEADS)
+../objs/fsalloc.o : fsalloc.c $(HEADS)
 	$(CC) $(CFLAGS) -o $@ $<
 
 ../objs/cache.o : cache.c $(HEADS)
