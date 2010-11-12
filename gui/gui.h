@@ -20,10 +20,14 @@ typedef struct _FREE_BLK_DESC
 	struct _FREE_BLK_DESC *nxt;		/*后一项*/
 }FREE_BLK_DESC;	/*自由块描述符*/
 
-#define FDAT_SIZ		0x03F00000	/*动态内存大小*/
+#define FDAT_SIZ		0x00300000	/*动态内存大小*/
 #define FMT_LEN			0x100		/*动态内存管理表长度*/
 extern FREE_BLK_DESC fmt[];			/*动态内存管理表*/
 extern DWORD fmtl;					/*动态内存管理锁*/
+#define VDAT_SIZ		0x03C00000	/*可视内存大小*/
+#define VMT_LEN			0x100		/*可视内存管理表长度*/
+extern FREE_BLK_DESC vmt[];			/*可视内存管理表*/
+extern DWORD vmtl;					/*可视内存管理锁*/
 
 /**********图形用户界面结构定义**********/
 
@@ -43,9 +47,33 @@ typedef struct _GUIOBJ_DESC
 extern GUIOBJ_DESC *gobjt[];	/*GUI对象描述符指针表*/
 
 /*自由块分配*/
-void *malloc(DWORD siz);
+void *alloc(FREE_BLK_DESC *fbt, DWORD siz);
 
 /*自由块回收*/
-void free(void *addr, DWORD siz);
+void free(FREE_BLK_DESC *fbt, void *addr, DWORD siz);
+
+/*动态内存分配*/
+static inline void *falloc(DWORD siz)
+{
+	return alloc(fmt, siz);
+}
+
+/*动态内存回收*/
+static inline void ffree(void *addr, DWORD siz)
+{
+	free(fmt, addr, siz);
+}
+
+/*可视内存分配*/
+static inline void *valloc(DWORD siz)
+{
+	return alloc(vmt, ((siz + 0x00000FFF) & 0x00001000));
+}
+
+/*可视内存回收*/
+static inline void vfree(void *addr, DWORD siz)
+{
+	free(vmt, addr, ((siz + 0x00000FFF) & 0x00001000));
+}
 
 #endif
