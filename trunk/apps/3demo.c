@@ -261,8 +261,8 @@ int main()
 			z = point[i].z * cb + x * sb;
 			x = x * cb - point[i].z * sb;
 			GDIPutPixel(point[i].sx, point[i].sy, 0);
-			point[i].sx = GDIwidth / 2 + (long)(1000.0f * y / (1400.0f - x));
-			point[i].sy = GDIheight / 2 - (long)(1000.0f * z / (1400.0f - x));
+			point[i].sx = (GDIwidth >> 1) + (long)(1000.0f * y / (1400.0f - x));
+			point[i].sy = (GDIheight >> 1) - (long)(1000.0f * z / (1400.0f - x));
 			GDIPutPixel(point[i].sx, point[i].sy, ((colr << 16) | (colg << 8) ) | colb);
 		}
 
