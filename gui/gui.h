@@ -46,6 +46,9 @@ typedef struct _GUIOBJ_DESC
 #define GOBJT_LEN	0x1000		/*4k个GUI对象描述符*/
 extern GUIOBJ_DESC *gobjt[];	/*GUI对象描述符指针表*/
 
+/*初始化自由块管理表*/
+void InitFbt(FREE_BLK_DESC *fbt, DWORD FbtLen, void *addr, DWORD siz);
+
 /*自由块分配*/
 void *alloc(FREE_BLK_DESC *fbt, DWORD siz);
 

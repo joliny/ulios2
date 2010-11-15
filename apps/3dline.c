@@ -36,8 +36,8 @@ int main()
 			float temp = x[i];
 			x[i] = x[i] * 0.99955f + y[i] * 0.0299955f;
 			y[i] = y[i] * 0.99955f - temp * 0.0299955f;
-			sx[i] = (long)(1000.0f * y[i] / (1400.0f - x[i])) + 400;
-			sy[i] = 300 - (long)(1000.0f * z[i] / (1400.0f - x[i]));
+			sx[i] = (GDIwidth >> 1) + (long)(1000.0f * y[i] / (1400.0f - x[i]));
+			sy[i] = (GDIheight >> 1) - (long)(1000.0f * z[i] / (1400.0f - x[i]));
 		}
 		for (i = 0; i < PN - 1; i++)
 			GDIDrawLine(sx[i], sy[i], sx[i + 1], sy[i + 1], 0xFFFFFF);
