@@ -48,7 +48,7 @@ void PutStr(const char *str)
 			CursX++;
 			break;
 		}
-		if (CursX == width)	/*光标在最后一列，回到前面*/
+		if (CursX >= width)	/*光标在最后一列，回到前面*/
 		{
 			CursX = 0;
 			CursY++;
@@ -62,7 +62,7 @@ void PutStr(const char *str)
 			BufX = GDICharWidth * CursX;
 			BufY = GDICharHeight * CursY;
 		}
-		if (CursY == height)	/*光标在最后一行，向上滚屏*/
+		if (CursY >= height)	/*光标在最后一行，向上滚屏*/
 		{
 			CursY--;
 			GDIMoveUp(GDICharHeight);
