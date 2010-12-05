@@ -288,7 +288,7 @@ DWORD ReadPath(	BPB *bpb,			/*输入：分区BPB*/
 			PutS(path);
 			if (SearchDir(bpb, idx, buf, SrcDir, path, DstDir) != NO_ERROR)	/*取得目录项*/
 				return 0;
-			if (DstDir->attr & 0x10 == 0)	/*检查是否是目录*/
+			if (!(DstDir->attr & 0x10))	/*检查是否是目录*/
 				return 0;
 			*SrcDir = *DstDir;
 			path = cp;
@@ -301,7 +301,7 @@ DWORD ReadPath(	BPB *bpb,			/*输入：分区BPB*/
 			PutS(path);
 			if (SearchDir(bpb, idx, buf, SrcDir, path, DstDir) != NO_ERROR)	/*取得文件目录项*/
 				return 0;
-			if (DstDir->attr & 0x10 != 0)	/*检查是否是文件*/
+			if (DstDir->attr & 0x10)	/*检查是否是文件*/
 				return 0;
 			end = ReadFile(bpb, idx, DstDir, BufferAddr);	/*读取文件*/
 			if (end == BufferAddr)

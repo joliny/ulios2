@@ -1,3 +1,5 @@
+;引导程序加载模块列表,请务必使用UNIX行尾格式,并调整好加载顺序
+;行首字符含义:F:加载文件的路径,S:ulios系统目录路径,V:显卡模式号,分号:注释
 Fulios/uliknl.bin
 Fulios/athd.bin
 Fulios/time.bin

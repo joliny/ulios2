@@ -39,6 +39,10 @@ typedef struct _FILE_INFO
 	QWORD size;					/*文件字节数*/
 }FILE_INFO;	/*文件信息*/
 
+/*open参数*/
+#define FS_OPEN_READ	0	/*打开文件读*/
+#define FS_OPEN_WRITE	1	/*打开文件写*/
+
 /*seek参数*/
 #define FS_SEEK_SET		0	/*从文件头定位*/
 #define FS_SEEK_CUR		1	/*从当前位置定位*/

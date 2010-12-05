@@ -75,6 +75,8 @@ typedef struct _THREAD_ID
 #define MSG_ATTR_USER		0x01000000	/*用户自定义消息最小值*/
 #define MSG_ATTR_EXITREQ	0x01010000	/*建议:退出请求消息*/
 
+#define EXEC_ATTR_DRIVER	0x00000002	/*KCreateProcess的attr参数,启动一个具有驱动权限的进程*/
+
 /**********基本操作**********/
 
 /*内存设置*/

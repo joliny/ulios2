@@ -42,13 +42,13 @@ int main()
 		return res;
 	if ((res = FSChDir(ptid, (const char*)(vm + 0x280))) != NO_ERROR)	/*切换到系统目录*/
 		return res;
-	if ((res = FSopen(ptid, FONT_FILE, 0)) < 0)	/*打开字体文件*/
+	if ((res = FSopen(ptid, FONT_FILE, FS_OPEN_READ)) < 0)	/*打开字体文件*/
 		return res;
 	if (FSread(ptid, res, font, FONT_SIZE) <= 0)	/*读取字体文件*/
 		return -1;
 	FSclose(ptid, res);
 	KFreeAddr(vm);
-	VmSiz = ((PixBits + 7) / 8) * width * height;
+	VmSiz = ((PixBits + 7) >> 3) * width * height;
 	if ((res = KMapPhyAddr(&vm, VmPhy, VmSiz)) != NO_ERROR)	/*映射显存*/
 		return res;
 	for (;;)
