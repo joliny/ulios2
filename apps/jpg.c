@@ -880,7 +880,7 @@ BOOL JpegOpen(const char *fileName)
 	long fh;
 	BYTE seg[2];
 
-	if ((fh = FSopen(FsPtid, fileName, 0)) < 0)
+	if ((fh = FSopen(FsPtid, fileName, FS_OPEN_READ)) < 0)
 	{
 		CUIPutS(CuiPtid, "打开文件出错！\n");
 		return FALSE;

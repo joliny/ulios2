@@ -344,11 +344,11 @@ static inline DWORD CsEncode(long x, long y)
 	mask = 0;
 	if (x < 0)
 		mask |= CS_LEFT;
-	else if (x >= GDIwidth)
+	else if (x >= (long)GDIwidth)
 		mask |= CS_RIGHT;
 	if (y < 0)
 		mask |= CS_TOP;
-	else if (y >= GDIheight)
+	else if (y >= (long)GDIheight)
 		mask |= CS_BOTTOM;
 	return mask;
 }
@@ -386,8 +386,8 @@ long GDIDrawLine(long x1, long y1, long x2, long y2, DWORD c)
 			}
 			else if (mask & CS_RIGHT)
 			{
-				dx = GDIwidth - 1;
-				dy = y1 - (x1 + 1 - GDIwidth) * ydivx;
+				dx = (long)GDIwidth - 1;
+				dy = y1 - (x1 + 1 - (long)GDIwidth) * ydivx;
 			}
 			if (mask & CS_TOP)
 			{
@@ -396,8 +396,8 @@ long GDIDrawLine(long x1, long y1, long x2, long y2, DWORD c)
 			}
 			else if (mask & CS_BOTTOM)
 			{
-				dy = GDIheight - 1;
-				dx = x1 - (y1 + 1 - GDIheight) * xdivy;
+				dy = (long)GDIheight - 1;
+				dx = x1 - (y1 + 1 - (long)GDIheight) * xdivy;
 			}
 			if (mask == mask1)
 			{

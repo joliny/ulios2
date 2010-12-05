@@ -104,7 +104,7 @@ long FillPage(EXEC_DESC *exec, void *addr, DWORD ErrCode)
 	CurPg0 = &pt0[(DWORD)addr >> 12];
 	CurPt = &pt[(DWORD)CurPg >> 12];
 	CurPt0 = &pt[(DWORD)CurPg0 >> 12];
-	if (ErrCode & PAGE_ATTR_W && *CurPt & PAGE_ATTR_ROMAP)	/*页表为映射只读*/
+	if ((ErrCode & PAGE_ATTR_W) && (*CurPt & PAGE_ATTR_ROMAP))	/*页表为映射只读*/
 		return ERROR_INVALID_MAPADDR;
 	if (!(ErrCode & PAGE_ATTR_P) && !(*CurPt & PAGE_ATTR_P))	/*页表不存在*/
 	{
@@ -127,7 +127,7 @@ long FillPage(EXEC_DESC *exec, void *addr, DWORD ErrCode)
 				*CurPt0 = PtAddr;
 		}
 	}
-	if (ErrCode & PAGE_ATTR_W && !(*CurPt & PAGE_ATTR_W))	/*页表写保护*/
+	if ((ErrCode & PAGE_ATTR_W) && !(*CurPt & PAGE_ATTR_W))	/*页表写保护*/
 	{
 		if (*CurPt0 & PAGE_ATTR_P)	/*副本页表存在*/
 		{
@@ -145,11 +145,11 @@ long FillPage(EXEC_DESC *exec, void *addr, DWORD ErrCode)
 			RefreshTlb();
 		}
 	}
-	if (ErrCode & PAGE_ATTR_W && *CurPg & PAGE_ATTR_ROMAP)	/*页为映射只读*/
+	if ((ErrCode & PAGE_ATTR_W) && (*CurPg & PAGE_ATTR_ROMAP))	/*页为映射只读*/
 		return ERROR_INVALID_MAPADDR;
 	if (!(ErrCode & PAGE_ATTR_P) && !(*CurPg & PAGE_ATTR_P))	/*页不存在*/
 	{
-		if (*CurPt0 & PAGE_ATTR_P && *CurPg0 & PAGE_ATTR_P)	/*副本页表和副本页存在*/
+		if ((*CurPt0 & PAGE_ATTR_P) && (*CurPg0 & PAGE_ATTR_P))	/*副本页表和副本页存在*/
 			*CurPg = *CurPg0;	/*映射副本页*/
 		else	/*副本页表或副本页不存在*/
 		{
@@ -201,9 +201,9 @@ long FillPage(EXEC_DESC *exec, void *addr, DWORD ErrCode)
 			}
 		}
 	}
-	if (ErrCode & PAGE_ATTR_W && !(*CurPg & PAGE_ATTR_W))	/*页写保护*/
+	if ((ErrCode & PAGE_ATTR_W) && !(*CurPg & PAGE_ATTR_W))	/*页写保护*/
 	{
-		if (*CurPt0 & PAGE_ATTR_P && *CurPg0 & PAGE_ATTR_P)	/*副本页存在*/
+		if ((*CurPt0 & PAGE_ATTR_P) && (*CurPg0 & PAGE_ATTR_P))	/*副本页存在*/
 		{
 			DWORD PgAddr;	/*页的物理地址*/
 			PAGE_DESC *Pg0Pt;
@@ -579,7 +579,7 @@ long MapProcAddr(void *addr, DWORD siz, THREAD_ID *ptid, BOOL isWrite, BOOL isCh
 	{
 		DWORD PtAddr;	/*页表的物理地址*/
 
-		if ((PtAddr = pt[(DWORD)FstPg >> 12]) & PAGE_ATTR_ROMAP && isWrite)	/*源页表映射为只读*/
+		if (((PtAddr = pt[(DWORD)FstPg >> 12]) & PAGE_ATTR_ROMAP) && isWrite)	/*源页表映射为只读*/
 		{
 			ClearPage(&pt2[(DWORD)MapAddr >> 12], FstPg2, FALSE);
 			ulock(&pt[(PT_ID << 10) | PT2_ID]);	/*解除关系进程页表的映射*/
@@ -595,7 +595,7 @@ long MapProcAddr(void *addr, DWORD siz, THREAD_ID *ptid, BOOL isWrite, BOOL isCh
 			{
 				DWORD PgAddr;	/*页的物理地址*/
 
-				if ((PgAddr = *FstPg) & PAGE_ATTR_ROMAP && isWrite)	/*源页映射为只读*/
+				if (((PgAddr = *FstPg) & PAGE_ATTR_ROMAP) && isWrite)	/*源页映射为只读*/
 				{
 					ClearPage(&pt2[(DWORD)MapAddr >> 12], FstPg2, FALSE);
 					ulock(&pt[(PT_ID << 10) | PT2_ID]);	/*解除关系进程页表的映射*/

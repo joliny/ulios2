@@ -9,18 +9,6 @@
 #define KBD_IRQ	0x1	/*键盘中断请求号*/
 #define MUS_IRQ	0xC	/*鼠标中断请求号*/
 
-/*键盘控制器等待*/
-static inline void Wait8042()
-{
-	while (inb(0x64) & 0x02);
-}
-
-/*键盘控制器回复*/
-static inline void Ack8042()
-{
-	while (inb(0x60) != 0xFA);
-}
-
 const BYTE KeyMap[] = {0,	/*美国英语键盘主键码表*/
 	27, '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-', '=', 8,	/*(1-14)ESC--BACKSPACE*/
 	9,  'q', 'w', 'e', 'r', 't', 'y', 'u', 'i', 'o', 'p', '[', ']', 13,	/*(15-28)TAB--ENTER*/
@@ -46,12 +34,45 @@ const BYTE KeyMapEx[] = {0,	/*美国英语键盘扩展键码表*/
 #define VS_MODE_ADDR	0x90500	/*显卡模式信息物理地址*/
 #define RECVPTID_LEN	0x300	/*接收消息线程ID栈长度*/
 
+/*向8042发送命令*/
+static inline void Cmd8042(BYTE b)
+{
+	while (inb(0x64) & 0x02);
+	outb(0x64, b);
+}
+
+/*读8042数据*/
+static inline BYTE Read8042()
+{
+	while (!(inb(0x64) & 0x01));
+	return inb(0x60);
+}
+
+/*写8042数据*/
+static inline void Write8042(BYTE b)
+{
+	while (inb(0x64) & 0x02);
+	outb(0x60, b);
+}
+
+/*等待8042回复*/
+static inline void Ack8042()
+{
+	while (inb(0x60) != 0xFA);
+}
+
+/*向键盘发送命令*/
+void OutKeyboard(BYTE b)
+{
+	Write8042(b);
+	Ack8042();
+}
+
 /*向鼠标发送命令*/
 void OutMouse(BYTE b)
 {
-	Wait8042();
-	outb(0x64, 0xD4);	/*通知8042数据将要发向鼠标*/
-	outb(0x60, b);
+	Cmd8042(0xD4);	/*通知8042数据将要发向鼠标*/
+	Write8042(b);
 	Ack8042();
 }
 
@@ -68,29 +89,25 @@ int main()
 	if ((res = KRegKnlPort(SRV_KBDMUS_PORT)) != NO_ERROR)	/*注册服务端口号*/
 		return res;
 	/*键盘初始化*/
-	Wait8042();
-	outb(0x60, 0xED);	/*命令:设置LED灯*/
-	Ack8042();
-	outb(0x60, 0x00);	/*设置LED状态:全部关闭*/
-	Ack8042();
+	OutKeyboard(0xED);	/*设置LED灯命令*/
+	OutKeyboard(0x00);	/*设置LED状态全部关闭*/
+	OutKeyboard(0xF4);	/*清空键盘缓冲*/
 	/*鼠标初始化*/
-	Wait8042();
-	outb(0x64, 0xA8);	/*允许鼠标接口*/
-	Ack8042();
+	Cmd8042(0xA8);	/*允许鼠标接口*/
 	OutMouse(0xF3);	/*设置鼠标采样率*/
 	OutMouse(0xC8);	/*采样率200*/
 	OutMouse(0xF3);	/*设置鼠标采样率*/
 	OutMouse(0x64);	/*采样率100*/
 	OutMouse(0xF3);	/*设置鼠标采样率*/
 	OutMouse(0x50);	/*采样率80*/
-	OutMouse(0xF3);	/*设置鼠标采样率*/
 	OutMouse(0xF2);	/*取得鼠标ID*/
-	MusId = inb(0x60);
+	MusId = Read8042();
 	OutMouse(0xF4);	/*允许鼠标发数据*/
-	Wait8042();
-	outb(0x64, 0x60);	/*通知8042数据将要发向8042命令寄存器*/
-	outb(0x60, 0x47);	/*许可键盘,鼠标接口及中断*/
-	Ack8042();
+	/*打开中断位*/
+	Cmd8042(0x20);	/*打开键盘鼠标中断位*/
+	code = Read8042();
+	Cmd8042(0x60);
+	Write8042(code | 3);
 	if ((res = KRegIrq(KBD_IRQ)) != NO_ERROR)	/*注册键盘中断请求号*/
 		return res;
 	if ((res = KRegIrq(MUS_IRQ)) != NO_ERROR)	/*注册鼠标中断请求号*/
@@ -297,8 +314,10 @@ int main()
 				switch (MusCou)
 				{
 				case 0:	/*收到第一字节,按键信息*/
+					if (!(code & 0x08))
+						continue;
 					MusKey = code;
-					MusCou = 1;
+					MusCou++;
 					continue;
 				case 1:	/*收到第二字节,x的位移量*/
 					if (MusKey & MUS_STATE_XSIGN)
@@ -308,7 +327,7 @@ int main()
 						MusX = 0;
 					else if (MusX > MusMaxX)
 						MusX = MusMaxX;
-					MusCou = 2;
+					MusCou++;
 					continue;
 				case 2:	/*收到第三字节,y的位移量*/
 					if (MusKey & MUS_STATE_YSIGN)
@@ -320,7 +339,7 @@ int main()
 						MusY = MusMaxY;
 					if (MusId)
 					{
-						MusCou = 3;
+						MusCou++;
 						continue;
 					}
 					MusCou = 0;

@@ -6,7 +6,7 @@
 
 #include "ulimkapi.h"
 
-extern long main(int argc, char *argv[]);
+extern int main(int argc, char *argv[]);
 
 void start(char *args)
 {

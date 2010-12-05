@@ -185,7 +185,7 @@ void copy(char *args)
 			return;
 		}
 	}
-	if ((in = FSopen(FsPtid, args, 0)) < 0)
+	if ((in = FSopen(FsPtid, args, FS_OPEN_READ)) < 0)
 	{
 		CUIPutS(CuiPtid, "源文件不存在！\n");
 		return;
