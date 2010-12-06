@@ -257,14 +257,14 @@ void partlist(char *args)
 void dir(char *args)
 {
 	FILE_INFO fi;
-	long dhl;
+	long dh;
 
-	if ((dhl = FSOpenDir(FsPtid, args)) < 0)
+	if ((dh = FSOpenDir(FsPtid, args)) < 0)
 	{
 		CUIPutS(CuiPtid, "目录不存在！\n");
 		return;
 	}
-	while (FSReadDir(FsPtid, dhl, &fi) == NO_ERROR)
+	while (FSReadDir(FsPtid, dh, &fi) == NO_ERROR)
 	{
 		THREAD_ID ptid;
 		TM tm;
@@ -280,7 +280,7 @@ void dir(char *args)
 			break;
 		}
 	}
-	FSclose(FsPtid, dhl);
+	FSclose(FsPtid, dh);
 }
 
 /*切换目录*/
@@ -295,6 +295,32 @@ void md(char *args)
 {
 	if (FSMkDir(FsPtid, args) != NO_ERROR)
 		CUIPutS(CuiPtid, "无法创建目录！\n");
+}
+
+void show(char *args)
+{
+	long fh, siz;
+	char buf[4097];
+
+	if ((fh = FSopen(FsPtid, args, FS_OPEN_READ)) < 0)
+	{
+		CUIPutS(CuiPtid, "文件不存在！\n");
+		return;
+	}
+	while ((siz = FSread(FsPtid, fh, buf, 4096)) > 0)
+	{
+		THREAD_ID ptid;
+
+		buf[siz] = '\0';
+		CUIPutS(CuiPtid, buf);
+		ptid = KbdPtid;
+		if (KRecvProcMsg(&ptid, (DWORD*)buf, 0) == NO_ERROR && ((DWORD*)buf)[0] == MSG_ATTR_KBD && buf[4] == 27)
+		{
+			CUIPutS(CuiPtid, "用户取消！\n");
+			break;
+		}
+	}
+	FSclose(FsPtid, fh);
 }
 
 /*显示时间*/
@@ -368,6 +394,7 @@ void help(char *args)
 		"dir DirPath:目录列表\n"
 		"cd DirPath:切换目录\n"
 		"md DirPath:创建目录\n"
+		"show FilePath:显示文件内容\n"
 		"time:显示当前时间\n"
 		"ps:进程列表\n"
 		"kill ProcID:强行结束进程\n"
@@ -389,6 +416,33 @@ char *cmdcmp(char *str1, char *str2)
 	return NULL;
 }
 
+void ProcStr(char *str, char **exec, char **args)
+{
+	(*args) = (*exec) = NULL;
+	while (*str == ' ' || *str == '\t')	/*清除参数前无意义的空格*/
+		str++;
+	if (*str == '\0')
+		return;
+	if (*str == '\"')	/*双引号内的参数单独处理*/
+	{
+		*exec = ++str;
+		while (*str != '\0' && *str != '\"')	/*搜索匹配的双引号*/
+			str++;
+	}
+	else	/*普通参数用空格分隔*/
+	{
+		*exec = str;
+		while (*str != '\0' && *str != ' ' && *str != '\t')	/*搜索空格*/
+			str++;
+	}
+	if (*str == '\0')
+		return;
+	*str++ = '\0';
+	while (*str == ' ' || *str == '\t')	/*清除参数前无意义的空格*/
+		str++;
+	*args = str;
+}
+
 void CmdProc(char *str)
 {
 	struct
@@ -406,6 +460,7 @@ void CmdProc(char *str)
 		{"dir", dir},
 		{"cd", cd},
 		{"md", md},
+		{"show", show},
 		{"time", showtim},
 		{"ps", proclist},
 		{"kill", killproc},
@@ -413,7 +468,7 @@ void CmdProc(char *str)
 		{"help", help}
 	};
 	long i;
-	char *args;
+	char *exec, *args;
 	THREAD_ID ptid;
 	char buf[40];
 	for (i = 0; i < sizeof(CMD) / 8; i++)
@@ -423,17 +478,8 @@ void CmdProc(char *str)
 			CUIPutS(CuiPtid, PROMPT);
 			return;
 		}
-	for (args = str;; args++)
-	{
-		if (*args == ' ')
-		{
-			*args++ = '\0';
-			break;
-		}
-		if (*args == '\0')
-			break;
-	}
-	if (KCreateProcess(0, str, args, &ptid) != NO_ERROR)
+	ProcStr(str, &exec, &args);
+	if (KCreateProcess(0, exec, args, &ptid) != NO_ERROR)
 		Sprintf(buf, "无效的命令或可执行文件!\n%s", PROMPT);
 	else
 		Sprintf(buf, "进程ID: %d\n%s", ptid.ProcID, PROMPT);

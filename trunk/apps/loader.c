@@ -8,6 +8,33 @@
 
 #define LOADLIST_SIZ	10240
 
+void ProcStr(char *str, char **exec, char **args)
+{
+	(*args) = (*exec) = NULL;
+	while (*str == ' ' || *str == '\t')	/*清除参数前无意义的空格*/
+		str++;
+	if (*str == '\0')
+		return;
+	if (*str == '\"')	/*双引号内的参数单独处理*/
+	{
+		*exec = ++str;
+		while (*str != '\0' && *str != '\"')	/*搜索匹配的双引号*/
+			str++;
+	}
+	else	/*普通参数用空格分隔*/
+	{
+		*exec = str;
+		while (*str != '\0' && *str != ' ' && *str != '\t')	/*搜索空格*/
+			str++;
+	}
+	if (*str == '\0')
+		return;
+	*str++ = '\0';
+	while (*str == ' ' || *str == '\t')	/*清除参数前无意义的空格*/
+		str++;
+	*args = str;
+}
+
 int main()
 {
 	char LoadList[LOADLIST_SIZ], *path;
@@ -31,7 +58,7 @@ int main()
 	LoadList[siz] = '\0';
 	for (;;)
 	{
-		char *pathp = path;
+		char *pathp = path, *exec, *args;
 
 		while (*pathp != '\n' && *pathp != '\0')
 			pathp++;
@@ -41,11 +68,13 @@ int main()
 		{
 		case 'D':	/*driver*/
 		case 'd':
-			KCreateProcess(EXEC_ATTR_DRIVER, path, NULL, &ptid);
+			ProcStr(path, &exec, &args);
+			KCreateProcess(EXEC_ATTR_DRIVER, exec, args, &ptid);
 			break;
 		case 'A':	/*apps*/
 		case 'a':
-			KCreateProcess(0, path, NULL, &ptid);
+			ProcStr(path, &exec, &args);
+			KCreateProcess(0, exec, args, &ptid);
 			break;
 		}
 		if (*(path = pathp) == '\0')	/*没有文件了*/
