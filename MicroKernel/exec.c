@@ -6,39 +6,6 @@
 
 #include "knldef.h"
 
-/*分配空可执行体ID*/
-long AllocExid(EXEC_DESC *exec)
-{
-	cli();
-	if (FstExmd >= &exmt[EXMT_LEN])
-	{
-		sti();
-		return ERROR_HAVENO_EXECID;	/*没有空可执行体ID*/
-	}
-	exec->id = FstExmd - exmt;
-	exec->cou = 1;
-	*FstExmd = exec;
-	do
-		FstExmd++;
-	while (FstExmd < &exmt[EXMT_LEN] && *FstExmd);
-	if (EndExmd < FstExmd)
-		EndExmd = FstExmd;
-	sti();
-	return NO_ERROR;
-}
-
-/*释放空可执行体ID*/
-void FreeExid(EXEC_DESC **exmd)
-{
-	cli();
-	*exmd = NULL;
-	if (FstExmd > exmd)
-		FstExmd = exmd;
-	while (EndExmd > exmt && *(EndExmd - 1) == NULL)
-		EndExmd--;
-	sti();
-}
-
 /*线程起点*/
 void ThedStart()
 {
@@ -81,6 +48,7 @@ void ProcStart()
 	PROCESS_DESC *CurProc;
 	THREAD_DESC *CurThed;
 	EXEC_DESC *NewExec;
+	BLK_DESC *blk;
 	DWORD NewPdt, PhyAddr;
 
 	sti();
@@ -100,6 +68,7 @@ void ProcStart()
 		}
 		memset32(NewExec, 0, sizeof(EXEC_DESC) / sizeof(DWORD));
 		CurSrv = (PHYBLK_DESC*)&CurThed->kstk[1];
+		NewExec->cou = 1;
 		NewExec->entry = NewExec->CodeOff = BASESRV_OFF;
 		NewExec->DataEnd = NewExec->DataOff = NewExec->CodeEnd = BASESRV_OFF + CurSrv->siz;
 		NewPdt |= PAGE_ATTR_P;
@@ -119,13 +88,6 @@ void ProcStart()
 		{
 			*FstPg = PhyAddr;
 			PhyAddr += PAGE_SIZE;
-		}
-		if (AllocExid(NewExec) != NO_ERROR)
-		{
-			ClearPage(&pt0[(DWORD)UADDR_OFF >> 12], &pt0[(DWORD)SHRDLIB_OFF >> 12], FALSE);
-			LockFreePage(NewPdt);
-			LockKfree(NewExec, sizeof(EXEC_DESC));
-			DeleteThed();
 		}
 	}
 	else	/*启动可执行文件进程*/
@@ -157,6 +119,7 @@ void ProcStart()
 			DeleteThed();
 		}
 		memcpy32(NewExec, &CurThed->kstk[1], 8);	/*复制可执行体信息*/
+		NewExec->cou = 1;
 		ulock(&NewExec->Page_l);
 		if ((NewPdt = LockAllocPage()) == 0)
 		{
@@ -173,24 +136,15 @@ void ProcStart()
 		pt[(PT_ID << 10) | PT0_ID] = pddt0[CurThed->id.ProcID] = NewPdt;	/*映射页目录表副本*/
 		memset32(&pt[PT0_ID << 10], 0, 0x400);
 		pt[(PT0_ID << 10) | PT_ID] = NewPdt;	/*映射页目录表副本自身*/
-		if (AllocExid(NewExec) != NO_ERROR)
-		{
-			LockFreePage(NewPdt);
-			LockKfree(NewExec, sizeof(EXEC_DESC));
-			if ((msg = AllocMsg()) == NULL)	/*申请消息结构*/
-				DeleteThed();
-			msg->ptid = kpt[FS_KPORT];	/*通知文件服务器退出消息*/
-			msg->data[0] = MSG_ATTR_PROCEXIT;
-			if (SendMsg(msg) != NO_ERROR)
-				FreeMsg(msg);
-			DeleteThed();
-		}
 	}
 strset:
 	if (!(CurThed->kstk[0] & EXEC_ARGV_DRIVER))	/*设置用户应用进程*/
 		CurProc->attr |= PROC_ATTR_APPS;
 	CurProc->exec = NewExec;
 	CurProc->EndUBlk = CurProc->FstUBlk = CurProc->ublkt;
+	for (blk = CurProc->ublkt; blk < &CurProc->ublkt[UBLKT_LEN - 1]; blk++)
+		blk->addr = (void*)(blk + 1);
+	blk->addr = NULL;
 	InitFbt(CurProc->ufdmt, UFDMT_LEN, UFDATA_OFF, UFDATA_SIZ);	/*初始化用户自由数据区*/
 	CurThed->ustk = alloc(CurProc->ufdmt, THEDSTK_SIZ);
 	CurThed->UstkSiz = THEDSTK_SIZ;
@@ -278,7 +232,6 @@ void ThedExit(DWORD ExitCode)
 			ClearPage(&pt0[(DWORD)UADDR_OFF >> 12], &pt0[(DWORD)SHRDLIB_OFF >> 12], TRUE);
 			ulock(&CurExec->Page_l);
 			LockKfree(CurExec, sizeof(EXEC_DESC));
-			FreeExid(&exmt[CurExec->id]);
 			LockFreePage(pt[(PT_ID << 10) | PT0_ID]);
 		}
 	}

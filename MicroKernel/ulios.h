@@ -73,28 +73,27 @@ static inline long InitPMM()
 /*消息管理初始化*/
 static inline long InitMsg()
 {
-	if ((msgmt = (MESSAGE_DESC*)kmalloc(MSGMT_LEN * sizeof(MESSAGE_DESC))) == NULL)
+	MESSAGE_DESC *msg;
+
+	if ((FstMsg = (MESSAGE_DESC*)kmalloc(MSGMT_LEN * sizeof(MESSAGE_DESC))) == NULL)
 		return ERROR_HAVENO_KMEM;
-	memset32(msgmt, 0, MSGMT_LEN * sizeof(MESSAGE_DESC) / sizeof(DWORD));
-	FstMsg = msgmt;
+	for (msg = FstMsg; msg < &FstMsg[MSGMT_LEN - 1]; msg++)
+		msg->nxt = msg + 1;
+	msg->nxt = NULL;
 	return NO_ERROR;
 }
 
 /*地址映射管理初始化*/
 static inline long InitMap()
 {
-	if ((mapmt = (MAPBLK_DESC*)kmalloc(MAPMT_LEN * sizeof(MAPBLK_DESC))) == NULL)
-		return ERROR_HAVENO_KMEM;
-	memset32(mapmt, 0, MAPMT_LEN * sizeof(MAPBLK_DESC) / sizeof(DWORD));
-	FstMap = mapmt;
-	return NO_ERROR;
-}
+	MAPBLK_DESC *map;
 
-/*可执行体管理表初始化*/
-static inline void InitEXMT()
-{
-	memset32(exmt, 0, EXMT_LEN * sizeof(EXEC_DESC*) / sizeof(DWORD));
-	EndExmd = FstExmd = exmt;
+	if ((FstMap = (MAPBLK_DESC*)kmalloc(MAPMT_LEN * sizeof(MAPBLK_DESC))) == NULL)
+		return ERROR_HAVENO_KMEM;
+	for (map = FstMap; map < &FstMap[MAPMT_LEN - 1]; map++)
+		map->nxt = map + 1;
+	map->nxt = NULL;
+	return NO_ERROR;
 }
 
 /*进程管理表初始化*/

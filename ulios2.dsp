@@ -371,6 +371,10 @@ SOURCE=.\apps\3dline.c
 # End Source File
 # Begin Source File
 
+SOURCE=.\apps\clock.c
+# End Source File
+# Begin Source File
+
 SOURCE=.\apps\cmd.c
 # End Source File
 # Begin Source File

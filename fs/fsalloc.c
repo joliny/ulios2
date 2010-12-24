@@ -28,8 +28,8 @@ void *malloc(DWORD siz)
 			if ((CurFblk->siz -= siz) == 0)	/*表项已空*/
 			{
 				PreFblk->nxt = CurFblk->nxt;	/*去除表项*/
-				if (fmt->addr > (void*)CurFblk)
-					fmt->addr = (void*)CurFblk;
+				CurFblk->nxt = (FREE_BLK_DESC*)fmt->addr;	/*释放表项*/
+				fmt->addr = (void*)CurFblk;
 			}
 			addr = CurFblk->addr + CurFblk->siz;
 			ulock(&fmtl);
@@ -73,14 +73,13 @@ void free(void *addr, DWORD siz)
 			goto creat;
 creat:	/*新建描述符*/
 	TmpFblk = (FREE_BLK_DESC*)fmt->addr;
+	if (TmpFblk == NULL)	/*无空表项,无法释放*/
+		return;
+	fmt->addr = (void*)TmpFblk->nxt;	/*申请表项*/
 	TmpFblk->addr = addr;
 	TmpFblk->siz = siz;
 	TmpFblk->nxt = PreFblk->nxt;
 	PreFblk->nxt = TmpFblk;
-	do
-		TmpFblk++;
-	while (TmpFblk->siz);	/*	while (TmpFblk < &fbt[FBT_LEN] && TmpFblk->siz);*/
-	fmt->addr = (void*)TmpFblk;
 	ulock(&fmtl);
 	return;
 addpre:	/*加入到前面*/
@@ -95,9 +94,8 @@ addnxt:	/*加入到后面*/
 link:	/*连接前后描述符*/
 	PreFblk->siz += (siz + CurFblk->siz);
 	PreFblk->nxt = CurFblk->nxt;
-	CurFblk->siz = 0;
-	if (fmt->addr > (void*)CurFblk)
-		fmt->addr = (void*)CurFblk;
+	CurFblk->nxt = (FREE_BLK_DESC*)fmt->addr;	/*释放表项*/
+	fmt->addr = (void*)CurFblk;
 	ulock(&fmtl);
 	return;
 }

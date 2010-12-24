@@ -46,9 +46,7 @@ void GDIrelease()
 typedef struct _RGB24
 {
 	BYTE blue, green, red;
-}RGB24;	/*每像素24位模式专用结构*/
-
-#define HZ_SIZE		196272
+}__attribute__((packed)) RGB24;	/*每像素24位模式专用结构*/
 
 static inline DWORD DW2RGB15(DWORD c)
 {
@@ -155,22 +153,22 @@ long GDIPutImage(long x, long y, DWORD *img, long w, long h)
 	switch (GDIPixBits)
 	{
 	case 15:
-		tmpvm = vm + tx * 2;
+		tmpvm = vm + tx * sizeof(WORD);
 		for (h = th - 1; h >= 0; h--)
 			Dw2Rgb15((WORD*)tmpvm + (ty + h) * GDIwidth, img + (ty + h - y) * w, tw);
 		break;
 	case 16:
-		tmpvm = vm + tx * 2;
+		tmpvm = vm + tx * sizeof(WORD);
 		for (h = th - 1; h >= 0; h--)
 			Dw2Rgb16((WORD*)tmpvm + (ty + h) * GDIwidth, img + (ty + h - y) * w, tw);
 		break;
 	case 24:
-		tmpvm = vm + tx * 3;
+		tmpvm = vm + tx * sizeof(RGB24);
 		for (h = th - 1; h >= 0; h--)
 			Dw2Rgb24((RGB24*)tmpvm + (ty + h) * GDIwidth, img + (ty + h - y) * w, tw);
 		break;
 	case 32:
-		tmpvm = vm + tx * 4;
+		tmpvm = vm + tx * sizeof(DWORD);
 		for (h = th - 1; h >= 0; h--)
 			memcpy32((DWORD*)tmpvm + (ty + h) * GDIwidth, img + (ty + h - y) * w, tw);
 		break;
@@ -217,22 +215,22 @@ long GDIGetImage(long x, long y, DWORD *img, long w, long h)
 	switch (GDIPixBits)
 	{
 	case 15:
-		tmpvm = vm + tx * 2;
+		tmpvm = vm + tx * sizeof(WORD);
 		for (h = th - 1; h >= 0; h--)
 			Rgb152Dw(img + (ty + h - y) * w, (WORD*)tmpvm + (ty + h) * GDIwidth, tw);
 		break;
 	case 16:
-		tmpvm = vm + tx * 2;
+		tmpvm = vm + tx * sizeof(WORD);
 		for (h = th - 1; h >= 0; h--)
 			Rgb162Dw(img + (ty + h - y) * w, (WORD*)tmpvm + (ty + h) * GDIwidth, tw);
 		break;
 	case 24:
-		tmpvm = vm + tx * 3;
+		tmpvm = vm + tx * sizeof(RGB24);
 		for (h = th - 1; h >= 0; h--)
 			Rgb242Dw(img + (ty + h - y) * w, (RGB24*)tmpvm + (ty + h) * GDIwidth, tw);
 		break;
 	case 32:
-		tmpvm = vm + tx * 4;
+		tmpvm = vm + tx * sizeof(DWORD);
 		for (h = th - 1; h >= 0; h--)
 			memcpy32(img + (ty + h - y) * w, (DWORD*)tmpvm + (ty + h) * GDIwidth, tw);
 		break;
@@ -240,16 +238,11 @@ long GDIGetImage(long x, long y, DWORD *img, long w, long h)
 	return NO_ERROR;
 }
 
-static inline void SetRgb15(WORD *dest, DWORD d, DWORD n)
+static inline void SetRgb1516(WORD *dest, DWORD d, DWORD n)
 {
-	while (n--)
-		*dest++ = DW2RGB15(d);
-}
-
-static inline void SetRgb16(WORD *dest, DWORD d, DWORD n)
-{
-	while (n--)
-		*dest++ = DW2RGB16(d);
+	void *_dest;
+	DWORD _n;
+	__asm__ __volatile__("cld;rep stosw": "=&D"(_dest), "=&c"(_n): "0"(dest), "a"(d), "1"(n): "flags", "memory");
 }
 
 static inline void SetRgb24(RGB24 *dest, DWORD d, DWORD n)
@@ -277,22 +270,27 @@ long GDIFillRect(long x, long y, long w, long h, DWORD c)
 	switch (GDIPixBits)
 	{
 	case 15:
-		tmpvm = vm + tx * 2;
-		for (h = th - 1; h >= 0; h--)
-			SetRgb15((WORD*)tmpvm + (ty + h) * GDIwidth, c, tw);
+		c = DW2RGB15(c);
 		break;
 	case 16:
-		tmpvm = vm + tx * 2;
+		c = DW2RGB16(c);
+		break;
+	}
+	switch (GDIPixBits)
+	{
+	case 15:
+	case 16:
+		tmpvm = vm + tx * sizeof(WORD);
 		for (h = th - 1; h >= 0; h--)
-			SetRgb16((WORD*)tmpvm + (ty + h) * GDIwidth, c, tw);
+			SetRgb1516((WORD*)tmpvm + (ty + h) * GDIwidth, c, tw);
 		break;
 	case 24:
-		tmpvm = vm + tx * 3;
+		tmpvm = vm + tx * sizeof(RGB24);
 		for (h = th - 1; h >= 0; h--)
 			SetRgb24((RGB24*)tmpvm + (ty + h) * GDIwidth, c, tw);
 		break;
 	case 32:
-		tmpvm = vm + tx * 4;
+		tmpvm = vm + tx * sizeof(DWORD);
 		for (h = th - 1; h >= 0; h--)
 			memset32((DWORD*)tmpvm + (ty + h) * GDIwidth, c, tw);
 		break;
@@ -305,7 +303,7 @@ long GDIMoveUp(DWORD pix)
 {
 	if (pix >= GDIheight)
 		return VESA_ERR_LOCATION;
-	memcpy32(vm, vm + ((GDIPixBits + 7) / 8) * GDIwidth * pix, ((GDIPixBits + 7) / 8) * GDIwidth * (GDIheight - pix) / sizeof(DWORD));
+	memcpy32(vm, vm + ((GDIPixBits + 7) >> 3) * GDIwidth * pix, ((GDIPixBits + 7) >> 3) * GDIwidth * (GDIheight - pix) / sizeof(DWORD));
 	return NO_ERROR;
 }
 
@@ -317,10 +315,8 @@ static inline void NCPutPixel(DWORD x, DWORD y, DWORD c)
 	switch (GDIPixBits)
 	{
 	case 15:
-		((WORD*)vm)[x + y * GDIwidth] = DW2RGB15(c);
-		break;
 	case 16:
-		((WORD*)vm)[x + y * GDIwidth] = DW2RGB16(c);
+		((WORD*)vm)[x + y * GDIwidth] = c;
 		break;
 	case 24:
 		((RGB24*)vm)[x + y * GDIwidth] = *(RGB24*)&c;
@@ -422,6 +418,15 @@ long GDIDrawLine(long x1, long y1, long x2, long y2, DWORD c)
 	dy = abs(y2 - y1);
 	dy2 = dy << 1;
 	yinc = (y2 > y1) ? 1 : (y2 < y1 ? -1 : 0);
+	switch (GDIPixBits)
+	{
+	case 15:
+		c = DW2RGB15(c);
+		break;
+	case 16:
+		c = DW2RGB16(c);
+		break;
+	}
 	if (dx >= dy)
 	{
 		e = dy2 - dx;
@@ -494,72 +499,65 @@ long GDIcircle(long cx, long cy, long r, DWORD c)
 	return NO_ERROR;
 }
 
+#define HZ_COUNT	8178
+
 /*显示汉字*/
 long GDIDrawHz(long x, long y, DWORD hz, DWORD c)
 {
-	long i, j;
-	WORD *p;
+	void *tmpvm;
+	long i, j, HzWidth;
+	const WORD *p;
 
-	if (x <= -12 || x >= GDIwidth || y <= -12 || y >= GDIheight)
+	HzWidth = GDICharWidth * 2;
+	if (x <= -HzWidth || x >= GDIwidth || y <= -(long)GDICharHeight || y >= GDIheight)
 		return VESA_ERR_LOCATION;
-	if ((p = (WORD*)(font + ((((hz & 0xFF) - 161) * 94 + ((hz >> 8) & 0xFF) - 161) * 24))) >= (WORD*)(font + HZ_SIZE))
+	hz = ((hz & 0xFF) - 161) * 94 + ((hz >> 8) & 0xFF) - 161;
+	if (hz >= HZ_COUNT)
 		return NO_ERROR;
+	p = (WORD*)(font + hz * GDICharHeight * 2);
 	switch (GDIPixBits)
 	{
 	case 15:
-		for (j = 11; j >= 0; j--)
-		{
-			if ((DWORD)(y + j) >= GDIheight)
-				continue;
-			for (i = 7; i >= 0; i--)
-			{
-				if ((DWORD)(x - i + 7) < GDIwidth && ((p[j] >> i) & 1ul))
-					((WORD*)vm)[(x - i + 7) + (y + j) * GDIwidth] = DW2RGB15(c);
-				if ((DWORD)(x - i + 15) < GDIwidth && ((p[j] >> (i + 8)) & 1ul))
-					((WORD*)vm)[(x - i + 15) + (y + j) * GDIwidth] = DW2RGB15(c);
-			}
-		}
+		c = DW2RGB15(c);
 		break;
 	case 16:
-		for (j = 11; j >= 0; j--)
+		c = DW2RGB16(c);
+		break;
+	}
+	switch (GDIPixBits)
+	{
+	case 15:
+	case 16:
+		for (j = GDICharHeight - 1; j >= 0; j--, p++, y++, x -= HzWidth)
 		{
-			if ((DWORD)(y + j) >= GDIheight)
+			if ((DWORD)y >= GDIheight)
 				continue;
-			for (i = 7; i >= 0; i--)
-			{
-				if ((DWORD)(x - i + 7) < GDIwidth && ((p[j] >> i) & 1ul))
-					((WORD*)vm)[(x - i + 7) + (y + j) * GDIwidth] = DW2RGB16(c);
-				if ((DWORD)(x - i + 15) < GDIwidth && ((p[j] >> (i + 8)) & 1ul))
-					((WORD*)vm)[(x - i + 15) + (y + j) * GDIwidth] = DW2RGB16(c);
-			}
+			tmpvm = vm + (x + y * GDIwidth) * sizeof(WORD);
+			for (i = HzWidth - 1; i >= 0; i--, x++, tmpvm += sizeof(WORD))
+				if ((DWORD)x < GDIwidth && ((*p >> i) & 1u))
+					*((WORD*)tmpvm) = c;
 		}
 		break;
 	case 24:
-		for (j = 11; j >= 0; j--)
+		for (j = GDICharHeight - 1; j >= 0; j--, p++, y++, x -= HzWidth)
 		{
-			if ((DWORD)(y + j) >= GDIheight)
+			if ((DWORD)y >= GDIheight)
 				continue;
-			for (i = 7; i >= 0; i--)
-			{
-				if ((DWORD)(x - i + 7) < GDIwidth && ((p[j] >> i) & 1ul))
-					((RGB24*)vm)[(x - i + 7) + (y + j) * GDIwidth] = *(RGB24*)&c;
-				if ((DWORD)(x - i + 15) < GDIwidth && ((p[j] >> (i + 8)) & 1ul))
-					((RGB24*)vm)[(x - i + 15) + (y + j) * GDIwidth] = *(RGB24*)&c;
-			}
+			tmpvm = vm + (x + y * GDIwidth) * sizeof(RGB24);
+			for (i = HzWidth - 1; i >= 0; i--, x++, tmpvm += sizeof(RGB24))
+				if ((DWORD)x < GDIwidth && ((*p >> i) & 1u))
+					*((RGB24*)tmpvm) = *(RGB24*)&c;
 		}
 		break;
 	case 32:
-		for (j = 11; j >= 0; j--)
+		for (j = GDICharHeight - 1; j >= 0; j--, p++, y++, x -= HzWidth)
 		{
-			if ((DWORD)(y + j) >= GDIheight)
+			if ((DWORD)y >= GDIheight)
 				continue;
-			for (i = 7; i >= 0; i--)
-			{
-				if ((DWORD)(x - i + 7) < GDIwidth && ((p[j] >> i) & 1ul))
-					((DWORD*)vm)[(x - i + 7) + (y + j) * GDIwidth] = c;
-				if ((DWORD)(x - i + 15) < GDIwidth && ((p[j] >> (i + 8)) & 1ul))
-					((DWORD*)vm)[(x - i + 15) + (y + j) * GDIwidth] = c;
-			}
+			tmpvm = vm + (x + y * GDIwidth) * sizeof(DWORD);
+			for (i = HzWidth - 1; i >= 0; i--, x++, tmpvm += sizeof(DWORD))
+				if ((DWORD)x < GDIwidth && ((*p >> i) & 1u))
+					*((DWORD*)tmpvm) = c;
 		}
 		break;
 	}
@@ -569,60 +567,56 @@ long GDIDrawHz(long x, long y, DWORD hz, DWORD c)
 /*显示ASCII字符*/
 long GDIDrawAscii(long x, long y, DWORD ch, DWORD c)
 {
+	void *tmpvm;
 	long i, j;
 	const BYTE *p;
 
-	if (x <= -6 || x >= GDIwidth || y <= -12 || y >= GDIheight)
+	if (x <= -(long)GDICharWidth || x >= GDIwidth || y <= -(long)GDICharHeight || y >= GDIheight)
 		return VESA_ERR_LOCATION;
-	p = font + HZ_SIZE + (ch & 0xFF) * 12;
+	p = font + HZ_COUNT * GDICharHeight * 2 + (ch & 0xFF) * GDICharHeight;
 	switch (GDIPixBits)
 	{
 	case 15:
-		for (j = 11; j >= 0; j--)
-		{
-			if ((DWORD)(y + j) >= GDIheight)
-				continue;
-			for (i = 5; i >= 0; i--)
-			{
-				if ((DWORD)(x - i + 5) < GDIwidth && ((p[j] >> i) & 1ul))
-					((WORD*)vm)[(x - i + 5) + (y + j) * GDIwidth] = DW2RGB15(c);
-			}
-		}
+		c = DW2RGB15(c);
 		break;
 	case 16:
-		for (j = 11; j >= 0; j--)
+		c = DW2RGB16(c);
+		break;
+	}
+	switch (GDIPixBits)
+	{
+	case 15:
+	case 16:
+		for (j = GDICharHeight - 1; j >= 0; j--, p++, y++, x -= GDICharWidth)
 		{
-			if ((DWORD)(y + j) >= GDIheight)
+			if ((DWORD)y >= GDIheight)
 				continue;
-			for (i = 5; i >= 0; i--)
-			{
-				if ((DWORD)(x - i + 5) < GDIwidth && ((p[j] >> i) & 1ul))
-					((WORD*)vm)[(x - i + 5) + (y + j) * GDIwidth] = DW2RGB16(c);
-			}
+			tmpvm = vm + (x + y * GDIwidth) * sizeof(WORD);
+			for (i = GDICharWidth - 1; i >= 0; i--, x++, tmpvm += sizeof(WORD))
+				if ((DWORD)x < GDIwidth && ((*p >> i) & 1u))
+					*((WORD*)tmpvm) = c;
 		}
 		break;
 	case 24:
-		for (j = 11; j >= 0; j--)
+		for (j = GDICharHeight - 1; j >= 0; j--, p++, y++, x -= GDICharWidth)
 		{
-			if ((DWORD)(y + j) >= GDIheight)
+			if ((DWORD)y >= GDIheight)
 				continue;
-			for (i = 5; i >= 0; i--)
-			{
-				if ((DWORD)(x - i + 5) < GDIwidth && ((p[j] >> i) & 1ul))
-					((RGB24*)vm)[(x - i + 5) + (y + j) * GDIwidth] = *(RGB24*)&c;
-			}
+			tmpvm = vm + (x + y * GDIwidth) * sizeof(RGB24);
+			for (i = GDICharWidth - 1; i >= 0; i--, x++, tmpvm += sizeof(RGB24))
+				if ((DWORD)x < GDIwidth && ((*p >> i) & 1u))
+					*((RGB24*)tmpvm) = *(RGB24*)&c;
 		}
 		break;
 	case 32:
-		for (j = 11; j >= 0; j--)
+		for (j = GDICharHeight - 1; j >= 0; j--, p++, y++, x -= GDICharWidth)
 		{
-			if ((DWORD)(y + j) >= GDIheight)
+			if ((DWORD)y >= GDIheight)
 				continue;
-			for (i = 5; i >= 0; i--)
-			{
-				if ((DWORD)(x - i + 5) < GDIwidth && ((p[j] >> i) & 1ul))
-					((DWORD*)vm)[(x - i + 5) + (y + j) * GDIwidth] = c;
-			}
+			tmpvm = vm + (x + y * GDIwidth) * sizeof(DWORD);
+			for (i = GDICharWidth - 1; i >= 0; i--, x++, tmpvm += sizeof(DWORD))
+				if ((DWORD)x < GDIwidth && ((*p >> i) & 1u))
+					*((DWORD*)tmpvm) = c;
 		}
 		break;
 	}
@@ -641,7 +635,7 @@ long GDIDrawStr(long x, long y, const char *str, DWORD c)
 			if (hzf)	/*显示汉字*/
 			{
 				GDIDrawHz(x, y, ((BYTE)(*str) << 8) | hzf, c);
-				x += 12;
+				x += GDICharWidth * 2;
 				hzf = 0;
 			}
 			else
@@ -652,11 +646,11 @@ long GDIDrawStr(long x, long y, const char *str, DWORD c)
 			if (hzf)	/*有未显示的ASCII*/
 			{
 				GDIDrawAscii(x, y, hzf, c);
-				x += 6;
+				x += GDICharWidth;
 				hzf = 0;
 			}
 			GDIDrawAscii(x, y, (BYTE)(*str), c);	/*显示当前ASCII*/
-			x += 6;
+			x += GDICharWidth;
 		}
 	}
 	return NO_ERROR;

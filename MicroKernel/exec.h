@@ -21,7 +21,7 @@
 
 typedef struct _EXEC_DESC
 {
-	WORD id, cou;	/*可执行体ID,使用计数*/
+	DWORD cou;		/*使用计数*/
 	void *CodeOff;	/*代码段开始地址*/
 	void *CodeEnd;	/*代码段结束地址*/
 	DWORD CodeSeek;	/*代码段文件偏移*/
@@ -31,12 +31,6 @@ typedef struct _EXEC_DESC
 	void *entry;	/*入口点*/
 	volatile DWORD Page_l;	/*分页管理锁*/
 }EXEC_DESC;	/*可执行体结构*/
-
-/*分配空可执行体ID*/
-long AllocExid(EXEC_DESC *exec);
-
-/*释放空可执行体ID*/
-void FreeExid(EXEC_DESC **exmd);
 
 /*线程起点*/
 void ThedStart();

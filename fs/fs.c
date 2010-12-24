@@ -51,6 +51,7 @@ DWORD prel;					/*进程资源表管理锁*/
 /*初始化文件系统,如果不成功必须退出*/
 long InitFS()
 {
+	FREE_BLK_DESC *fbd;
 	long res;
 
 	if ((res = KRegKnlPort(SRV_FS_PORT)) != NO_ERROR)	/*注册服务端口*/
@@ -67,7 +68,9 @@ long InitFS()
 	fmt[1].addr = cache + BLK_SIZ * BMT_LEN;
 	fmt[1].siz = FDAT_SIZ;
 	fmt[1].nxt = NULL;
-	memset32(&fmt[2], 0, (FMT_LEN - 2) * sizeof(FREE_BLK_DESC) / sizeof(DWORD));
+	for (fbd = &fmt[2]; fbd < &fmt[FMT_LEN - 1]; fbd++)
+		fbd->nxt = fbd + 1;
+	fbd->nxt = NULL;
 	fmtl = FALSE;
 	memset32(bmt, BLKID_MASK, BMT_LEN * sizeof(CACHE_DESC) / sizeof(DWORD));	/*初始化高速缓冲管理*/
 	cahl = FALSE;

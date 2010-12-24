@@ -51,16 +51,12 @@ MAPBLK_DESC *AllocMap()
 	MAPBLK_DESC *map;
 
 	cli();
-	if (FstMap >= &mapmt[MAPMT_LEN])
+	if (FstMap == NULL)
 	{
 		sti();
 		return NULL;
 	}
-	map = FstMap;
-	map->siz = INVALID;
-	do
-		FstMap++;
-	while (FstMap < &mapmt[MAPMT_LEN] && FstMap->siz);
+	FstMap = (map = FstMap)->nxt;
 	sti();
 	return map;
 }
@@ -69,9 +65,8 @@ MAPBLK_DESC *AllocMap()
 void FreeMap(MAPBLK_DESC *map)
 {
 	cli();
-	map->siz = 0;
-	if (FstMap > map)
-		FstMap = map;
+	map->nxt = FstMap;
+	FstMap = map;
 	sti();
 }
 

@@ -21,7 +21,7 @@ DASMFLAGS	= -u -o $(ENTRYPOINT) -e $(ENTRYOFFSET)
 
 # This Program
 HEADS		= ../MkApi/ulimkapi.h ../driver/basesrv.h
-OBJS		= ../objs/gdi.o ../objs/loader.o ../objs/cmd.o ../objs/3demo.o ../objs/3dline.o ../objs/workout.o ../objs/jpg.o
+OBJS		= ../objs/gdi.o ../objs/loader.o ../objs/cmd.o ../objs/3demo.o ../objs/3dline.o ../objs/workout.o ../objs/jpg.o ../objs/clock.o
 HEADOBJ		= ../objs/apphead.o
 
 # All Phony Targets
@@ -29,7 +29,7 @@ HEADOBJ		= ../objs/apphead.o
 
 # Default starting position
 
-all : ../out/ulios/loader.bin ../out/ulios/cmd.bin ../out/ulios/3demo.bin ../out/ulios/3dline.bin ../out/ulios/workout.bin ../out/ulios/jpg.bin
+all : ../out/ulios/loader.bin ../out/ulios/cmd.bin ../out/ulios/3demo.bin ../out/ulios/3dline.bin ../out/ulios/workout.bin ../out/ulios/jpg.bin ../out/ulios/clock.bin
 
 redo : clean all
 
@@ -54,6 +54,9 @@ clean :
 ../out/ulios/jpg.bin : ../objs/jpg.o $(HEADOBJ) $(LDFILE)
 	$(LD) $(LDFLAGS) -o $@ $(HEADOBJ) ../objs/jpg.o ../objs/gdi.o
 
+../out/ulios/clock.bin : ../objs/clock.o $(HEADOBJ) $(LDFILE)
+	$(LD) $(LDFLAGS) -o $@ $(HEADOBJ) ../objs/clock.o ../objs/gdi.o
+
 ../objs/apphead.o : ../MkApi/apphead.c
 	$(CC) $(CFLAGS) -o $@ $<
 
@@ -76,4 +79,7 @@ clean :
 	$(CC) $(CFLAGS) -o $@ $<
 
 ../objs/jpg.o : jpg.c $(HEADS)
+	$(CC) $(CFLAGS) -o $@ $<
+
+../objs/clock.o : clock.c $(HEADS)
 	$(CC) $(CFLAGS) -o $@ $<

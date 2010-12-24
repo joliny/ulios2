@@ -9,13 +9,17 @@
 /*初始化自由块管理表*/
 void InitFbt(FREE_BLK_DESC *fbt, DWORD FbtLen, void *addr, DWORD siz)
 {
+	FREE_BLK_DESC *fbd;
+
 	fbt->addr = &fbt[2];	/*0项不用1项已用2以后的空闲*/
 	fbt->siz = siz;
 	fbt->nxt = &fbt[1];
 	fbt[1].addr = addr;
 	fbt[1].siz = siz;
 	fbt[1].nxt = NULL;
-	memset32(&fbt[2], 0, (FbtLen - 2) * sizeof(FREE_BLK_DESC) / sizeof(DWORD));
+	for (fbd = &fbt[2]; fbd < &fbt[FbtLen - 1]; fbd++)
+		fbd->nxt = fbd + 1;
+	fbd->nxt = NULL;
 }
 
 /*自由块分配*/
@@ -32,8 +36,8 @@ void *alloc(FREE_BLK_DESC *fbt, DWORD siz)
 			if ((CurFblk->siz -= siz) == 0)	/*表项已空*/
 			{
 				PreFblk->nxt = CurFblk->nxt;	/*去除表项*/
-				if (fbt->addr > (void*)CurFblk)
-					fbt->addr = (void*)CurFblk;
+				CurFblk->nxt = (FREE_BLK_DESC*)fbt->addr;	/*释放表项*/
+				fbt->addr = (void*)CurFblk;
 			}
 			return CurFblk->addr + CurFblk->siz;
 		}
@@ -73,14 +77,13 @@ void free(FREE_BLK_DESC *fbt, void *addr, DWORD siz)
 			goto creat;
 creat:	/*新建描述符*/
 	TmpFblk = (FREE_BLK_DESC*)fbt->addr;
+	if (TmpFblk == NULL)	/*无空表项,无法释放*/
+		return;
+	fbt->addr = (void*)TmpFblk->nxt;	/*申请表项*/
 	TmpFblk->addr = addr;
 	TmpFblk->siz = siz;
 	TmpFblk->nxt = PreFblk->nxt;
 	PreFblk->nxt = TmpFblk;
-	do
-		TmpFblk++;
-	while (TmpFblk->siz);	/*	while (TmpFblk < &fbt[FBT_LEN] && TmpFblk->siz);*/
-	fbt->addr = (void*)TmpFblk;
 	return;
 addpre:	/*加入到前面*/
 	PreFblk->siz += siz;
@@ -92,8 +95,7 @@ addnxt:	/*加入到后面*/
 link:	/*连接前后描述符*/
 	PreFblk->siz += (siz + CurFblk->siz);
 	PreFblk->nxt = CurFblk->nxt;
-	CurFblk->siz = 0;
-	if (fbt->addr > (void*)CurFblk)
-		fbt->addr = (void*)CurFblk;
+	CurFblk->nxt = (FREE_BLK_DESC*)fbt->addr;	/*释放表项*/
+	fbt->addr = (void*)CurFblk;
 	return;
 }

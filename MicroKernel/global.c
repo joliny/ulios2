@@ -17,7 +17,6 @@ PAGE_DESC pddt0[PDT_LEN];	/*页目录表副本的目录表4KB*/
 /*内核管理表*/
 FREE_BLK_DESC kmmt[FMT_LEN];/*内核自由数据管理表12KB(0项不用)*/
 PROCESS_DESC* pmt[PMT_LEN];	/*进程管理表4KB*/
-EXEC_DESC* exmt[EXMT_LEN];	/*可执行体管理表4KB*/
 THREAD_ID kpt[KPT_LEN];		/*内核端口注册表4KB*/
 
 /**********内核零散变量**********/

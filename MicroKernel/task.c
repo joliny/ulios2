@@ -551,17 +551,15 @@ BLK_DESC *AllocUBlk(PROCESS_DESC *proc, DWORD siz)
 {
 	BLK_DESC *blk;
 
-	if (proc->FstUBlk >= &proc->ublkt[UBLKT_LEN])
-		return NULL;
 	blk = proc->FstUBlk;
+	if (blk == NULL)
+		return NULL;
+	if (proc->EndUBlk < blk + 1)
+		proc->EndUBlk = blk + 1;
+	proc->FstUBlk = (BLK_DESC*)blk->addr;
 	if ((blk->addr = alloc(proc->ufdmt, siz)) == NULL)
 		return NULL;
 	blk->siz = siz;
-	do
-		proc->FstUBlk++;
-	while (proc->FstUBlk < &proc->ublkt[UBLKT_LEN] && proc->FstUBlk->siz);
-	if (proc->EndUBlk < proc->FstUBlk)
-		proc->EndUBlk = proc->FstUBlk;
 	return blk;
 }
 
@@ -581,8 +579,8 @@ void FreeUBlk(PROCESS_DESC *proc, BLK_DESC *blk)
 {
 	free(proc->ufdmt, blk->addr, blk->siz);
 	blk->siz = 0;
-	if (proc->FstUBlk > blk)
-		proc->FstUBlk = blk;
+	blk->addr = (BLK_DESC*)proc->FstUBlk;	/*ÊÍ·Å±íÏî*/
+	proc->FstUBlk = blk;
 	while (proc->EndUBlk > proc->ublkt && (proc->EndUBlk - 1)->siz == 0)
 		proc->EndUBlk--;
 }
