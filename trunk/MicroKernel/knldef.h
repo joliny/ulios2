@@ -52,8 +52,6 @@ extern PAGE_DESC pddt0[];	/*页目录表副本的目录表4KB*/
 extern FREE_BLK_DESC kmmt[];/*内核自由数据管理表*/
 #define PMT_LEN		0x0400	/*1024项*/
 extern PROCESS_DESC* pmt[];	/*进程管理表4KB*/
-#define EXMT_LEN	0x0400	/*1024项*/
-extern EXEC_DESC* exmt[];	/*可执行体管理表4KB*/
 #define KPT_LEN		0x0400	/*1024项*/
 extern THREAD_ID kpt[];		/*内核端口注册表4KB*/
 
@@ -66,27 +64,23 @@ extern BYTE KnlValue[];		/*内核零散变量区4KB*/
 #define EndPmd		(*((PROCESS_DESC***)(KnlValue + 0x0004)))	/*末个非空进程项指针*/
 #define CurPmd		(*((PROCESS_DESC**)	(KnlValue + 0x0008)))	/*当前进程指针*/
 #define PmdCou		(*((DWORD*)			(KnlValue + 0x000C)))	/*已有进程数量*/
-/*可执行体管理*/
-#define FstExmd		(*((EXEC_DESC***)	(KnlValue + 0x0010)))	/*首个空可执行体指针*/
-#define EndExmd		(*((EXEC_DESC***)	(KnlValue + 0x0014)))	/*末个非空可执行体指针*/
 /*用户物理内存管理*/
-#define pmmap		(*((DWORD**)		(KnlValue + 0x0018)))	/*物理页面使用位图指针*/
-#define PmmLen		(*((DWORD*)			(KnlValue + 0x001C)))	/*物理页管理表长度*/
-#define PmpID		(*((DWORD*)			(KnlValue + 0x0020)))	/*首个空物理页ID*/
-#define RemmSiz		(*((DWORD*)			(KnlValue + 0x0024)))	/*剩余内存字节数*/
+#define pmmap		(*((DWORD**)		(KnlValue + 0x0010)))	/*物理页面使用位图指针*/
+#define PmmLen		(*((DWORD*)			(KnlValue + 0x0014)))	/*物理页管理表长度*/
+#define PmpID		(*((DWORD*)			(KnlValue + 0x0018)))	/*首个空物理页ID*/
+#define RemmSiz		(*((DWORD*)			(KnlValue + 0x001C)))	/*剩余内存字节数*/
 /*消息管理*/
-#define msgmt		(*((MESSAGE_DESC**)	(KnlValue + 0x0028)))	/*消息管理表指针*/
-#define FstMsg		(*((MESSAGE_DESC**)	(KnlValue + 0x002C)))	/*首个空消息指针*/
+#define FstMsg		(*((MESSAGE_DESC**)	(KnlValue + 0x0020)))	/*消息管理表指针*/
 /*地址映射管理*/
-#define mapmt		(*((MAPBLK_DESC**)	(KnlValue + 0x0030)))	/*地址映射管理表指针*/
-#define FstMap		(*((MAPBLK_DESC**)	(KnlValue + 0x0034)))	/*首个空地址映射结构指针*/
-
-#define clock		(*((DWORD*)			(KnlValue + 0x0038)))	/*时钟计数器*/
-#define SleepList	(*((THREAD_DESC**)	(KnlValue + 0x003C)))	/*延时阻塞链表指针*/
-#define LastI387	(*((I387**)			(KnlValue + 0x0040)))	/*被推迟保存的协处理器寄存器指针*/
-
-#define Kmalloc_l	(*((volatile DWORD*)(KnlValue + 0x0F50)))	/*kmalloc锁*/
-#define AllocPage_l	(*((volatile DWORD*)(KnlValue + 0x0F54)))	/*AllocPage锁*/
+#define FstMap		(*((MAPBLK_DESC**)	(KnlValue + 0x0024)))	/*地址映射管理表指针*/
+/*零散变量*/
+#define clock		(*((DWORD*)			(KnlValue + 0x0028)))	/*时钟计数器*/
+#define SleepList	(*((THREAD_DESC**)	(KnlValue + 0x002C)))	/*延时阻塞链表指针*/
+#define LastI387	(*((I387**)			(KnlValue + 0x0030)))	/*被推迟保存的协处理器寄存器指针*/
+/*锁变量*/
+#define Kmalloc_l	(*((volatile DWORD*)(KnlValue + 0x0034)))	/*kmalloc锁*/
+#define AllocPage_l	(*((volatile DWORD*)(KnlValue + 0x0038)))	/*AllocPage锁*/
+/*表结构*/
 #define IRQ_LEN		0x10	/*IRQ信号数量16项*/
 #define IrqPort		((THREAD_ID*)		(KnlValue + 0x0F58))	/*Irq端口注册表*/
 #define KnlTss		(*((TSS*)			(KnlValue + 0x0F98)))	/*内核线程的TSS*/

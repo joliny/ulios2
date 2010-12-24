@@ -34,10 +34,5 @@ typedef struct _MEM_ARDS
 extern PHYBLK_DESC BaseSrv[];	/*8 * 16字节基础服务程序段表*/
 extern DWORD MemEnd;		/*内存上限*/
 extern MEM_ARDS ards[];		/*20 * 19字节内存结构体*/
-extern BYTE SysDir[];		/*124字节系统目录字符串*/
-extern DWORD VesaMode;		/*启动VESA模式号*/
-extern DWORD VbeInfo[];		/*VBE信息*/
-extern DWORD ModeInfo[];	/*VESA模式信息*/
-extern DWORD HdInfo[];		/*两个硬盘参数*/
 
 #endif

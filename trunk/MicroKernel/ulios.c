@@ -18,7 +18,6 @@ int main()
 		return res;
 	if ((res = InitMap()) != NO_ERROR)	/*地址映射管理*/
 		return res;
-	InitEXMT();			/*可执行体管理*/
 	InitPMT();			/*进程管理*/
 	InitKnlProc();		/*内核进程*/
 	InitINTR();			/*中断处理*/

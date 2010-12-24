@@ -12,16 +12,12 @@ MESSAGE_DESC *AllocMsg()
 	MESSAGE_DESC *msg;
 
 	cli();
-	if (FstMsg >= &msgmt[MSGMT_LEN])
+	if (FstMsg == NULL)
 	{
 		sti();
 		return NULL;
 	}
-	msg = FstMsg;
-	msg->data[0] = INVALID;
-	do
-		FstMsg++;
-	while (FstMsg < &msgmt[MSGMT_LEN] && FstMsg->data[0]);
+	FstMsg = (msg = FstMsg)->nxt;
 	sti();
 	return msg;
 }
@@ -30,9 +26,8 @@ MESSAGE_DESC *AllocMsg()
 void FreeMsg(MESSAGE_DESC *msg)
 {
 	cli();
-	msg->data[0] = 0;
-	if (FstMsg > msg)
-		FstMsg = msg;
+	msg->nxt = FstMsg;
+	FstMsg = msg;
 	sti();
 }
 
@@ -40,18 +35,16 @@ void FreeMsg(MESSAGE_DESC *msg)
 void FreeAllMsg()
 {
 	THREAD_DESC *CurThed;
-	MESSAGE_DESC *msg;
 
 	CurThed = CurPmd->CurTmd;
 	cli();
-	for (msg = CurThed->msg; msg; msg = msg->nxt)
+	if (CurThed->msg)
 	{
-		msg->data[0] = 0;
-		if (FstMsg > msg)
-			FstMsg = msg;
+		CurThed->lst->nxt = FstMsg;
+		FstMsg = CurThed->msg;
+		CurThed->msg = NULL;
+		CurThed->MsgCou = 0;
 	}
-	CurThed->msg = NULL;
-	CurThed->MsgCou = 0;
 	sti();
 }
 

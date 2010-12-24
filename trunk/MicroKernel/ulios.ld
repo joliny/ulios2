@@ -9,8 +9,7 @@ SECTIONS
 	_pddt0 =0x3000;
 	_kmmt =	0x4000;
 	_pmt =	0x7000;
-	_exmt =	0x8000;
-	_kpt =	0x9000;
+	_kpt =	0x8000;
 
 	_KnlValue =	0xF000;
 
@@ -21,11 +20,6 @@ SECTIONS
 	_BaseSrv =	0x90080;
 	_MemEnd =	0x900FC;
 	_ards =		0x90100;
-	_SysDir =	0x90280;
-	_VesaMode =	0x902FC;
-	_VbeInfo =	0x90300;
-	_ModeInfo =	0x90500;
-	_HdInfo =	0x90600;
 
 	_gramem =	0x000A0000;
 	_txtmem =	0x000B8000;
