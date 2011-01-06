@@ -401,14 +401,14 @@ long Fat32SetSize(FILE_DESC *fd, QWORD siz)
 		for (;;)
 		{
 			if (clui >= cun)	/*从此开始回收*/
-				goto strfre;
+				break;
 			clui++;
 			if ((CurIdx >> 7) != (PreIdx >> 7))	/*下一簇号不在缓冲中*/
 				RwPart(CurPart, FALSE, ((FAT32*)CurPart->data)->res + (CurIdx >> 7), 1, idx);
 			PreIdx = CurIdx;
 			CurIdx = idx[CurIdx & 0x7F];
 		}
-strfre:	if ((res = FreeClu(CurPart, CurIdx)) != NO_ERROR)
+		if ((res = FreeClu(CurPart, CurIdx)) != NO_ERROR)
 			return res;
 		if (cun)	/*设置结束簇*/
 		{
@@ -432,14 +432,14 @@ strfre:	if ((res = FreeClu(CurPart, CurIdx)) != NO_ERROR)
 		for (;;)
 		{
 			if (cun0 == 0 || CurIdx == 0x0FFFFFFF)
-				goto stralc;
+				break;
 			clui++;
 			if ((CurIdx >> 7) != (PreIdx >> 7))	/*下一簇号不在缓冲中*/
 				RwPart(CurPart, FALSE, ((FAT32*)CurPart->data)->res + (CurIdx >> 7), 1, idx);
 			PreIdx = CurIdx;
 			CurIdx = idx[CurIdx & 0x7F];
 		}
-stralc:	if (cun - clui)
+		if (cun - clui)
 		{
 			clu = AllocClu(CurPart, cun - clui);
 			if (cun0)	/*设置连接簇*/
@@ -802,6 +802,8 @@ crtdir:
 		memcpy32(&dat[1], par->data, sizeof(FAT32_DIR) / sizeof(DWORD));
 		dat[1].name[1] = dat[1].name[0] = '.';
 		memset8(&dat[1].name[2], ' ', FAT32_FILE_NAME_SIZE - 2);
+		if (par->par == NULL)
+			dat[1].idxl = dat[1].idxh = 0;
 		memset32(&dat[2], 0, (bpc - sizeof(FAT32_DIR) * 2) / sizeof(DWORD));
 		if ((res = Fat32RwFile(fd, TRUE, 0, bpc, dat, NULL)) != NO_ERROR)
 		{

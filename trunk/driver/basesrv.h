@@ -159,8 +159,8 @@ static inline long TMGetRand(THREAD_ID ptid)
 
 #define KBDMUS_API_SETRECV		0	/*注册接收键盘鼠标消息的线程功能号*/
 
-#define MSG_ATTR_KBD	(MSG_ATTR_USER)		/*键盘按键消息*/
-#define MSG_ATTR_MUS	(MSG_ATTR_USER + 1)	/*鼠标状态消息*/
+#define MSG_ATTR_KBD	(MSG_ATTR_USER + 0x40000)	/*键盘按键消息*/
+#define MSG_ATTR_MUS	(MSG_ATTR_USER + 0x40001)	/*鼠标状态消息*/
 
 /*注册接收键盘鼠标消息的线程*/
 static inline long KMSetRecv(THREAD_ID ptid)

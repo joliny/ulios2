@@ -152,8 +152,8 @@ DWORD ReadFile(	BPB *bpb,			/*输入：分区BPB*/
 				DIR *SrcDir,		/*输入：文件目录项*/
 				DWORD BufferAddr)	/*输出：存放数据远地址*/
 {
-	WORD idxcou, idxi, idxblkcou;	/*每次读取的索引节点数，索引节点索引，每次读取的索引扇区数*/
-	DWORD idxfstblk, brd;	/*索引簇首扇区，已读取字节数*/
+	WORD idxcou, idxi, idxblkcou;	/*每次读取的索引节点数,索引节点索引,每次读取的索引扇区数*/
+	DWORD idxfstblk, brd;	/*索引簇首扇区,已读取字节数*/
 
 	if (SrcDir->len[0] == 0)	/*空文件*/
 		return BufferAddr;
@@ -186,9 +186,9 @@ DWORD ReadFile(	BPB *bpb,			/*输入：分区BPB*/
 			{
 				ReadSector(bpb->DRV_num, fstblk, 1, BufferAddr);	/*读取数据扇区*/
 				PutChar('.');
-				brd += bpb->bps;
 				fstblk++;
 				BufferAddr += bpb->bps;
+				brd += bpb->bps;
 				if (brd >= SrcDir->len[0])	/*读取完成*/
 					return BufferAddr;
 			}

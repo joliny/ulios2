@@ -37,28 +37,40 @@ const BYTE KeyMapEx[] = {0,	/*美国英语键盘扩展键码表*/
 /*向8042发送命令*/
 static inline void Cmd8042(BYTE b)
 {
-	while (inb(0x64) & 0x02);
+	DWORD i;
+
+	i = 0x2000;
+	while ((inb(0x64) & 0x02) && --i);
 	outb(0x64, b);
 }
 
 /*读8042数据*/
 static inline BYTE Read8042()
 {
-	while (!(inb(0x64) & 0x01));
+	DWORD i;
+
+	i = 0x2000;
+	while (!(inb(0x64) & 0x01) && --i);
 	return inb(0x60);
 }
 
 /*写8042数据*/
 static inline void Write8042(BYTE b)
 {
-	while (inb(0x64) & 0x02);
+	DWORD i;
+
+	i = 0x2000;
+	while ((inb(0x64) & 0x02) && --i);
 	outb(0x60, b);
 }
 
 /*等待8042回复*/
 static inline void Ack8042()
 {
-	while (inb(0x60) != 0xFA);
+	DWORD i;
+
+	i = 0x2000;
+	while ((inb(0x60) != 0xFA) && --i);
 }
 
 /*向键盘发送命令*/

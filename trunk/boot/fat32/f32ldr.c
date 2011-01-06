@@ -203,12 +203,13 @@ DWORD ReadFile(	BPB *bpb,			/*输入：分区BPB*/
 				DIR *SrcDir,		/*输入：文件目录项*/
 				DWORD BufferAddr)	/*输出：存放数据远地址*/
 {
-	DWORD prei, clui;/*簇号计数,上一簇号*/
+	DWORD prei, clui, brd;	/*簇号计数,上一簇号,已读取字节数*/
 
 	if (SrcDir->len == 0)	/*空文件*/
 		return BufferAddr;
 	prei = 0xFFFFFFFF;
 	clui = ((DWORD)(SrcDir->idxh) << 16) | SrcDir->idxl;
+	brd = 0;
 	for (;;)
 	{
 		DWORD i, fstblk;
@@ -220,12 +221,14 @@ DWORD ReadFile(	BPB *bpb,			/*输入：分区BPB*/
 			PutChar('.');
 			fstblk++;
 			BufferAddr += bpb->bps;
+			brd += bpb->bps;
+			if (brd >= SrcDir->len)	/*读取完成*/
+				return BufferAddr;
 		}
 		if ((i = clui / (bpb->bps >> 2)) != prei / (bpb->bps >> 2))	/*下一簇号不在缓冲中*/
 			ReadSector(bpb->DRV_num, bpb->secoff + bpb->res + i, 1, FAR2LINE((DWORD)((void far *)idx)));
 		prei = clui;
-		if ((clui = idx[clui % (bpb->bps >> 2)] & 0x0FFFFFFF) >= 0x0FFFFFF8)	/*文件结束*/
-			return BufferAddr;
+		clui = idx[clui % (bpb->bps >> 2)];
 	}
 }
 

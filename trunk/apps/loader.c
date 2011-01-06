@@ -50,7 +50,7 @@ int main()
 	if ((res = FSChDir(ptid, (const char*)addr)) != NO_ERROR)	/*切换到系统目录*/
 		return res;
 	KFreeAddr(addr);
-	if ((res = FSopen(ptid, "loadlist.txt", FS_OPEN_READ)) < 0)	/*读取配置文件*/
+	if ((res = FSopen(ptid, "bootlist", FS_OPEN_READ)) < 0)	/*读取配置文件*/
 		return res;
 	siz = FSread(ptid, res, LoadList, LOADLIST_SIZ - 1);
 	FSclose(ptid, res);

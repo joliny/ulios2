@@ -9,18 +9,18 @@
 
 #include "gui.h"
 
-typedef struct _GUIDSK_WNDBLOCK
+typedef struct _GUIDSK_VRECT
 {
-	long xpos, xend;				/*块起始/结束X坐标*/
-	GUIOBJ_DESC *obj;				/*窗口对象指针*/
-	struct _GUIDSK_WNDBLOCK *nxt;	/*后续指针*/
-}GUIDSK_WNDBLOCK;	/*窗口块节点,用于桌面内窗口的重叠控制*/
+	RECT rect;					/*剪切矩形*/
+	GUIOBJ_DESC *obj;			/*矩形所属对象指针*/
+	struct _GUIDSK_VRECT *nxt;	/*后续指针*/
+}GUIDSK_VRECT;	/*可视剪切矩形节点,用于桌面内窗口的重叠控制*/
 
 typedef struct _GUIOBJ_DESKTOP
 {
 	GUIOBJ_DESC obj;
-	GUIDSK_WNDBLOCK **blk;
-}GUIOBJ_DESKTOP;		/*桌面结构*/
+	GUIDSK_VRECT *RectList;		/*剪切矩形列表*/
+}GUIOBJ_DESKTOP;	/*桌面结构*/
 
 typedef struct _GUIOBJ_WINDOW
 {

@@ -186,7 +186,7 @@ long UlifsRwFile(FILE_DESC *fd, BOOL isWrite, QWORD seek, DWORD siz, void *buf, 
 	DWORD bpc;	/*每簇字节数*/
 	BLKID *idxp;	/*索引节点索引*/
 	long res;
-	BLKID idx[ULIFS_BPS * ULIFS_MAX_SPC / sizeof(BLKID)];	/*索引簇*/
+	BLKID blk, idx[ULIFS_BPS * ULIFS_MAX_SPC / sizeof(BLKID)];	/*索引簇*/
 	BYTE dat[ULIFS_BPS * ULIFS_MAX_SPC];	/*数据簇*/
 
 	dati = 0;
@@ -211,96 +211,102 @@ long UlifsRwFile(FILE_DESC *fd, BOOL isWrite, QWORD seek, DWORD siz, void *buf, 
 	}
 	idxp = &idx[(bpc / sizeof(BLKID)) - ULIFS_FILE_IDX_LEN];
 	memcpy32(idxp, ((ULIFS_DIR*)fd->data)->idx, sizeof(BLKID) * ULIFS_FILE_IDX_LEN / sizeof(DWORD));	/*复制目录项中的索引*/
-	for (;;)
+	for (;;)	/*索引簇内循环*/
 	{
-		DWORD blkfst, blkcou;
-		for (; (blkfst = idxp->fst, blkcou = idxp->cou) != 0; idxp++)	/*索引簇内循环*/
+		DWORD tmpcou;
+
+		blk = *idxp;
+		if (blk.cou == 0)
 		{
-			DWORD tmpcou;
-			if (dati + blkcou * bpc <= seek)	/*未开始*/
+			if ((res = RwClu(CurPart, FALSE, blk.fst, 1, idx)) != NO_ERROR)	/*读取下一个索引簇*/
+				return res;
+			idxp = idx;
+			continue;
+		}
+		if (dati + blk.cou * bpc <= seek)	/*未开始*/
+		{
+			dati += blk.cou * bpc;	/*处理下一块*/
+			idxp++;
+			continue;
+		}
+		if (dati < seek)	/*当前块将开始*/
+		{
+			tmpcou = (DWORD)((seek - dati) / ULIFS_BPS) / (bpc / ULIFS_BPS);	/*tmpcou = (seek - dati) / bpc;*/
+			blk.fst += tmpcou;
+			blk.cou -= tmpcou;
+			tmpcou *= bpc;
+			dati += tmpcou;	/*调整数据指针*/
+		}
+		if (dati < seek)	/*当前簇将开始*/
+		{
+			if (dati + bpc >= end)	/*开始即完成*/
+				tmpcou = siz;
+			else
+				tmpcou = bpc - (DWORD)seek % bpc;
+			if ((res = RwClu(CurPart, FALSE, blk.fst, 1, dat)) != NO_ERROR)
+				return res;
+			if (isWrite)
 			{
-				dati += blkcou * bpc;	/*处理下一块*/
-				continue;
-			}
-			if (dati < seek)	/*当前块将开始*/
-			{
-				tmpcou = (DWORD)((seek - dati) / ULIFS_BPS) / (bpc / ULIFS_BPS);	/*tmpcou = (seek - dati) / bpc;*/
-				blkfst += tmpcou;
-				blkcou -= tmpcou;
-				tmpcou *= bpc;
-				dati += tmpcou;	/*调整数据指针*/
-			}
-			if (dati < seek)	/*当前簇将开始*/
-			{
-				if (dati + bpc >= end)	/*开始即完成*/
-					tmpcou = siz;
-				else
-					tmpcou = bpc - (DWORD)seek % bpc;
-				if ((res = RwClu(CurPart, FALSE, blkfst, 1, dat)) != NO_ERROR)
+				memcpy8(dat + (DWORD)seek % bpc, buf, tmpcou);
+				if ((res = RwClu(CurPart, TRUE, blk.fst, 1, dat)) != NO_ERROR)
 					return res;
-				if (isWrite)
-				{
-					memcpy8(dat + (DWORD)seek % bpc, buf, tmpcou);
-					if ((res = RwClu(CurPart, TRUE, blkfst, 1, dat)) != NO_ERROR)
-						return res;
-				}
-				else
-					memcpy8(buf, dat + (DWORD)seek % bpc, tmpcou);
-				if (dati + bpc >= end)	/*开始即完成*/
-				{
-					if (curc)
-						*curc = (DWORD)end % bpc ? blkfst : 0;
-					return NO_ERROR;
-				}
-				else
-				{
-					blkfst++;
-					blkcou--;
-					dati += bpc;
-					buf += tmpcou;
-				}
 			}
-			if (dati + bpc <= end)	/*有整簇可处理*/
+			else
+				memcpy8(buf, dat + (DWORD)seek % bpc, tmpcou);
+			if (dati + bpc >= end)	/*开始即完成*/
 			{
-				tmpcou = (DWORD)((end - dati) / ULIFS_BPS) / (bpc / ULIFS_BPS);	/*tmpcou = (end - dati) / bpc;*/
-				if (tmpcou > blkcou)
-					tmpcou = blkcou;
-				if ((res = RwClu(CurPart, isWrite, blkfst, tmpcou, buf)) != NO_ERROR)
-					return res;
-				blkfst += tmpcou;
-				blkcou -= tmpcou;
-				tmpcou *= bpc;
-				dati += tmpcou;
-				buf += tmpcou;
-				if (dati >= end)	/*刚好完成*/
-				{
-					if (curc)
-						*curc = 0;
-					return NO_ERROR;
-				}
-				if (blkcou == 0)
-					continue;
-			}
-			if (dati + bpc >= end)	/*将要完成*/
-			{
-				if ((res = RwClu(CurPart, FALSE, blkfst, 1, dat)) != NO_ERROR)
-					return res;
-				if (isWrite)
-				{
-					memcpy8(dat, buf, (DWORD)end % bpc);
-					if ((res = RwClu(CurPart, TRUE, blkfst, 1, dat)) != NO_ERROR)
-						return res;
-				}
-				else
-					memcpy8(buf, dat, (DWORD)end % bpc);
 				if (curc)
-					*curc = blkfst;
+					*curc = (DWORD)end % bpc ? blk.fst : 0;
 				return NO_ERROR;
 			}
+			else
+			{
+				blk.fst++;
+				blk.cou--;
+				dati += bpc;
+				buf += tmpcou;
+			}
 		}
-		if ((res = RwClu(CurPart, FALSE, blkfst, 1, idx)) != NO_ERROR)	/*读取下一个索引簇*/
-			return res;
-		idxp = idx;
+		if (dati + bpc <= end)	/*有整簇可处理*/
+		{
+			tmpcou = (DWORD)((end - dati) / ULIFS_BPS) / (bpc / ULIFS_BPS);	/*tmpcou = (end - dati) / bpc;*/
+			if (tmpcou > blk.cou)
+				tmpcou = blk.cou;
+			if ((res = RwClu(CurPart, isWrite, blk.fst, tmpcou, buf)) != NO_ERROR)
+				return res;
+			blk.fst += tmpcou;
+			blk.cou -= tmpcou;
+			tmpcou *= bpc;
+			dati += tmpcou;
+			buf += tmpcou;
+			if (dati >= end)	/*刚好完成*/
+			{
+				if (curc)
+					*curc = 0;
+				return NO_ERROR;
+			}
+			if (blk.cou == 0)
+			{
+				idxp++;
+				continue;
+			}
+		}
+		if (dati + bpc >= end)	/*将要完成*/
+		{
+			if ((res = RwClu(CurPart, FALSE, blk.fst, 1, dat)) != NO_ERROR)
+				return res;
+			if (isWrite)
+			{
+				memcpy8(dat, buf, (DWORD)end % bpc);
+				if ((res = RwClu(CurPart, TRUE, blk.fst, 1, dat)) != NO_ERROR)
+					return res;
+			}
+			else
+				memcpy8(buf, dat, (DWORD)end % bpc);
+			if (curc)
+				*curc = blk.fst;
+			return NO_ERROR;
+		}
 	}
 }
 
@@ -447,18 +453,24 @@ long UlifsSetSize(FILE_DESC *fd, QWORD siz)
 		DWORD PreIdx, CurIdx;	/*前索引簇,当前索引簇位置*/
 		BLKID blk;	/*块计数*/
 		CurIdx = PreIdx = 0;
-		for (;;)	/*搜索释放位置*/
+		for (;;)	/*索引簇内循环,搜索释放位置*/
 		{
-			for (; blk = *idxp, blk.cou; idxp++)	/*索引簇内循环*/
-				if ((clui += blk.cou) > cun)	/*开始释放簇*/
-					goto strfre;
-			if ((res = RwClu(CurPart, FALSE, blk.fst, 1, idx)) != NO_ERROR)	/*读取下一个索引簇*/
-				return res;
-			PreIdx = CurIdx;
-			CurIdx = blk.fst;
-			idxp = idx;
+			blk = *idxp;
+			if (blk.cou == 0)
+			{
+				if ((res = RwClu(CurPart, FALSE, blk.fst, 1, idx)) != NO_ERROR)	/*读取下一个索引簇*/
+					return res;
+				PreIdx = CurIdx;
+				CurIdx = blk.fst;
+				idxp = idx;
+				continue;
+			}
+			clui += blk.cou;
+			if (clui > cun)	/*开始释放簇*/
+				break;
+			idxp++;
 		}
-strfre:	blk.cou = clui - cun;
+		blk.cou = clui - cun;
 		blk.fst += idxp->cou - blk.cou;
 		if ((res = FreeClu(CurPart, &blk)) != NO_ERROR)	/*释放当前索引标记的簇*/
 			return res;
@@ -500,24 +512,28 @@ strfre:	blk.cou = clui - cun;
 			return UlifsRwFile(par, TRUE, (QWORD)fd->idx * sizeof(ULIFS_DIR), sizeof(ULIFS_DIR), data, NULL);
 		}
 		idxp++;
-		for (;;)	/*继续释放*/
+		for (;;)	/*索引簇内循环,继续释放*/
 		{
-			for (; blk = *idxp, blk.cou; idxp++)	/*索引簇内循环*/
+			blk = *idxp;
+			if (blk.cou == 0)
 			{
+				if ((res = RwClu(CurPart, FALSE, blk.fst, 1, idx)) != NO_ERROR)	/*读取下一个索引簇*/
+					return res;
+				idxp = idx;
 				if ((res = FreeClu(CurPart, &blk)) != NO_ERROR)
 					return res;
-				if ((clui += blk.cou) >= cun0)	/*释放完成*/
-				{
-					fd->file.size = data->size = siz;
-					CurPart->part.remain += (cun0 - cun) * bpc;
-					return UlifsRwFile(par, TRUE, (QWORD)fd->idx * sizeof(ULIFS_DIR), sizeof(ULIFS_DIR), data, NULL);
-				}
+				continue;
 			}
-			if ((res = RwClu(CurPart, FALSE, blk.fst, 1, idx)) != NO_ERROR)	/*读取下一个索引簇*/
-				return res;
-			idxp = idx;
 			if ((res = FreeClu(CurPart, &blk)) != NO_ERROR)
 				return res;
+			clui += blk.cou;
+			if (clui >= cun0)	/*释放完成*/
+			{
+				fd->file.size = data->size = siz;
+				CurPart->part.remain += (cun0 - cun) * bpc;
+				return UlifsRwFile(par, TRUE, (QWORD)fd->idx * sizeof(ULIFS_DIR), sizeof(ULIFS_DIR), data, NULL);
+			}
+			idxp++;
 		}
 	}
 	else	/*增大文件*/
@@ -526,22 +542,26 @@ strfre:	blk.cou = clui - cun;
 		BLKID blk;	/*当前块计数*/
 		CurIdx = 0;
 		blk.cou = blk.fst = 0;
-		for (;;)	/*搜索结束位置*/
+		if (cun0)
 		{
-			for (;;)	/*索引簇内循环*/
+			for (;;)	/*索引簇内循环,搜索结束位置*/
 			{
-				if (clui >= cun0)	/*到文件尾*/
-					goto stralc;
-				if (blk = *idxp, blk.cou == 0)
-					break;
+				blk = *idxp;
+				if (blk.cou == 0)
+				{
+					if ((res = RwClu(CurPart, FALSE, blk.fst, 1, idx)) != NO_ERROR)	/*读取下一个索引簇*/
+						return res;
+					CurIdx = blk.fst;
+					idxp = idx;
+					continue;
+				}
 				clui += blk.cou;
+				if (clui >= cun0)	/*到文件尾*/
+					break;
+				idxp++;
 			}
-			if ((res = RwClu(CurPart, FALSE, blk.fst, 1, idx)) != NO_ERROR)	/*读取下一个索引簇*/
-				return res;
-			CurIdx = blk.fst;
-			idxp = idx;
 		}
-stralc:	for (;;)
+		for (;;)
 		{
 			BLKID tblk;	/*临时块计数*/
 			tblk.fst = blk.fst + blk.cou;

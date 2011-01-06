@@ -14,7 +14,7 @@
 #define GUI_TYPE_BUTTON		2	/*按钮类型*/
 
 /*错误定义*/
-#define GUI_ERR_HAVENO_GOBJ		-256	/*文件描述符不足*/
+#define GUI_ERR_HAVENO_GOBJ		-2560	/*GUI对象描述符不足*/
 
 #define SRV_GUI_PORT		10	/*GUI服务端口*/
 
