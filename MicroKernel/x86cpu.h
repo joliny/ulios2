@@ -103,15 +103,48 @@ typedef struct _TSS
 
 typedef struct _I387
 {
-	DWORD cwd;
-	DWORD swd;
-	DWORD twd;
-	DWORD fip;
-	DWORD fcs;
-	DWORD foo;
-	DWORD fos;
-	DWORD st[20];
-}I387;	/*浮点协处理器寄存器*/
+	DWORD cwd;	/*控制字*/
+	DWORD swd;	/*状态字*/
+	DWORD twd;	/*标记字*/
+	DWORD fip;	/*指令指针偏移*/
+	DWORD fcs;	/*指令指针选择*/
+	DWORD foo;	/*操作数偏移*/
+	DWORD fos;	/*操作数选择*/
+	DWORD st[20];	/*10个8字节FP寄存器*/
+}I387;	/*I387浮点协处理器寄存器*/
+
+typedef struct _I387SSE
+{
+	WORD cwd;	/*控制字*/
+	WORD swd;	/*状态字*/
+	WORD twd;	/*标记字*/
+	WORD fop;	/*最后一条指令操作码*/
+	union _I387SSE_REG
+	{
+		struct _I387SSE_INS_R
+		{
+			QWORD rip;	/*指令指针*/
+			QWORD rdp;	/*数据指针*/
+		}rreg;
+		struct _I387SSE_INS_F
+		{
+			DWORD fip;	/*FPU指令指针偏移*/
+			DWORD fcs;	/*FPU指令指针选择*/
+			DWORD foo;	/*FPU操作数偏移*/
+			DWORD fos;	/*FPU操作数选择*/
+		}freg;
+	}reg;
+	DWORD mxcsr;		/*MXCSR寄存器状态*/
+	DWORD mxcsr_mask;	/*MXCSR位蒙板*/
+	DWORD st[32];		/*8个16字节FP寄存器*/
+	DWORD xmm[64];		/*16个16字节XMM寄存器*/
+	DWORD padding[12];
+	union _I387SSE_PAD
+	{
+		DWORD padding1[12];
+		DWORD sw_reserved[12];
+	}pad;
+}__attribute__((aligned(16))) I387SSE;	/*SSE处理器寄存器*/
 
 /*页目录表页表项*/
 #define PAGE_ATTR_P		0x00000001	/*0:页不存在1:页存在*/

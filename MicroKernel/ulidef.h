@@ -11,6 +11,7 @@ typedef unsigned char		BYTE;	/*8λ*/
 typedef unsigned short		WORD;	/*16λ*/
 typedef unsigned long		DWORD;	/*32λ*/
 typedef unsigned long		BOOL;
+typedef unsigned long long	QWORD;	/*64λ*/
 
 typedef struct _THREAD_ID
 {

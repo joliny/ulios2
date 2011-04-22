@@ -7,9 +7,7 @@
 #include "gui.h"
 
 FREE_BLK_DESC fmt[FMT_LEN];
-DWORD fmtl;	/*动态内存管理锁*/
 FREE_BLK_DESC vmt[VMT_LEN];
-DWORD vmtl;	/*可视内存管理锁*/
 
 /*初始化自由块管理表*/
 void InitFbt(FREE_BLK_DESC *fbt, DWORD FbtLen, void *addr, DWORD siz)

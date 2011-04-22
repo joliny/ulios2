@@ -92,24 +92,21 @@ void OutCmd(ATHD_REQ *req)
 }
 
 /*分配请求结构*/
-static inline ATHD_REQ *AllocReq(ATHD_REQ *req, ATHD_REQ **FstReq)
+static inline ATHD_REQ *AllocReq(ATHD_REQ **FstReq)
 {
 	ATHD_REQ *CurReq;
 
-	if (*FstReq >= &req[REQ_LEN])
+	if (*FstReq == NULL)
 		return NULL;
-	CurReq = *FstReq;
-	do
-		(*FstReq)++;
-	while (*FstReq < &req[REQ_LEN] && (*FstReq)->cou);
+	*FstReq = (CurReq = *FstReq)->nxt;
 	return CurReq;
 }
 
 /*释放请求结构*/
 static inline void FreeReq(ATHD_REQ **FstReq, ATHD_REQ *CurReq)
 {
-	if (*FstReq > CurReq)
-		*FstReq = CurReq;
+	CurReq->nxt = *FstReq;
+	*FstReq = CurReq;
 }
 
 /*插入请求结构*/
@@ -146,7 +143,9 @@ int main()
 	secou[0] = haddr[0].cylinders * haddr[0].heads * haddr[0].spt;
 	secou[1] = haddr[1].cylinders * haddr[1].heads * haddr[1].spt;
 	KFreeAddr(haddr);
-	memset32(req, 0, sizeof(req) / sizeof(DWORD));	/*初始化变量*/
+	for (FstReq = req; FstReq < &req[REQ_LEN - 1]; FstReq++)	/*初始化变量*/
+		FstReq->nxt = FstReq + 1;
+	FstReq->nxt = NULL;
 	FstReq = req;
 	LstReq = ReqList = NULL;
 	state = STATE_WAIT;
@@ -195,7 +194,7 @@ int main()
 				KUnmapProcAddr((void*)data[2], data);
 				continue;
 			}
-			if ((CurReq = AllocReq(req, &FstReq)) == NULL)	/*服务请求列表已满*/
+			if ((CurReq = AllocReq(&FstReq)) == NULL)	/*服务请求列表已满*/
 			{
 				data[0] = ATHD_ERR_HAVENO_REQ;
 				KUnmapProcAddr((void*)data[2], data);

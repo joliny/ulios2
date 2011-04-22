@@ -31,22 +31,35 @@ int main()
 	if ((res = KMapPhyAddr(&vm, 0x90000, 0x70000)) != NO_ERROR)	/*取得显卡信息*/
 		return res;
 	CurMode = *((DWORD*)(vm + 0x2FC));
-	width = *((WORD*)(vm + 0x512));
-	height = *((WORD*)(vm + 0x514));
-	PixBits = *((BYTE*)(vm + 0x519));
-	VmPhy = *((DWORD*)(vm + 0x528));
+	if (CurMode)	/*图形模式*/
+	{
+		width = *((WORD*)(vm + 0x512));
+		height = *((WORD*)(vm + 0x514));
+		PixBits = *((BYTE*)(vm + 0x519));
+		VmPhy = *((DWORD*)(vm + 0x528));
+	}
+	else	/*文本模式*/
+	{
+		width = 80;
+		height = 25;
+		PixBits = 16;	/*每个字符占2字节*/
+		VmPhy = 0xB8000;
+	}
 	Modep = (WORD*)((DWORD)vm + FAR2LINE(*(DWORD*)(vm + 0x30E)) - 0x90000);	/*复制模式列表*/
 	for (ModeCou = 0; *Modep != 0xFFFF; ModeCou++, Modep++)
 		ModeList[ModeCou] = *Modep;
-	if ((res = KGetKptThed(SRV_FS_PORT, &ptid)) != NO_ERROR)	/*取得文件系统线程ID*/
-		return res;
-	if ((res = FSChDir(ptid, (const char*)(vm + 0x280))) != NO_ERROR)	/*切换到系统目录*/
-		return res;
-	if ((res = FSopen(ptid, FONT_FILE, FS_OPEN_READ)) < 0)	/*打开字体文件*/
-		return res;
-	if (FSread(ptid, res, font, FONT_SIZE) <= 0)	/*读取字体文件*/
-		return -1;
-	FSclose(ptid, res);
+	if (CurMode)
+	{
+		if ((res = KGetKptThed(SRV_FS_PORT, &ptid)) != NO_ERROR)	/*取得文件系统线程ID*/
+			return res;
+		if ((res = FSChDir(ptid, (const char*)(vm + 0x280))) != NO_ERROR)	/*切换到系统目录*/
+			return res;
+		if ((res = FSopen(ptid, FONT_FILE, FS_OPEN_READ)) < 0)	/*打开字体文件*/
+			return res;
+		if (FSread(ptid, res, font, FONT_SIZE) <= 0)	/*读取字体文件*/
+			return -1;
+		FSclose(ptid, res);
+	}
 	KFreeAddr(vm);
 	VmSiz = ((PixBits + 7) >> 3) * width * height;
 	if ((res = KMapPhyAddr(&vm, VmPhy, VmSiz)) != NO_ERROR)	/*映射显存*/
@@ -64,16 +77,24 @@ int main()
 			{
 			case VESA_API_GETVMEM:
 				data[0] = NO_ERROR;
-				data[1] = width;	/*像素分辨率*/
+				data[1] = width;	/*像素/字符分辨率*/
 				data[2] = height;
 				data[3] = PixBits;	/*色彩位数*/
 				KReadProcAddr(vm, VmSiz, &ptid, data, 0);
 				break;
 			case VESA_API_GETFONT:
-				data[0] = NO_ERROR;
-				data[1] = 6;	/*字符大小*/
-				data[2] = 12;
-				KWriteProcAddr(font, FONT_SIZE, &ptid, data, 0);
+				if (CurMode)	/*图形模式*/
+				{
+					data[0] = NO_ERROR;
+					data[1] = 6;	/*字符大小*/
+					data[2] = 12;
+					KWriteProcAddr(font, FONT_SIZE, &ptid, data, 0);
+				}
+				else	/*文本模式*/
+				{
+					data[3] = VESA_ERR_TEXTMODE;
+					KSendMsg(&ptid, data, 0);
+				}
 				break;
 			}
 		}
