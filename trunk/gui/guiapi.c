@@ -6,6 +6,10 @@
 
 #include "gui.h"
 
+extern GOBJ_DESC *gobjt[];	/*窗体管理表*/
+extern GOBJ_DESC **FstGobj;	/*第一个空对象描述符指针*/
+extern CLIPRECT *FstClipRect;	/*剪切矩形管理表指针*/
+
 THREAD_ID KbdMusPtid;	/*键盘鼠标服务ID*/
 long MouX, MouY, MpicWidth, MpicHeight;	/*鼠标位置,背景图像备份*/
 DWORD *MpicBak;	/*鼠标背景图像*/
@@ -15,6 +19,7 @@ long InitGUI()
 {
 	long res;
 	void *addr;
+	CLIPRECT *clip;
 
 	if ((res = KRegKnlPort(SRV_GUI_PORT)) != NO_ERROR)	/*注册服务端口*/
 		return res;
@@ -27,12 +32,19 @@ long InitGUI()
 	if ((res = KMapUserAddr(&addr, FDAT_SIZ + VDAT_SIZ)) != NO_ERROR)	/*申请自由内存和可视内存空间*/
 		return res;
 	InitFbt(fmt, FMT_LEN, addr, FDAT_SIZ);
-	fmtl = FALSE;
 	InitFbt(vmt, VMT_LEN, addr + FDAT_SIZ, VDAT_SIZ);
-	vmtl = FALSE;
+	memset32(gobjt, 0, GOBJT_LEN * sizeof(GOBJ_DESC*) / sizeof(DWORD));	/*窗体管理表*/
+	FstGobj = gobjt;
+	if ((FstClipRect = (CLIPRECT*)falloc(CLIPRECTT_LEN * sizeof(CLIPRECT))) == NULL)	/*剪切矩形管理表*/
+		return GUI_ERR_HAVENO_MEMORY;
+	for (clip = FstClipRect; clip < &FstClipRect[CLIPRECTT_LEN - 1]; clip++)
+		clip->nxt = clip + 1;
+	clip->nxt = NULL;
+	if ((res = CreateDesktop(GDIwidth, GDIheight)) != NO_ERROR)	/*创建桌面*/
+		return res;
 	MpicHeight = MpicWidth = 32;	/*鼠标图像*/
 	if ((MpicBak = valloc(MpicWidth * MpicHeight * sizeof(DWORD))) == NULL)
-		return res;
+		return GUI_ERR_HAVENO_MEMORY;
 	GDIGetImage(MouX, MouY, MpicBak, MpicWidth, MpicHeight);
 	return NO_ERROR;
 }
@@ -43,6 +55,11 @@ int main()
 
 	if ((res = InitGUI()) != NO_ERROR)
 		return res;
+	{
+		WORD id;
+		CreateGobj(KbdMusPtid, 0, GUI_TYPE_WINDOW, 200, 200, 400, 300, 0, &id);
+		CreateGobj(KbdMusPtid, id, GUI_TYPE_WINDOW, 300, 100, 350, 100, 0, &id);
+	}
 	for (;;)
 	{
 		DWORD data[MSG_DATA_LEN];

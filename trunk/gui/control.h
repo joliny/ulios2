@@ -9,29 +9,33 @@
 
 #include "gui.h"
 
-typedef struct _GUIDSK_VRECT
-{
-	RECT rect;					/*剪切矩形*/
-	GUIOBJ_DESC *obj;			/*矩形所属对象指针*/
-	struct _GUIDSK_VRECT *nxt;	/*后续指针*/
-}GUIDSK_VRECT;	/*可视剪切矩形节点,用于桌面内窗口的重叠控制*/
-
 typedef struct _GUIOBJ_DESKTOP
 {
-	GUIOBJ_DESC obj;
-	GUIDSK_VRECT *RectList;		/*剪切矩形列表*/
+	GOBJ_DESC obj;
 }GUIOBJ_DESKTOP;	/*桌面结构*/
 
 typedef struct _GUIOBJ_WINDOW
 {
-	GUIOBJ_DESC obj;
+	GOBJ_DESC obj;
 }GUIOBJ_WINDOW;		/*窗口结构*/
 
-#define BUTTON_CAPTION_LEN 1024
+#define BUTTON_CAPTION_LEN 256
 typedef struct _GUIOBJ_BUTTON
 {
-	GUIOBJ_DESC obj;
+	GOBJ_DESC obj;
 	char caption[BUTTON_CAPTION_LEN];
 }GUIOBJ_BUTTON;		/*按钮结构*/
+
+long InitDesktop(GUIOBJ_DESKTOP *dsk);
+
+long InitWindow(GUIOBJ_WINDOW *wnd);
+
+long InitButton(GUIOBJ_BUTTON *btn);
+
+long ReleaseDesktop(GUIOBJ_DESKTOP *dsk);
+
+long ReleaseWindow(GUIOBJ_WINDOW *wnd);
+
+long ReleaseButton(GUIOBJ_BUTTON *btn);
 
 #endif

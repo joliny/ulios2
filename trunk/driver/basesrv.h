@@ -182,6 +182,7 @@ static inline long KMSetRecv(THREAD_ID ptid)
 #define VESA_ERR_LOCATION	-1280	/*坐标错误*/
 #define VESA_ERR_SIZE		-1281	/*尺寸错误*/
 #define VESA_ERR_ARGS		-1282	/*参数错误*/
+#define VESA_ERR_TEXTMODE	-1283	/*文本模式*/
 
 /*取得显存映射*/
 static inline long VSGetVmem(THREAD_ID ptid, void **vm, DWORD *width, DWORD *height, DWORD *PixBits)

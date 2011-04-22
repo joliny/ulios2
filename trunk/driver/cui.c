@@ -9,16 +9,40 @@
 #define MAX_LINE	200	/*每行最多字符数量*/
 #define CURS_WIDTH	2	/*光标高度*/
 
+BOOL isTextMode;	/*是否文本模式*/
+extern void *vm;	/*文本显存*/
 DWORD width, height;	/*显示字符数量*/
 DWORD CursX, CursY;		/*光标位置*/
 DWORD BgColor, CharColor;	/*当前背景,前景色*/
+
+#define TEXT_MODE_COLOR	((CharColor & 0xF) | ((BgColor & 0xF) << 4))
+
+/*字符模式设置光标*/
+void SetTextCurs()
+{
+	DWORD PortData;
+
+	PortData = CursX + CursY * width;
+	outb(0x3D4, 0xF);
+	outb(0x3D5, PortData & 0xFF);
+	outb(0x3D4, 0xE);
+	outb(0x3D5, (PortData >> 8));
+}
 
 /*清屏*/
 void ClearScr()
 {
 	CursY = CursX = 0;
-	GDIFillRect(0, 0, GDIwidth, GDIheight, BgColor);
-	GDIFillRect(0, GDICharHeight - CURS_WIDTH, GDICharWidth, CURS_WIDTH, CharColor);	/*画光标*/
+	if (isTextMode)
+	{
+		memset32(vm, (TEXT_MODE_COLOR << 8) | (TEXT_MODE_COLOR << 24), width * height / 2);
+		SetTextCurs();
+	}
+	else
+	{
+		GDIFillRect(0, 0, GDIwidth, GDIheight, BgColor);
+		GDIFillRect(0, GDICharHeight - CURS_WIDTH, GDICharWidth, CURS_WIDTH, CharColor);	/*画光标*/
+	}
 }
 
 /*输出字符串*/
@@ -35,7 +59,8 @@ void PutStr(const char *str)
 		switch (*str)
 		{
 		case '\n':
-			GDIFillRect(GDICharWidth * CursX, GDICharHeight * CursY, GDICharWidth, GDICharHeight, BgColor);	/*清除背景*/
+			if (!isTextMode)
+				GDIFillRect(GDICharWidth * CursX, GDICharHeight * CursY, GDICharWidth, GDICharHeight, BgColor);	/*清除背景*/
 			CursX = width;
 			break;
 		case '\t':
@@ -55,8 +80,19 @@ void PutStr(const char *str)
 			if (bufp != LineBuf)
 			{
 				*bufp = '\0';
-				GDIFillRect(BufX, BufY, GDICharWidth * (bufp - LineBuf), GDICharHeight, BgColor);
-				GDIDrawStr(BufX, BufY, LineBuf, CharColor);
+				if (isTextMode)
+				{
+					WORD *CurVm;
+
+					CurVm = ((WORD*)vm) + BufX + BufY * width;
+					for (bufp = LineBuf; *bufp; bufp++, CurVm++)
+						*CurVm = *(BYTE*)bufp | (TEXT_MODE_COLOR << 8);
+				}
+				else
+				{
+					GDIFillRect(BufX, BufY, GDICharWidth * (bufp - LineBuf), GDICharHeight, BgColor);
+					GDIDrawStr(BufX, BufY, LineBuf, CharColor);
+				}
 				bufp = LineBuf;
 			}
 			BufX = GDICharWidth * CursX;
@@ -65,8 +101,16 @@ void PutStr(const char *str)
 		if (CursY >= height)	/*光标在最后一行，向上滚屏*/
 		{
 			CursY--;
-			GDIMoveUp(GDICharHeight);
-			GDIFillRect(0, GDICharHeight * (height - 1), GDIwidth, GDICharHeight, BgColor);
+			if (isTextMode)
+			{
+				memcpy32(vm, ((WORD*)vm) + width, width * (height - 1) / 2);
+				memset32(((WORD*)vm) + width * (height - 1), (TEXT_MODE_COLOR << 8) | (TEXT_MODE_COLOR << 24), width / 2);
+			}
+			else
+			{
+				GDIMoveUp(GDICharHeight);
+				GDIFillRect(0, GDICharHeight * (height - 1), GDIwidth, GDICharHeight, BgColor);
+			}
 			BufY = GDICharHeight * CursY;
 		}
 		str++;
@@ -74,10 +118,24 @@ void PutStr(const char *str)
 	if (bufp != LineBuf)	/*输出最后一行*/
 	{
 		*bufp = '\0';
-		GDIFillRect(BufX, BufY, GDICharWidth * (bufp - LineBuf), GDICharHeight, BgColor);
-		GDIDrawStr(BufX, BufY, LineBuf, CharColor);
+		if (isTextMode)
+		{
+			WORD *CurVm;
+
+			CurVm = ((WORD*)vm) + BufX + BufY * width;
+			for (bufp = LineBuf; *bufp; bufp++, CurVm++)
+				*CurVm = *(BYTE*)bufp | (TEXT_MODE_COLOR << 8);
+		}
+		else
+		{
+			GDIFillRect(BufX, BufY, GDICharWidth * (bufp - LineBuf), GDICharHeight, BgColor);
+			GDIDrawStr(BufX, BufY, LineBuf, CharColor);
+		}
 	}
-	GDIFillRect(GDICharWidth * CursX, GDICharHeight * CursY + GDICharHeight - CURS_WIDTH, GDICharWidth, CURS_WIDTH, CharColor);	/*画光标*/
+	if (isTextMode)
+		SetTextCurs();
+	else
+		GDIFillRect(GDICharWidth * CursX, GDICharHeight * CursY + GDICharHeight - CURS_WIDTH, GDICharWidth, CURS_WIDTH, CharColor);	/*画光标*/
 }
 
 /*退格处理*/
@@ -85,7 +143,8 @@ void BackSp()
 {
 	if (CursX == 0 && CursY == 0)
 		return;
-	GDIFillRect(GDICharWidth * CursX, GDICharHeight * CursY + GDICharHeight - CURS_WIDTH, GDICharWidth, CURS_WIDTH, BgColor);	/*清除光标*/
+	if (!isTextMode)
+		GDIFillRect(GDICharWidth * CursX, GDICharHeight * CursY + GDICharHeight - CURS_WIDTH, GDICharWidth, CURS_WIDTH, BgColor);	/*清除光标*/
 	if (CursX)
 		CursX--;
 	else
@@ -93,8 +152,16 @@ void BackSp()
 		CursX = width - 1;
 		CursY--;
 	}
-	GDIFillRect(GDICharWidth * CursX, GDICharHeight * CursY, GDICharWidth, GDICharHeight, BgColor);	/*清除背景*/
-	GDIFillRect(GDICharWidth * CursX, GDICharHeight * CursY + GDICharHeight - CURS_WIDTH, GDICharWidth, CURS_WIDTH, CharColor);	/*画光标*/
+	if (isTextMode)
+	{
+		((WORD*)vm)[CursX + CursY * width] = (TEXT_MODE_COLOR << 8);
+		SetTextCurs();
+	}
+	else
+	{
+		GDIFillRect(GDICharWidth * CursX, GDICharHeight * CursY, GDICharWidth, GDICharHeight, BgColor);	/*清除背景*/
+		GDIFillRect(GDICharWidth * CursX, GDICharHeight * CursY + GDICharHeight - CURS_WIDTH, GDICharWidth, CURS_WIDTH, CharColor);	/*画光标*/
+	}
 }
 
 int main()
@@ -103,13 +170,29 @@ int main()
 
 	if ((res = KRegKnlPort(SRV_CUI_PORT)) != NO_ERROR)	/*注册服务端口号*/
 		return res;
-	if ((res = GDIinit()) != NO_ERROR)
-		return res;
-	width = GDIwidth / GDICharWidth;	/*计算显示字符数量*/
-	height = GDIheight / GDICharHeight;
-	CursY = CursX = 0;
-	BgColor = 0;
-	CharColor = 0xFFFFFFFF;
+	res = GDIinit();
+	if (res != NO_ERROR)
+	{
+		if (res == VESA_ERR_TEXTMODE)
+		{
+			GDICharHeight = GDICharWidth = 1;
+			isTextMode = TRUE;
+			width = GDIwidth;	/*计算显示字符数量*/
+			height = GDIheight;
+			BgColor = 0;
+			CharColor = 0x7;
+		}
+		else
+			return res;
+	}
+	else
+	{
+		width = GDIwidth / GDICharWidth;	/*计算显示字符数量*/
+		height = GDIheight / GDICharHeight;
+		BgColor = 0;
+		CharColor = 0xFFFFFFFF;
+	}
+	ClearScr();
 	for (;;)
 	{
 		THREAD_ID ptid;
@@ -136,12 +219,23 @@ int main()
 				KSendMsg(&ptid, data, 0);
 				break;
 			case CUI_API_SETCUR:	/*设置光标位置*/
-				GDIFillRect(GDICharWidth * CursX, GDICharHeight * CursY + GDICharHeight - CURS_WIDTH, GDICharWidth, CURS_WIDTH, BgColor);	/*清除光标*/
-				if (data[1] < width)
-					CursX = data[1];
-				if (data[2] < height)
-					CursY = data[2];
-				GDIFillRect(GDICharWidth * CursX, GDICharHeight * CursY + GDICharHeight - CURS_WIDTH, GDICharWidth, CURS_WIDTH, CharColor);	/*画光标*/
+				if (isTextMode)
+				{
+					if (data[1] < width)
+						CursX = data[1];
+					if (data[2] < height)
+						CursY = data[2];
+					SetTextCurs();
+				}
+				else
+				{
+					GDIFillRect(GDICharWidth * CursX, GDICharHeight * CursY + GDICharHeight - CURS_WIDTH, GDICharWidth, CURS_WIDTH, BgColor);	/*清除光标*/
+					if (data[1] < width)
+						CursX = data[1];
+					if (data[2] < height)
+						CursY = data[2];
+					GDIFillRect(GDICharWidth * CursX, GDICharHeight * CursY + GDICharHeight - CURS_WIDTH, GDICharWidth, CURS_WIDTH, CharColor);	/*画光标*/
+				}
 				break;
 			case CUI_API_CLRSCR:	/*清屏*/
 				ClearScr();
