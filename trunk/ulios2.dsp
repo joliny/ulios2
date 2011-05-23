@@ -96,6 +96,10 @@ SOURCE=.\boot\setup386.asm
 # Begin Source File
 
 SOURCE=.\driver\athd.c
+DEP_CPP_ATHD_=\
+	".\driver\basesrv.h"\
+	".\MkApi\ulimkapi.h"\
+	
 # End Source File
 # Begin Source File
 
@@ -104,14 +108,19 @@ SOURCE=.\driver\basesrv.h
 # Begin Source File
 
 SOURCE=.\driver\cui.c
-# End Source File
-# Begin Source File
-
-SOURCE=.\driver\gdi.c
+DEP_CPP_CUI_C=\
+	".\driver\basesrv.h"\
+	".\lib\gdi.h"\
+	".\MkApi\ulimkapi.h"\
+	
 # End Source File
 # Begin Source File
 
 SOURCE=.\driver\kbdmus.c
+DEP_CPP_KBDMU=\
+	".\driver\basesrv.h"\
+	".\MkApi\ulimkapi.h"\
+	
 # End Source File
 # Begin Source File
 
@@ -120,22 +129,43 @@ SOURCE=.\driver\Makefile
 # Begin Source File
 
 SOURCE=.\driver\rep.c
+DEP_CPP_REP_C=\
+	".\driver\basesrv.h"\
+	".\MkApi\ulimkapi.h"\
+	
 # End Source File
 # Begin Source File
 
 SOURCE=.\driver\speaker.c
+DEP_CPP_SPEAK=\
+	".\driver\basesrv.h"\
+	".\MkApi\ulimkapi.h"\
+	
 # End Source File
 # Begin Source File
 
 SOURCE=.\driver\time.c
+DEP_CPP_TIME_=\
+	".\driver\basesrv.h"\
+	".\MkApi\ulimkapi.h"\
+	
 # End Source File
 # Begin Source File
 
 SOURCE=.\driver\uart.c
+DEP_CPP_UART_=\
+	".\driver\basesrv.h"\
+	".\MkApi\ulimkapi.h"\
+	
 # End Source File
 # Begin Source File
 
 SOURCE=.\driver\vesa.c
+DEP_CPP_VESA_=\
+	".\driver\basesrv.h"\
+	".\fs\fsapi.h"\
+	".\MkApi\ulimkapi.h"\
+	
 # End Source File
 # End Group
 # Begin Group "fs"
@@ -144,14 +174,32 @@ SOURCE=.\driver\vesa.c
 # Begin Source File
 
 SOURCE=.\fs\cache.c
+DEP_CPP_CACHE=\
+	".\driver\basesrv.h"\
+	".\fs\fs.h"\
+	".\fs\fsapi.h"\
+	".\MkApi\ulimkapi.h"\
+	
 # End Source File
 # Begin Source File
 
 SOURCE=.\fs\fat32.c
+DEP_CPP_FAT32=\
+	".\driver\basesrv.h"\
+	".\fs\fs.h"\
+	".\fs\fsapi.h"\
+	".\MkApi\ulimkapi.h"\
+	
 # End Source File
 # Begin Source File
 
 SOURCE=.\fs\fs.c
+DEP_CPP_FS_C14=\
+	".\driver\basesrv.h"\
+	".\fs\fs.h"\
+	".\fs\fsapi.h"\
+	".\MkApi\ulimkapi.h"\
+	
 # End Source File
 # Begin Source File
 
@@ -160,10 +208,22 @@ SOURCE=.\fs\fs.h
 # Begin Source File
 
 SOURCE=.\fs\fsalloc.c
+DEP_CPP_FSALL=\
+	".\driver\basesrv.h"\
+	".\fs\fs.h"\
+	".\fs\fsapi.h"\
+	".\MkApi\ulimkapi.h"\
+	
 # End Source File
 # Begin Source File
 
 SOURCE=.\fs\fsapi.c
+DEP_CPP_FSAPI=\
+	".\driver\basesrv.h"\
+	".\fs\fs.h"\
+	".\fs\fsapi.h"\
+	".\MkApi\ulimkapi.h"\
+	
 # End Source File
 # Begin Source File
 
@@ -176,6 +236,12 @@ SOURCE=.\fs\Makefile
 # Begin Source File
 
 SOURCE=.\fs\ulifs.c
+DEP_CPP_ULIFS=\
+	".\driver\basesrv.h"\
+	".\fs\fs.h"\
+	".\fs\fsapi.h"\
+	".\MkApi\ulimkapi.h"\
+	
 # End Source File
 # End Group
 # Begin Group "gui"
@@ -183,11 +249,7 @@ SOURCE=.\fs\ulifs.c
 # PROP Default_Filter ""
 # Begin Source File
 
-SOURCE=.\gui\control.c
-# End Source File
-# Begin Source File
-
-SOURCE=.\gui\control.h
+SOURCE=.\gui\desktop.c
 # End Source File
 # Begin Source File
 
@@ -195,11 +257,14 @@ SOURCE=.\gui\gui.h
 # End Source File
 # Begin Source File
 
-SOURCE=.\gui\guialloc.c
-# End Source File
-# Begin Source File
-
 SOURCE=.\gui\guiapi.c
+DEP_CPP_GUIAP=\
+	".\driver\basesrv.h"\
+	".\gui\gui.h"\
+	".\gui\guiapi.h"\
+	".\lib\gdi.h"\
+	".\MkApi\ulimkapi.h"\
+	
 # End Source File
 # Begin Source File
 
@@ -207,11 +272,36 @@ SOURCE=.\gui\guiapi.h
 # End Source File
 # Begin Source File
 
+SOURCE=.\gui\guilib.c
+# End Source File
+# Begin Source File
+
 SOURCE=.\gui\guiobj.c
+DEP_CPP_GUIOB=\
+	".\driver\basesrv.h"\
+	".\gui\gui.h"\
+	".\gui\guiapi.h"\
+	".\lib\gdi.h"\
+	".\MkApi\ulimkapi.h"\
+	
+# End Source File
+# Begin Source File
+
+SOURCE=.\gui\guirect.c
+DEP_CPP_GUIRE=\
+	".\driver\basesrv.h"\
+	".\gui\gui.h"\
+	".\gui\guiapi.h"\
+	".\MkApi\ulimkapi.h"\
+	
 # End Source File
 # Begin Source File
 
 SOURCE=.\gui\Makefile
+# End Source File
+# Begin Source File
+
+SOURCE=.\gui\mouse.c
 # End Source File
 # End Group
 # Begin Group "MicroKernel"
@@ -275,14 +365,50 @@ SOURCE=.\MicroKernel\x86cpu.h
 # Begin Source File
 
 SOURCE=.\MicroKernel\cintr.c
+DEP_CPP_CINTR=\
+	".\MicroKernel\bootdata.h"\
+	".\MicroKernel\cintr.h"\
+	".\MicroKernel\exec.h"\
+	".\MicroKernel\ipc.h"\
+	".\MicroKernel\kalloc.h"\
+	".\MicroKernel\knldef.h"\
+	".\MicroKernel\page.h"\
+	".\MicroKernel\task.h"\
+	".\MicroKernel\ulidef.h"\
+	".\MicroKernel\x86cpu.h"\
+	
 # End Source File
 # Begin Source File
 
 SOURCE=.\MicroKernel\exec.c
+DEP_CPP_EXEC_=\
+	".\MicroKernel\bootdata.h"\
+	".\MicroKernel\cintr.h"\
+	".\MicroKernel\exec.h"\
+	".\MicroKernel\ipc.h"\
+	".\MicroKernel\kalloc.h"\
+	".\MicroKernel\knldef.h"\
+	".\MicroKernel\page.h"\
+	".\MicroKernel\task.h"\
+	".\MicroKernel\ulidef.h"\
+	".\MicroKernel\x86cpu.h"\
+	
 # End Source File
 # Begin Source File
 
 SOURCE=.\MicroKernel\global.c
+DEP_CPP_GLOBA=\
+	".\MicroKernel\bootdata.h"\
+	".\MicroKernel\cintr.h"\
+	".\MicroKernel\exec.h"\
+	".\MicroKernel\ipc.h"\
+	".\MicroKernel\kalloc.h"\
+	".\MicroKernel\knldef.h"\
+	".\MicroKernel\page.h"\
+	".\MicroKernel\task.h"\
+	".\MicroKernel\ulidef.h"\
+	".\MicroKernel\x86cpu.h"\
+	
 # End Source File
 # Begin Source File
 
@@ -295,22 +421,83 @@ SOURCE=.\MicroKernel\intr.asm
 # Begin Source File
 
 SOURCE=.\MicroKernel\ipc.c
+DEP_CPP_IPC_C=\
+	".\MicroKernel\bootdata.h"\
+	".\MicroKernel\cintr.h"\
+	".\MicroKernel\exec.h"\
+	".\MicroKernel\ipc.h"\
+	".\MicroKernel\kalloc.h"\
+	".\MicroKernel\knldef.h"\
+	".\MicroKernel\page.h"\
+	".\MicroKernel\task.h"\
+	".\MicroKernel\ulidef.h"\
+	".\MicroKernel\x86cpu.h"\
+	
 # End Source File
 # Begin Source File
 
 SOURCE=.\MicroKernel\kalloc.c
+DEP_CPP_KALLO=\
+	".\MicroKernel\bootdata.h"\
+	".\MicroKernel\cintr.h"\
+	".\MicroKernel\exec.h"\
+	".\MicroKernel\ipc.h"\
+	".\MicroKernel\kalloc.h"\
+	".\MicroKernel\knldef.h"\
+	".\MicroKernel\page.h"\
+	".\MicroKernel\task.h"\
+	".\MicroKernel\ulidef.h"\
+	".\MicroKernel\x86cpu.h"\
+	
 # End Source File
 # Begin Source File
 
 SOURCE=.\MicroKernel\page.c
+DEP_CPP_PAGE_=\
+	".\MicroKernel\bootdata.h"\
+	".\MicroKernel\cintr.h"\
+	".\MicroKernel\exec.h"\
+	".\MicroKernel\ipc.h"\
+	".\MicroKernel\kalloc.h"\
+	".\MicroKernel\knldef.h"\
+	".\MicroKernel\page.h"\
+	".\MicroKernel\task.h"\
+	".\MicroKernel\ulidef.h"\
+	".\MicroKernel\x86cpu.h"\
+	
 # End Source File
 # Begin Source File
 
 SOURCE=.\MicroKernel\task.c
+DEP_CPP_TASK_=\
+	".\MicroKernel\bootdata.h"\
+	".\MicroKernel\cintr.h"\
+	".\MicroKernel\exec.h"\
+	".\MicroKernel\ipc.h"\
+	".\MicroKernel\kalloc.h"\
+	".\MicroKernel\knldef.h"\
+	".\MicroKernel\page.h"\
+	".\MicroKernel\task.h"\
+	".\MicroKernel\ulidef.h"\
+	".\MicroKernel\x86cpu.h"\
+	
 # End Source File
 # Begin Source File
 
 SOURCE=.\MicroKernel\ulios.c
+DEP_CPP_ULIOS=\
+	".\MicroKernel\bootdata.h"\
+	".\MicroKernel\cintr.h"\
+	".\MicroKernel\exec.h"\
+	".\MicroKernel\ipc.h"\
+	".\MicroKernel\kalloc.h"\
+	".\MicroKernel\knldef.h"\
+	".\MicroKernel\page.h"\
+	".\MicroKernel\task.h"\
+	".\MicroKernel\ulidef.h"\
+	".\MicroKernel\ulios.h"\
+	".\MicroKernel\x86cpu.h"\
+	
 # End Source File
 # End Group
 # Begin Source File
@@ -340,6 +527,9 @@ SOURCE=.\MkApi\app_elf32.ld
 # Begin Source File
 
 SOURCE=.\MkApi\apphead.c
+DEP_CPP_APPHE=\
+	".\MkApi\ulimkapi.h"\
+	
 # End Source File
 # Begin Source File
 
@@ -364,26 +554,58 @@ SOURCE=.\tools\ulifsfmt.c
 # Begin Source File
 
 SOURCE=.\apps\3demo.c
+DEP_CPP_3DEMO=\
+	".\driver\basesrv.h"\
+	".\lib\gdi.h"\
+	".\lib\math.h"\
+	".\MkApi\ulimkapi.h"\
+	
 # End Source File
 # Begin Source File
 
 SOURCE=.\apps\3dline.c
+DEP_CPP_3DLIN=\
+	".\driver\basesrv.h"\
+	".\lib\gdi.h"\
+	".\MkApi\ulimkapi.h"\
+	
 # End Source File
 # Begin Source File
 
 SOURCE=.\apps\clock.c
+DEP_CPP_CLOCK=\
+	".\driver\basesrv.h"\
+	".\lib\gdi.h"\
+	".\lib\math.h"\
+	".\MkApi\ulimkapi.h"\
+	
 # End Source File
 # Begin Source File
 
 SOURCE=.\apps\cmd.c
+DEP_CPP_CMD_C=\
+	".\driver\basesrv.h"\
+	".\fs\fsapi.h"\
+	".\MkApi\ulimkapi.h"\
+	
 # End Source File
 # Begin Source File
 
 SOURCE=.\apps\jpg.c
+DEP_CPP_JPG_C=\
+	".\driver\basesrv.h"\
+	".\fs\fsapi.h"\
+	".\lib\gdi.h"\
+	".\MkApi\ulimkapi.h"\
+	
 # End Source File
 # Begin Source File
 
 SOURCE=.\apps\loader.c
+DEP_CPP_LOADE=\
+	".\fs\fsapi.h"\
+	".\MkApi\ulimkapi.h"\
+	
 # End Source File
 # Begin Source File
 
@@ -391,11 +613,37 @@ SOURCE=.\apps\Makefile
 # End Source File
 # Begin Source File
 
-SOURCE=.\apps\math.h
+SOURCE=.\apps\workout.c
+DEP_CPP_WORKO=\
+	".\driver\basesrv.h"\
+	".\lib\math.h"\
+	".\MkApi\ulimkapi.h"\
+	
+# End Source File
+# End Group
+# Begin Group "lib"
+
+# PROP Default_Filter ""
+# Begin Source File
+
+SOURCE=.\lib\gdi.c
+DEP_CPP_GDI_C=\
+	".\driver\basesrv.h"\
+	".\lib\gdi.h"\
+	".\MkApi\ulimkapi.h"\
+	
 # End Source File
 # Begin Source File
 
-SOURCE=.\apps\workout.c
+SOURCE=.\lib\gdi.h
+# End Source File
+# Begin Source File
+
+SOURCE=.\lib\Makefile
+# End Source File
+# Begin Source File
+
+SOURCE=.\lib\math.h
 # End Source File
 # End Group
 # End Target

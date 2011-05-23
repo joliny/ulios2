@@ -179,10 +179,8 @@ static inline long KMSetRecv(THREAD_ID ptid)
 #define VESA_API_GETFONT	1	/*取得字体映射功能号*/
 #define VESA_API_GETMODE	2	/*取得模式列表功能号*/
 
-#define VESA_ERR_LOCATION	-1280	/*坐标错误*/
-#define VESA_ERR_SIZE		-1281	/*尺寸错误*/
-#define VESA_ERR_ARGS		-1282	/*参数错误*/
-#define VESA_ERR_TEXTMODE	-1283	/*文本模式*/
+#define VESA_ERR_ARGS		-1280	/*参数错误*/
+#define VESA_ERR_TEXTMODE	-1281	/*文本模式*/
 
 /*取得显存映射*/
 static inline long VSGetVmem(THREAD_ID ptid, void **vm, DWORD *width, DWORD *height, DWORD *PixBits)
@@ -230,52 +228,6 @@ static inline long VSGetMode(THREAD_ID ptid, WORD mode[VESA_MAX_MODE], DWORD *Mo
 	*CurMode = data[5];
 	return NO_ERROR;
 }
-
-extern DWORD GDIwidth;
-extern DWORD GDIheight;
-extern DWORD GDIPixBits;
-extern DWORD GDICharWidth;
-extern DWORD GDICharHeight;
-extern THREAD_ID GDIVesaPtid;
-
-/*初始化GDI库*/
-long GDIinit();
-
-/*撤销GDI库*/
-void GDIrelease();
-
-/*画点*/
-long GDIPutPixel(DWORD x, DWORD y, DWORD c);
-
-/*取点*/
-long GDIGetPixel(DWORD x, DWORD y, DWORD *c);
-
-/*贴图*/
-long GDIPutImage(long x, long y, DWORD *img, long w, long h);
-
-/*截图*/
-long GDIGetImage(long x, long y, DWORD *img, long w, long h);
-
-/*填充矩形*/
-long GDIFillRect(long x, long y, long w, long h, DWORD c);
-
-/*向上滚屏*/
-long GDIMoveUp(DWORD pix);
-
-/*Bresenham改进算法画线*/
-long GDIDrawLine(long x1, long y1, long x2, long y2, DWORD c);
-
-/*Bresenham算法画圆*/
-long GDIcircle(long cx, long cy, long r, DWORD c);
-
-/*显示汉字*/
-long GDIDrawHz(long x, long y, DWORD hz, DWORD c);
-
-/*显示ASCII字符*/
-long GDIDrawAscii(long x, long y, DWORD ch, DWORD c);
-
-/*输出字符串*/
-long GDIDrawStr(long x, long y, const char *str, DWORD c);
 
 /**********CUI字符界面服务相关**********/
 #define SRV_CUI_PORT	6	/*CUI字符界面服务端口*/

@@ -20,9 +20,9 @@ LDFLAGS		= -T $(LDFILE) -mi386go32 -Map ../objs/knlmap.txt
 DASMFLAGS	= -u -o $(ENTRYPOINT) -e $(ENTRYOFFSET)
 
 # This Program
-KERNELBIN	= ../out/ulios/uliknl.bin
 HEADS		= bootdata.h cintr.h error.h exec.h ipc.h kalloc.h knldef.h page.h task.h ulidef.h x86cpu.h
 OBJS		= ../objs/head.o ../objs/intr.o ../objs/cintr.o ../objs/exec.o ../objs/global.o ../objs/kalloc.o ../objs/task.o ../objs/ipc.o ../objs/page.o ../objs/ulios.o
+KERNELBIN	= ../out/ulios/uliknl.bin
 
 # All Phony Targets
 .PHONY : all redo run clean

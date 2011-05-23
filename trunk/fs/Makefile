@@ -20,9 +20,9 @@ LDFLAGS		= -T $(LDFILE) -mi386go32 -Map ../objs/fsmap.txt
 DASMFLAGS	= -u -o $(ENTRYPOINT) -e $(ENTRYOFFSET)
 
 # This Program
-FSBIN		= ../out/ulios/fs.bin
 HEADS		= ../MkApi/ulimkapi.h ../driver/basesrv.h fs.h fsapi.h
 OBJS		= ../objs/apphead.o ../objs/fsapi.o ../objs/fsalloc.o ../objs/cache.o ../objs/fs.o ../objs/fat32.o ../objs/ulifs.o
+FSBIN		= ../out/ulios/fs.bin
 
 # All Phony Targets
 .PHONY : all redo clean

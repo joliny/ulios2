@@ -1,13 +1,13 @@
-/*	gdi.c for ulios driver
+/*	gdi.c for ulios
 	作者：孙亮
-	功能：图形设备接口库
+	功能：图形设备接口库实现
 	最后修改日期：2010-06-10
 */
 
-#include "basesrv.h"
+#include "gdi.h"
 
-void *vm;
-const BYTE *font;
+void *GDIvm;
+const BYTE *GDIfont;
 DWORD GDIwidth, GDIheight, GDIPixBits;
 DWORD GDICharWidth, GDICharHeight;
 THREAD_ID GDIVesaPtid;
@@ -19,9 +19,9 @@ long GDIinit()
 
 	if ((res = KGetKptThed(SRV_VESA_PORT, &GDIVesaPtid)) != NO_ERROR)
 		return res;
-	if (vm == NULL && (res = VSGetVmem(GDIVesaPtid, &vm, &GDIwidth, &GDIheight, &GDIPixBits)) != NO_ERROR)
+	if (GDIvm == NULL && (res = VSGetVmem(GDIVesaPtid, &GDIvm, &GDIwidth, &GDIheight, &GDIPixBits)) != NO_ERROR)
 		return res;
-	if (font == NULL && (res = VSGetFont(GDIVesaPtid, &font, &GDICharWidth, &GDICharHeight)) != NO_ERROR)
+	if (GDIfont == NULL && (res = VSGetFont(GDIVesaPtid, &GDIfont, &GDICharWidth, &GDICharHeight)) != NO_ERROR)
 		return res;
 	return NO_ERROR;
 }
@@ -31,15 +31,15 @@ void GDIrelease()
 {
 	DWORD data[MSG_DATA_LEN - 2];
 
-	if (vm)
+	if (GDIvm)
 	{
-		KUnmapProcAddr(vm, data);
-		vm = NULL;
+		KUnmapProcAddr(GDIvm, data);
+		GDIvm = NULL;
 	}
-	if (font)
+	if (GDIfont)
 	{
-		KUnmapProcAddr((void*)font, data);
-		font = NULL;
+		KUnmapProcAddr((void*)GDIfont, data);
+		GDIfont = NULL;
 	}
 }
 
@@ -72,20 +72,20 @@ static inline DWORD RGB162DW(DWORD c)
 long GDIPutPixel(DWORD x, DWORD y, DWORD c)
 {
 	if (x >= GDIwidth || y >= GDIheight)
-		return VESA_ERR_LOCATION;	/*位置越界*/
+		return GDI_ERR_LOCATION;	/*位置越界*/
 	switch (GDIPixBits)
 	{
 	case 15:
-		((WORD*)vm)[x + y * GDIwidth] = DW2RGB15(c);
+		((WORD*)GDIvm)[x + y * GDIwidth] = DW2RGB15(c);
 		break;
 	case 16:
-		((WORD*)vm)[x + y * GDIwidth] = DW2RGB16(c);
+		((WORD*)GDIvm)[x + y * GDIwidth] = DW2RGB16(c);
 		break;
 	case 24:
-		((RGB24*)vm)[x + y * GDIwidth] = *(RGB24*)&c;
+		((RGB24*)GDIvm)[x + y * GDIwidth] = *(RGB24*)&c;
 		break;
 	case 32:
-		((DWORD*)vm)[x + y * GDIwidth] = c;
+		((DWORD*)GDIvm)[x + y * GDIwidth] = c;
 		break;
 	}
 	return NO_ERROR;
@@ -95,20 +95,20 @@ long GDIPutPixel(DWORD x, DWORD y, DWORD c)
 long GDIGetPixel(DWORD x, DWORD y, DWORD *c)
 {
 	if (x >= GDIwidth || y >= GDIheight)
-		return VESA_ERR_LOCATION;	/*位置越界*/
+		return GDI_ERR_LOCATION;	/*位置越界*/
 	switch (GDIPixBits)
 	{
 	case 15:
-		*c = RGB152DW(((WORD*)vm)[x + y * GDIwidth]);
+		*c = RGB152DW(((WORD*)GDIvm)[x + y * GDIwidth]);
 		break;
 	case 16:
-		*c = RGB162DW(((WORD*)vm)[x + y * GDIwidth]);
+		*c = RGB162DW(((WORD*)GDIvm)[x + y * GDIwidth]);
 		break;
 	case 24:
-		*(RGB24*)c = ((RGB24*)vm)[x + y * GDIwidth];
+		*(RGB24*)c = ((RGB24*)GDIvm)[x + y * GDIwidth];
 		break;
 	case 32:
-		*c = ((DWORD*)vm)[x + y * GDIwidth];
+		*c = ((DWORD*)GDIvm)[x + y * GDIwidth];
 		break;
 	}
 	return NO_ERROR;
@@ -139,38 +139,175 @@ long GDIPutImage(long x, long y, DWORD *img, long w, long h)
 	long tx, ty, tw, th;	/*实际位置尺寸*/
 
 	if (x >= GDIwidth || y >= GDIheight)
-		return VESA_ERR_LOCATION;	/*位置越界*/
+		return GDI_ERR_LOCATION;	/*位置越界*/
 	if (w <= 0 || h <= 0)
-		return VESA_ERR_SIZE;	/*非法尺寸*/
+		return GDI_ERR_SIZE;	/*非法尺寸*/
 	tx = (x > 0 ? x : 0);	/*位置越界处理*/
 	ty = (y > 0 ? y : 0);
 	if ((tw = (x + w > GDIwidth ? GDIwidth : x + w) - tx) <= 0)	/*尺寸越界处理*/
-		return VESA_ERR_SIZE;
+		return GDI_ERR_SIZE;
 	if ((th = (y + h > GDIheight ? GDIheight : y + h) - ty) <= 0)
-		return VESA_ERR_SIZE;
+		return GDI_ERR_SIZE;
 	x = tx - x;
 	img += x;
+	y = ty - y;
 	switch (GDIPixBits)
 	{
 	case 15:
-		tmpvm = vm + tx * sizeof(WORD);
+		tmpvm = GDIvm + tx * sizeof(WORD);
 		for (h = th - 1; h >= 0; h--)
-			Dw2Rgb15((WORD*)tmpvm + (ty + h) * GDIwidth, img + (ty + h - y) * w, tw);
+			Dw2Rgb15((WORD*)tmpvm + (h + ty) * GDIwidth, img + (h + y) * w, tw);
 		break;
 	case 16:
-		tmpvm = vm + tx * sizeof(WORD);
+		tmpvm = GDIvm + tx * sizeof(WORD);
 		for (h = th - 1; h >= 0; h--)
-			Dw2Rgb16((WORD*)tmpvm + (ty + h) * GDIwidth, img + (ty + h - y) * w, tw);
+			Dw2Rgb16((WORD*)tmpvm + (h + ty) * GDIwidth, img + (h + y) * w, tw);
 		break;
 	case 24:
-		tmpvm = vm + tx * sizeof(RGB24);
+		tmpvm = GDIvm + tx * sizeof(RGB24);
 		for (h = th - 1; h >= 0; h--)
-			Dw2Rgb24((RGB24*)tmpvm + (ty + h) * GDIwidth, img + (ty + h - y) * w, tw);
+			Dw2Rgb24((RGB24*)tmpvm + (h + ty) * GDIwidth, img + (h + y) * w, tw);
 		break;
 	case 32:
-		tmpvm = vm + tx * sizeof(DWORD);
+		tmpvm = GDIvm + tx * sizeof(DWORD);
 		for (h = th - 1; h >= 0; h--)
-			memcpy32((DWORD*)tmpvm + (ty + h) * GDIwidth, img + (ty + h - y) * w, tw);
+			memcpy32((DWORD*)tmpvm + (h + ty) * GDIwidth, img + (h + y) * w, tw);
+		break;
+	}
+	return NO_ERROR;
+}
+
+static inline void BCDw2Rgb15(WORD *dest, const DWORD *src, DWORD n, DWORD bc)
+{
+	while (n--)
+	{
+		if (*src != bc)
+			*dest = DW2RGB15(*src);
+		src++;
+		dest++;
+	}
+}
+
+static inline void BCDw2Rgb16(WORD *dest, const DWORD *src, DWORD n, DWORD bc)
+{
+	while (n--)
+	{
+		if (*src != bc)
+			*dest = DW2RGB16(*src);
+		src++;
+		dest++;
+	}
+}
+
+static inline void BCDw2Rgb24(RGB24 *dest, const DWORD *src, DWORD n, DWORD bc)
+{
+	while (n--)
+	{
+		if (*src != bc)
+			*dest = *(RGB24*)src;
+		src++;
+		dest++;
+	}
+}
+
+static inline void BCDw2Rgb32(DWORD *dest, const DWORD *src, DWORD n, DWORD bc)
+{
+	while (n--)
+	{
+		if (*src != bc)
+			*dest = *src;
+		src++;
+		dest++;
+	}
+}
+
+/*去背景色贴图*/
+long GDIPutBCImage(long x, long y, DWORD *img, long w, long h, DWORD bc)
+{
+	void *tmpvm;
+	long tx, ty, tw, th;	/*实际位置尺寸*/
+
+	if (x >= GDIwidth || y >= GDIheight)
+		return GDI_ERR_LOCATION;	/*位置越界*/
+	if (w <= 0 || h <= 0)
+		return GDI_ERR_SIZE;	/*非法尺寸*/
+	tx = (x > 0 ? x : 0);	/*位置越界处理*/
+	ty = (y > 0 ? y : 0);
+	if ((tw = (x + w > GDIwidth ? GDIwidth : x + w) - tx) <= 0)	/*尺寸越界处理*/
+		return GDI_ERR_SIZE;
+	if ((th = (y + h > GDIheight ? GDIheight : y + h) - ty) <= 0)
+		return GDI_ERR_SIZE;
+	x = tx - x;
+	img += x;
+	y = ty - y;
+	switch (GDIPixBits)
+	{
+	case 15:
+		tmpvm = GDIvm + tx * sizeof(WORD);
+		for (h = th - 1; h >= 0; h--)
+			BCDw2Rgb15((WORD*)tmpvm + (h + ty) * GDIwidth, img + (h + y) * w, tw, bc);
+		break;
+	case 16:
+		tmpvm = GDIvm + tx * sizeof(WORD);
+		for (h = th - 1; h >= 0; h--)
+			BCDw2Rgb16((WORD*)tmpvm + (h + ty) * GDIwidth, img + (h + y) * w, tw, bc);
+		break;
+	case 24:
+		tmpvm = GDIvm + tx * sizeof(RGB24);
+		for (h = th - 1; h >= 0; h--)
+			BCDw2Rgb24((RGB24*)tmpvm + (h + ty) * GDIwidth, img + (h + y) * w, tw, bc);
+		break;
+	case 32:
+		tmpvm = GDIvm + tx * sizeof(DWORD);
+		for (h = th - 1; h >= 0; h--)
+			BCDw2Rgb32((DWORD*)tmpvm + (h + ty) * GDIwidth, img + (h + y) * w, tw, bc);
+		break;
+	}
+	return NO_ERROR;
+}
+
+/*区域贴图*/
+long GDIBitBlt(long x, long y, DWORD *img, long w, long h, long subx, long suby, long subw, long subh)
+{
+	void *tmpvm;
+	long tx, ty, tw, th;	/*实际位置尺寸*/
+
+	if (x >= GDIwidth || y >= GDIheight)
+		return GDI_ERR_LOCATION;	/*位置越界*/
+	if (w <= 0 || h <= 0 || subw <= 0 || subh <= 0)
+		return GDI_ERR_SIZE;	/*非法尺寸*/
+	if (subx < 0 || subx + subw > w || suby < 0 || suby + subh > h)
+		return GDI_ERR_LOCATION;	/*子图位置越界*/
+	tx = (x > 0 ? x : 0);	/*位置越界处理*/
+	ty = (y > 0 ? y : 0);
+	if ((tw = (x + subw > GDIwidth ? GDIwidth : x + subw) - tx) <= 0)	/*尺寸越界处理*/
+		return GDI_ERR_SIZE;
+	if ((th = (y + subh > GDIheight ? GDIheight : y + subh) - ty) <= 0)
+		return GDI_ERR_SIZE;
+	x = tx - x;
+	img += w * suby + subx + x;
+	y = ty - y;
+	switch (GDIPixBits)
+	{
+	case 15:
+		tmpvm = GDIvm + tx * sizeof(WORD);
+		for (h = th - 1; h >= 0; h--)
+			Dw2Rgb15((WORD*)tmpvm + (h + ty) * GDIwidth, img + (h + y) * w, tw);
+		break;
+	case 16:
+		tmpvm = GDIvm + tx * sizeof(WORD);
+		for (h = th - 1; h >= 0; h--)
+			Dw2Rgb16((WORD*)tmpvm + (h + ty) * GDIwidth, img + (h + y) * w, tw);
+		break;
+	case 24:
+		tmpvm = GDIvm + tx * sizeof(RGB24);
+		for (h = th - 1; h >= 0; h--)
+			Dw2Rgb24((RGB24*)tmpvm + (h + ty) * GDIwidth, img + (h + y) * w, tw);
+		break;
+	case 32:
+		tmpvm = GDIvm + tx * sizeof(DWORD);
+		for (h = th - 1; h >= 0; h--)
+			memcpy32((DWORD*)tmpvm + (h + ty) * GDIwidth, img + (h + y) * w, tw);
 		break;
 	}
 	return NO_ERROR;
@@ -201,38 +338,39 @@ long GDIGetImage(long x, long y, DWORD *img, long w, long h)
 	long tx, ty, tw, th;	/*实际位置尺寸*/
 
 	if (x >= GDIwidth || y >= GDIheight)
-		return VESA_ERR_LOCATION;	/*位置越界*/
+		return GDI_ERR_LOCATION;	/*位置越界*/
 	if (w <= 0 || h <= 0)
-		return VESA_ERR_SIZE;	/*非法尺寸*/
+		return GDI_ERR_SIZE;	/*非法尺寸*/
 	tx = (x > 0 ? x : 0);	/*位置越界处理*/
 	ty = (y > 0 ? y : 0);
 	if ((tw = (x + w > GDIwidth ? GDIwidth : x + w) - tx) <= 0)	/*尺寸越界处理*/
-		return VESA_ERR_SIZE;
+		return GDI_ERR_SIZE;
 	if ((th = (y + h > GDIheight ? GDIheight : y + h) - ty) <= 0)
-		return VESA_ERR_SIZE;
+		return GDI_ERR_SIZE;
 	x = tx - x;
 	img += x;
+	y = ty - y;
 	switch (GDIPixBits)
 	{
 	case 15:
-		tmpvm = vm + tx * sizeof(WORD);
+		tmpvm = GDIvm + tx * sizeof(WORD);
 		for (h = th - 1; h >= 0; h--)
-			Rgb152Dw(img + (ty + h - y) * w, (WORD*)tmpvm + (ty + h) * GDIwidth, tw);
+			Rgb152Dw(img + (h + y) * w, (WORD*)tmpvm + (h + ty) * GDIwidth, tw);
 		break;
 	case 16:
-		tmpvm = vm + tx * sizeof(WORD);
+		tmpvm = GDIvm + tx * sizeof(WORD);
 		for (h = th - 1; h >= 0; h--)
-			Rgb162Dw(img + (ty + h - y) * w, (WORD*)tmpvm + (ty + h) * GDIwidth, tw);
+			Rgb162Dw(img + (h + y) * w, (WORD*)tmpvm + (h + ty) * GDIwidth, tw);
 		break;
 	case 24:
-		tmpvm = vm + tx * sizeof(RGB24);
+		tmpvm = GDIvm + tx * sizeof(RGB24);
 		for (h = th - 1; h >= 0; h--)
-			Rgb242Dw(img + (ty + h - y) * w, (RGB24*)tmpvm + (ty + h) * GDIwidth, tw);
+			Rgb242Dw(img + (h + y) * w, (RGB24*)tmpvm + (h + ty) * GDIwidth, tw);
 		break;
 	case 32:
-		tmpvm = vm + tx * sizeof(DWORD);
+		tmpvm = GDIvm + tx * sizeof(DWORD);
 		for (h = th - 1; h >= 0; h--)
-			memcpy32(img + (ty + h - y) * w, (DWORD*)tmpvm + (ty + h) * GDIwidth, tw);
+			memcpy32(img + (h + y) * w, (DWORD*)tmpvm + (h + ty) * GDIwidth, tw);
 		break;
 	}
 	return NO_ERROR;
@@ -258,15 +396,15 @@ long GDIFillRect(long x, long y, long w, long h, DWORD c)
 	long tx, ty, tw, th;	/*实际位置尺寸*/
 
 	if (x >= GDIwidth || y >= GDIheight)
-		return VESA_ERR_LOCATION;	/*位置越界*/
+		return GDI_ERR_LOCATION;	/*位置越界*/
 	if (w <= 0 || h <= 0)
-		return VESA_ERR_SIZE;	/*非法尺寸*/
+		return GDI_ERR_SIZE;	/*非法尺寸*/
 	tx = (x > 0 ? x : 0);	/*位置越界处理*/
 	ty = (y > 0 ? y : 0);
 	if ((tw = (x + w > GDIwidth ? GDIwidth : x + w) - tx) <= 0)	/*尺寸越界处理*/
-		return VESA_ERR_SIZE;
+		return GDI_ERR_SIZE;
 	if ((th = (y + h > GDIheight ? GDIheight : y + h) - ty) <= 0)
-		return VESA_ERR_SIZE;
+		return GDI_ERR_SIZE;
 	switch (GDIPixBits)
 	{
 	case 15:
@@ -280,19 +418,19 @@ long GDIFillRect(long x, long y, long w, long h, DWORD c)
 	{
 	case 15:
 	case 16:
-		tmpvm = vm + tx * sizeof(WORD);
+		tmpvm = GDIvm + tx * sizeof(WORD);
 		for (h = th - 1; h >= 0; h--)
-			SetRgb1516((WORD*)tmpvm + (ty + h) * GDIwidth, c, tw);
+			SetRgb1516((WORD*)tmpvm + (h + ty) * GDIwidth, c, tw);
 		break;
 	case 24:
-		tmpvm = vm + tx * sizeof(RGB24);
+		tmpvm = GDIvm + tx * sizeof(RGB24);
 		for (h = th - 1; h >= 0; h--)
-			SetRgb24((RGB24*)tmpvm + (ty + h) * GDIwidth, c, tw);
+			SetRgb24((RGB24*)tmpvm + (h + ty) * GDIwidth, c, tw);
 		break;
 	case 32:
-		tmpvm = vm + tx * sizeof(DWORD);
+		tmpvm = GDIvm + tx * sizeof(DWORD);
 		for (h = th - 1; h >= 0; h--)
-			memset32((DWORD*)tmpvm + (ty + h) * GDIwidth, c, tw);
+			memset32((DWORD*)tmpvm + (h + ty) * GDIwidth, c, tw);
 		break;
 	}
 	return NO_ERROR;
@@ -302,8 +440,8 @@ long GDIFillRect(long x, long y, long w, long h, DWORD c)
 long GDIMoveUp(DWORD pix)
 {
 	if (pix >= GDIheight)
-		return VESA_ERR_LOCATION;
-	memcpy32(vm, vm + ((GDIPixBits + 7) >> 3) * GDIwidth * pix, ((GDIPixBits + 7) >> 3) * GDIwidth * (GDIheight - pix) / sizeof(DWORD));
+		return GDI_ERR_LOCATION;
+	memcpy32(GDIvm, GDIvm + ((GDIPixBits + 7) >> 3) * GDIwidth * pix, ((GDIPixBits + 7) >> 3) * GDIwidth * (GDIheight - pix) / sizeof(DWORD));
 	return NO_ERROR;
 }
 
@@ -316,13 +454,13 @@ static inline void NCPutPixel(DWORD x, DWORD y, DWORD c)
 	{
 	case 15:
 	case 16:
-		((WORD*)vm)[x + y * GDIwidth] = c;
+		((WORD*)GDIvm)[x + y * GDIwidth] = c;
 		break;
 	case 24:
-		((RGB24*)vm)[x + y * GDIwidth] = *(RGB24*)&c;
+		((RGB24*)GDIvm)[x + y * GDIwidth] = *(RGB24*)&c;
 		break;
 	case 32:
-		((DWORD*)vm)[x + y * GDIwidth] = c;
+		((DWORD*)GDIvm)[x + y * GDIwidth] = c;
 		break;
 	}
 }
@@ -478,7 +616,7 @@ long GDIcircle(long cx, long cy, long r, DWORD c)
 	long x, y, d;
 
 	if (!r)
-		return VESA_ERR_SIZE;
+		return GDI_ERR_SIZE;
 	y = r;
 	d = (3 - y) << 1;
 	for (x = 0; x <= y; x++)
@@ -510,11 +648,11 @@ long GDIDrawHz(long x, long y, DWORD hz, DWORD c)
 
 	HzWidth = GDICharWidth * 2;
 	if (x <= -HzWidth || x >= GDIwidth || y <= -(long)GDICharHeight || y >= GDIheight)
-		return VESA_ERR_LOCATION;
+		return GDI_ERR_LOCATION;
 	hz = ((hz & 0xFF) - 161) * 94 + ((hz >> 8) & 0xFF) - 161;
 	if (hz >= HZ_COUNT)
 		return NO_ERROR;
-	p = (WORD*)(font + hz * GDICharHeight * 2);
+	p = (WORD*)(GDIfont + hz * GDICharHeight * 2);
 	switch (GDIPixBits)
 	{
 	case 15:
@@ -532,7 +670,7 @@ long GDIDrawHz(long x, long y, DWORD hz, DWORD c)
 		{
 			if ((DWORD)y >= GDIheight)
 				continue;
-			tmpvm = vm + (x + y * GDIwidth) * sizeof(WORD);
+			tmpvm = GDIvm + (x + y * GDIwidth) * sizeof(WORD);
 			for (i = HzWidth - 1; i >= 0; i--, x++, tmpvm += sizeof(WORD))
 				if ((DWORD)x < GDIwidth && ((*p >> i) & 1u))
 					*((WORD*)tmpvm) = c;
@@ -543,7 +681,7 @@ long GDIDrawHz(long x, long y, DWORD hz, DWORD c)
 		{
 			if ((DWORD)y >= GDIheight)
 				continue;
-			tmpvm = vm + (x + y * GDIwidth) * sizeof(RGB24);
+			tmpvm = GDIvm + (x + y * GDIwidth) * sizeof(RGB24);
 			for (i = HzWidth - 1; i >= 0; i--, x++, tmpvm += sizeof(RGB24))
 				if ((DWORD)x < GDIwidth && ((*p >> i) & 1u))
 					*((RGB24*)tmpvm) = *(RGB24*)&c;
@@ -554,7 +692,7 @@ long GDIDrawHz(long x, long y, DWORD hz, DWORD c)
 		{
 			if ((DWORD)y >= GDIheight)
 				continue;
-			tmpvm = vm + (x + y * GDIwidth) * sizeof(DWORD);
+			tmpvm = GDIvm + (x + y * GDIwidth) * sizeof(DWORD);
 			for (i = HzWidth - 1; i >= 0; i--, x++, tmpvm += sizeof(DWORD))
 				if ((DWORD)x < GDIwidth && ((*p >> i) & 1u))
 					*((DWORD*)tmpvm) = c;
@@ -572,8 +710,8 @@ long GDIDrawAscii(long x, long y, DWORD ch, DWORD c)
 	const BYTE *p;
 
 	if (x <= -(long)GDICharWidth || x >= GDIwidth || y <= -(long)GDICharHeight || y >= GDIheight)
-		return VESA_ERR_LOCATION;
-	p = font + HZ_COUNT * GDICharHeight * 2 + (ch & 0xFF) * GDICharHeight;
+		return GDI_ERR_LOCATION;
+	p = GDIfont + HZ_COUNT * GDICharHeight * 2 + (ch & 0xFF) * GDICharHeight;
 	switch (GDIPixBits)
 	{
 	case 15:
@@ -591,7 +729,7 @@ long GDIDrawAscii(long x, long y, DWORD ch, DWORD c)
 		{
 			if ((DWORD)y >= GDIheight)
 				continue;
-			tmpvm = vm + (x + y * GDIwidth) * sizeof(WORD);
+			tmpvm = GDIvm + (x + y * GDIwidth) * sizeof(WORD);
 			for (i = GDICharWidth - 1; i >= 0; i--, x++, tmpvm += sizeof(WORD))
 				if ((DWORD)x < GDIwidth && ((*p >> i) & 1u))
 					*((WORD*)tmpvm) = c;
@@ -602,7 +740,7 @@ long GDIDrawAscii(long x, long y, DWORD ch, DWORD c)
 		{
 			if ((DWORD)y >= GDIheight)
 				continue;
-			tmpvm = vm + (x + y * GDIwidth) * sizeof(RGB24);
+			tmpvm = GDIvm + (x + y * GDIwidth) * sizeof(RGB24);
 			for (i = GDICharWidth - 1; i >= 0; i--, x++, tmpvm += sizeof(RGB24))
 				if ((DWORD)x < GDIwidth && ((*p >> i) & 1u))
 					*((RGB24*)tmpvm) = *(RGB24*)&c;
@@ -613,7 +751,7 @@ long GDIDrawAscii(long x, long y, DWORD ch, DWORD c)
 		{
 			if ((DWORD)y >= GDIheight)
 				continue;
-			tmpvm = vm + (x + y * GDIwidth) * sizeof(DWORD);
+			tmpvm = GDIvm + (x + y * GDIwidth) * sizeof(DWORD);
 			for (i = GDICharWidth - 1; i >= 0; i--, x++, tmpvm += sizeof(DWORD))
 				if ((DWORD)x < GDIwidth && ((*p >> i) & 1u))
 					*((DWORD*)tmpvm) = c;
@@ -655,3 +793,4 @@ long GDIDrawStr(long x, long y, const char *str, DWORD c)
 	}
 	return NO_ERROR;
 }
+

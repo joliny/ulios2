@@ -6,7 +6,7 @@
 */
 
 #include "../driver/basesrv.h"
-#include "math.h"
+#include "../lib/math.h"
 
 #define WOERR_NOERR		0	// 运算正确
 #define WOERR_ARGUMENT	1	// 参数错误

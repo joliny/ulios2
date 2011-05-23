@@ -5,7 +5,8 @@
 */
 
 #include "../driver/basesrv.h"
-#include "math.h"
+#include "../lib/gdi.h"
+#include "../lib/math.h"
 
 #define PI			3.1415927f
 #define CLOCK_R		31							/*±Ì≈Ã∞Îæ∂*/
