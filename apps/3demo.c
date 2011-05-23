@@ -5,7 +5,8 @@
 */
 
 #include "../driver/basesrv.h"
-#include "math.h"
+#include "../lib/gdi.h"
+#include "../lib/math.h"
 
 #define PN 2400
 #define TN 11

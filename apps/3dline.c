@@ -5,6 +5,7 @@
 */
 
 #include "../driver/basesrv.h"
+#include "../lib/gdi.h"
 
 #define PN		50
 

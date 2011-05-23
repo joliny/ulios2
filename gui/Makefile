@@ -20,9 +20,9 @@ LDFLAGS		= -T $(LDFILE) -mi386go32 -Map ../objs/guimap.txt
 DASMFLAGS	= -u -o $(ENTRYPOINT) -e $(ENTRYOFFSET)
 
 # This Program
+HEADS		= ../MkApi/ulimkapi.h ../driver/basesrv.h ../lib/gdi.h gui.h guiapi.h
+OBJS		= ../objs/apphead.o ../objs/guiapi.o ../objs/guiobj.o ../objs/guirect.o ../objs/desktop.o ../objs/mouse.o ../objs/guilib.o
 GUIBIN		= ../out/ulios/gui.bin
-HEADS		= ../MkApi/ulimkapi.h ../driver/basesrv.h gui.h guiapi.h control.h
-OBJS		= ../objs/apphead.o ../objs/guiapi.o ../objs/guialloc.o ../objs/guiobj.o ../objs/control.o
 
 # All Phony Targets
 .PHONY : all redo clean
@@ -45,11 +45,17 @@ $(GUIBIN) : $(OBJS) $(LDFILE)
 ../objs/guiapi.o : guiapi.c $(HEADS)
 	$(CC) $(CFLAGS) -o $@ $<
 
-../objs/guialloc.o : guialloc.c $(HEADS)
-	$(CC) $(CFLAGS) -o $@ $<
-
 ../objs/guiobj.o : guiobj.c $(HEADS)
 	$(CC) $(CFLAGS) -o $@ $<
 
-../objs/control.o : control.c $(HEADS)
+../objs/guirect.o : guirect.c $(HEADS)
+	$(CC) $(CFLAGS) -o $@ $<
+
+../objs/desktop.o : desktop.c $(HEADS)
+	$(CC) $(CFLAGS) -o $@ $<
+
+../objs/mouse.o : mouse.c $(HEADS)
+	$(CC) $(CFLAGS) -o $@ $<
+
+../objs/guilib.o : guilib.c $(HEADS)
 	$(CC) $(CFLAGS) -o $@ $<

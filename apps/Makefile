@@ -21,15 +21,16 @@ DASMFLAGS	= -u -o $(ENTRYPOINT) -e $(ENTRYOFFSET)
 
 # This Program
 HEADS		= ../MkApi/ulimkapi.h ../driver/basesrv.h
-OBJS		= ../objs/gdi.o ../objs/loader.o ../objs/cmd.o ../objs/3demo.o ../objs/3dline.o ../objs/workout.o ../objs/jpg.o ../objs/clock.o
 HEADOBJ		= ../objs/apphead.o
+OBJS		= ../objs/loader.o ../objs/cmd.o ../objs/3demo.o ../objs/3dline.o ../objs/workout.o ../objs/jpg.o ../objs/clock.o
+BINS		= ../out/ulios/loader.bin ../out/ulios/cmd.bin ../out/ulios/3demo.bin ../out/ulios/3dline.bin ../out/ulios/workout.bin ../out/ulios/jpg.bin ../out/ulios/clock.bin
 
 # All Phony Targets
 .PHONY : all redo clean
 
 # Default starting position
 
-all : ../out/ulios/loader.bin ../out/ulios/cmd.bin ../out/ulios/3demo.bin ../out/ulios/3dline.bin ../out/ulios/workout.bin ../out/ulios/jpg.bin ../out/ulios/clock.bin
+all : $(BINS)
 
 redo : clean all
 
@@ -42,10 +43,10 @@ clean :
 ../out/ulios/cmd.bin : ../objs/cmd.o $(HEADOBJ) $(LDFILE)
 	$(LD) $(LDFLAGS) -o $@ $(HEADOBJ) ../objs/cmd.o
 
-../out/ulios/3demo.bin : ../objs/3demo.o ../objs/gdi.o $(HEADOBJ) $(LDFILE)
+../out/ulios/3demo.bin : ../objs/3demo.o $(HEADOBJ) $(LDFILE)
 	$(LD) $(LDFLAGS) -o $@ $(HEADOBJ) ../objs/3demo.o ../objs/gdi.o
 
-../out/ulios/3dline.bin : ../objs/3dline.o ../objs/gdi.o $(HEADOBJ) $(LDFILE)
+../out/ulios/3dline.bin : ../objs/3dline.o $(HEADOBJ) $(LDFILE)
 	$(LD) $(LDFLAGS) -o $@ $(HEADOBJ) ../objs/3dline.o ../objs/gdi.o
 
 ../out/ulios/workout.bin : ../objs/workout.o $(HEADOBJ) $(LDFILE)
@@ -60,26 +61,23 @@ clean :
 ../objs/apphead.o : ../MkApi/apphead.c
 	$(CC) $(CFLAGS) -o $@ $<
 
-../objs/gdi.o : ../driver/gdi.c $(HEADS)
-	$(CC) $(CFLAGS) -o $@ $<
-
 ../objs/loader.o : loader.c $(HEADS) ../fs/fsapi.h
 	$(CC) $(CFLAGS) -o $@ $<
 
 ../objs/cmd.o : cmd.c $(HEADS) ../fs/fsapi.h
 	$(CC) $(CFLAGS) -o $@ $<
 
-../objs/3demo.o : 3demo.c $(HEADS) math.h
+../objs/3demo.o : 3demo.c $(HEADS) ../lib/gdi.h ../lib/math.h
 	$(CC) $(CFLAGS) -o $@ $<
 
-../objs/3dline.o : 3dline.c $(HEADS)
+../objs/3dline.o : 3dline.c $(HEADS) ../lib/gdi.h
 	$(CC) $(CFLAGS) -o $@ $<
 
-../objs/workout.o : workout.c $(HEADS) math.h
+../objs/workout.o : workout.c $(HEADS) ../lib/math.h
 	$(CC) $(CFLAGS) -o $@ $<
 
-../objs/jpg.o : jpg.c $(HEADS)
+../objs/jpg.o : jpg.c $(HEADS) ../lib/gdi.h
 	$(CC) $(CFLAGS) -o $@ $<
 
-../objs/clock.o : clock.c $(HEADS)
+../objs/clock.o : clock.c $(HEADS) ../lib/gdi.h
 	$(CC) $(CFLAGS) -o $@ $<

@@ -5,12 +5,12 @@
 */
 
 #include "basesrv.h"
+#include "../lib/gdi.h"
 
 #define MAX_LINE	200	/*每行最多字符数量*/
 #define CURS_WIDTH	2	/*光标高度*/
 
 BOOL isTextMode;	/*是否文本模式*/
-extern void *vm;	/*文本显存*/
 DWORD width, height;	/*显示字符数量*/
 DWORD CursX, CursY;		/*光标位置*/
 DWORD BgColor, CharColor;	/*当前背景,前景色*/
@@ -35,7 +35,7 @@ void ClearScr()
 	CursY = CursX = 0;
 	if (isTextMode)
 	{
-		memset32(vm, (TEXT_MODE_COLOR << 8) | (TEXT_MODE_COLOR << 24), width * height / 2);
+		memset32(GDIvm, (TEXT_MODE_COLOR << 8) | (TEXT_MODE_COLOR << 24), width * height / 2);
 		SetTextCurs();
 	}
 	else
@@ -84,7 +84,7 @@ void PutStr(const char *str)
 				{
 					WORD *CurVm;
 
-					CurVm = ((WORD*)vm) + BufX + BufY * width;
+					CurVm = ((WORD*)GDIvm) + BufX + BufY * width;
 					for (bufp = LineBuf; *bufp; bufp++, CurVm++)
 						*CurVm = *(BYTE*)bufp | (TEXT_MODE_COLOR << 8);
 				}
@@ -103,8 +103,8 @@ void PutStr(const char *str)
 			CursY--;
 			if (isTextMode)
 			{
-				memcpy32(vm, ((WORD*)vm) + width, width * (height - 1) / 2);
-				memset32(((WORD*)vm) + width * (height - 1), (TEXT_MODE_COLOR << 8) | (TEXT_MODE_COLOR << 24), width / 2);
+				memcpy32(GDIvm, ((WORD*)GDIvm) + width, width * (height - 1) / 2);
+				memset32(((WORD*)GDIvm) + width * (height - 1), (TEXT_MODE_COLOR << 8) | (TEXT_MODE_COLOR << 24), width / 2);
 			}
 			else
 			{
@@ -122,7 +122,7 @@ void PutStr(const char *str)
 		{
 			WORD *CurVm;
 
-			CurVm = ((WORD*)vm) + BufX + BufY * width;
+			CurVm = ((WORD*)GDIvm) + BufX + BufY * width;
 			for (bufp = LineBuf; *bufp; bufp++, CurVm++)
 				*CurVm = *(BYTE*)bufp | (TEXT_MODE_COLOR << 8);
 		}
@@ -154,7 +154,7 @@ void BackSp()
 	}
 	if (isTextMode)
 	{
-		((WORD*)vm)[CursX + CursY * width] = (TEXT_MODE_COLOR << 8);
+		((WORD*)GDIvm)[CursX + CursY * width] = (TEXT_MODE_COLOR << 8);
 		SetTextCurs();
 	}
 	else

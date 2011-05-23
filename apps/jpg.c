@@ -5,6 +5,7 @@
 */
 
 #include "../driver/basesrv.h"
+#include "../lib/gdi.h"
 #include "../fs/fsapi.h"
 
 THREAD_ID FsPtid, CuiPtid;

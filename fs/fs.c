@@ -513,14 +513,21 @@ static long CreateFild(PROCRES_DESC *pres, const char *path, DWORD attr, FILE_DE
 	return NO_ERROR;
 }
 
-/*查找空文件句柄*/
-static FILE_HANDLE *FindFh(FILE_HANDLE *fht)
+/*分配空文件句柄*/
+static FILE_HANDLE *AllocFh(FILE_HANDLE *fht, FILE_DESC *fd)
 {
 	FILE_HANDLE *fh;
 
+	lock(&filtl);
 	for (fh = fht; fh < &fht[FHT_LEN]; fh++)
 		if (fh->fd == NULL)
+		{
+			fh->fd = fd;
+			fh->seek = fh->avl = 0;	/*初始化自定值和读写指针*/
+			ulock(&filtl);
 			return fh;
+		}
+	ulock(&filtl);
 	return NULL;
 }
 
@@ -740,13 +747,16 @@ long SetPart(DWORD pid, PART_INFO *pi)
 long creat(PROCRES_DESC *pres, const char *path, DWORD *fhi)
 {
 	FILE_HANDLE *fh;
+	FILE_DESC *CurFile;
 	long res;
 
-	if ((fh = FindFh(pres->fht)) == NULL)	/*打开文件已满*/
-		return FS_ERR_HAVENO_HANDLE;
-	if ((res = CreateFild(pres, path, 0, &fh->fd)) != NO_ERROR)	/*创建文件项错误*/
+	if ((res = CreateFild(pres, path, 0, &CurFile)) != NO_ERROR)	/*创建文件项错误*/
 		return res;
-	fh->seek = fh->avl = 0;	/*初始化自定值和读写指针*/
+	if ((fh = AllocFh(pres->fht, CurFile)) == NULL)	/*打开文件已满*/
+	{
+		DecFildLn(CurFile);
+		return FS_ERR_HAVENO_HANDLE;
+	}
 	*fhi = fh - pres->fht;
 	return NO_ERROR;
 }
@@ -758,8 +768,6 @@ long open(PROCRES_DESC *pres, const char *path, BOOL isWrite, DWORD *fhi)
 	FILE_DESC *CurFile;
 	long res;
 
-	if ((fh = FindFh(pres->fht)) == NULL)	/*打开文件已满*/
-		return FS_ERR_HAVENO_HANDLE;
 	if ((res = SetFildLn(pres, path, isWrite, &CurFile)) != NO_ERROR)	/*搜索路径*/
 		return res;
 	if (CurFile->file.attr & FILE_ATTR_DIREC)	/*搜索到的是目录*/
@@ -772,8 +780,11 @@ long open(PROCRES_DESC *pres, const char *path, BOOL isWrite, DWORD *fhi)
 		DecFildLn(CurFile);
 		return FS_ERR_ATTR_RDONLY;
 	}
-	fh->fd = CurFile;
-	fh->seek = fh->avl = 0;	/*初始化自定值和读写指针*/
+	if ((fh = AllocFh(pres->fht, CurFile)) == NULL)	/*打开文件已满*/
+	{
+		DecFildLn(CurFile);
+		return FS_ERR_HAVENO_HANDLE;
+	}
 	*fhi = fh - pres->fht;
 	return NO_ERROR;
 }
@@ -791,6 +802,7 @@ long close(PROCRES_DESC *pres, DWORD fhi)
 	fh = &pres->fht[fhi];
 	if ((CurFile = fh->fd) == NULL)
 		return FS_ERR_WRONG_HANDLE;	/*空句柄*/
+	fh->fd = NULL;
 	fi.name[0] = 0;
 	fi.ModifyTime = fi.CreateTime = INVALID;
 	if (TMCurSecond(TimePtid, &fi.AccessTime) != NO_ERROR)	/*设置为当前时间*/
@@ -800,7 +812,6 @@ long close(PROCRES_DESC *pres, DWORD fhi)
 		fi.ModifyTime = fi.AccessTime;
 	res = fsuit[CurFile->part->FsID].SetFile(CurFile, &fi);
 	DecFildLn(CurFile);
-	fh->fd = NULL;
 	return res;
 }
 
@@ -926,8 +937,6 @@ long OpenDir(PROCRES_DESC *pres, const char *path, DWORD *fhi)
 	FILE_DESC *CurFile;
 	long res;
 
-	if ((fh = FindFh(pres->fht)) == NULL)	/*打开文件已满*/
-		return FS_ERR_HAVENO_HANDLE;
 	if ((res = SetFildLn(pres, path, FALSE, &CurFile)) != NO_ERROR)	/*搜索路径*/
 		return res;
 	if (!(CurFile->file.attr & FILE_ATTR_DIREC))	/*搜索到的是文件*/
@@ -935,8 +944,11 @@ long OpenDir(PROCRES_DESC *pres, const char *path, DWORD *fhi)
 		DecFildLn(CurFile);
 		return FS_ERR_PATH_NOT_DIR;
 	}
-	fh->fd = CurFile;
-	fh->seek = fh->avl = 0;	/*初始化自定值和读写指针*/
+	if ((fh = AllocFh(pres->fht, CurFile)) == NULL)	/*打开文件已满*/
+	{
+		DecFildLn(CurFile);
+		return FS_ERR_HAVENO_HANDLE;
+	}
 	*fhi = fh - pres->fht;
 	return NO_ERROR;
 }

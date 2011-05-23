@@ -11,56 +11,6 @@
 #include "../driver/basesrv.h"
 #include "guiapi.h"
 
-/**********动态内存管理相关**********/
-
-typedef struct _FREE_BLK_DESC
-{
-	void *addr;						/*起始地址*/
-	DWORD siz;						/*字节数*/
-	struct _FREE_BLK_DESC *nxt;		/*后一项*/
-}FREE_BLK_DESC;	/*自由块描述符*/
-
-#define FDAT_SIZ		0x00300000	/*动态内存大小*/
-#define FMT_LEN			0x100		/*动态内存管理表长度*/
-extern FREE_BLK_DESC fmt[];			/*动态内存管理表*/
-#define VPAGE_SIZE		0x00001000	/*可视内存页大小*/
-#define VDAT_SIZ		0x03C00000	/*可视内存大小*/
-#define VMT_LEN			0x100		/*可视内存管理表长度*/
-extern FREE_BLK_DESC vmt[];			/*可视内存管理表*/
-
-/*初始化自由块管理表*/
-void InitFbt(FREE_BLK_DESC *fbt, DWORD FbtLen, void *addr, DWORD siz);
-
-/*自由块分配*/
-void *alloc(FREE_BLK_DESC *fbt, DWORD siz);
-
-/*自由块回收*/
-void free(FREE_BLK_DESC *fbt, void *addr, DWORD siz);
-
-/*动态内存分配*/
-static inline void *falloc(DWORD siz)
-{
-	return alloc(fmt, siz);
-}
-
-/*动态内存回收*/
-static inline void ffree(void *addr, DWORD siz)
-{
-	free(fmt, addr, siz);
-}
-
-/*可视内存分配*/
-static inline void *valloc(DWORD siz)
-{
-	return alloc(vmt, ((siz + (VPAGE_SIZE - 1)) & VPAGE_SIZE));
-}
-
-/*可视内存回收*/
-static inline void vfree(void *addr, DWORD siz)
-{
-	free(vmt, addr, ((siz + (VPAGE_SIZE - 1)) & VPAGE_SIZE));
-}
-
 /**********图形用户界面结构定义**********/
 
 typedef struct _RECT
@@ -68,7 +18,7 @@ typedef struct _RECT
 	long xpos, ypos, xend, yend;
 }RECT;	/*矩形结构*/
 
-#define CLIPRECTT_LEN	0x1000		/*剪切矩形管理表长度*/
+#define CLIPRECTT_LEN	0x2000		/*剪切矩形管理表长度*/
 
 typedef struct _CLIPRECT
 {
@@ -76,31 +26,84 @@ typedef struct _CLIPRECT
 	struct _CLIPRECT *nxt;			/*后续指针*/
 }CLIPRECT;	/*可视剪切矩形节点,用于窗体的重叠控制*/
 
-#define GOBJT_LEN		0x1000		/*窗体描述符表长度*/
+#define GOBJT_LEN		0x4000		/*窗体描述符管理表长度*/
 
 typedef struct _GOBJ_DESC
 {
-	WORD id, type;					/*对象ID/类型*/
 	THREAD_ID ptid;					/*所属线程ID*/
+	DWORD attr;						/*属性*/
 	RECT rect;						/*相对父窗体的位置*/
 	struct _GOBJ_DESC *pre, *nxt;	/*兄/弟对象链指针*/
 	struct _GOBJ_DESC *par, *chl;	/*父/子对象链指针*/
 	CLIPRECT *ClipList;				/*自身剪切矩形列表*/
 	DWORD *vbuf;					/*可视内存缓冲*/
-	DWORD attr;						/*属性*/
 }GOBJ_DESC;	/*GUI对象(窗体)描述符*/
 
-typedef struct _GCTRLI
-{
-	DWORD ObjSize;		/*控件结构大小*/
-	long (*InitCtrl)(GOBJ_DESC *gobj);	/*初始化控件*/
-	long (*ReleaseCtrl)(GOBJ_DESC *gobj);	/*撤销控件*/
-}GCTRLI;	/*控件接口*/
+/**********剪切矩形管理相关**********/
 
-/**********图形用户界面上层接口**********/
+/*掩盖窗体的矩形外部*/
+long CoverRectExter(GOBJ_DESC *gobj, long xpos, long ypos, long xend, long yend);
 
-long CreateDesktop(long width, long height);
+/*掩盖窗体的矩形内部*/
+long CoverRectInter(GOBJ_DESC *gobj, long xpos, long ypos, long xend, long yend);
 
-long CreateGobj(THREAD_ID ptid, WORD pid, WORD type, long xpos, long ypos, long width, long height, DWORD attr, WORD *id);
+/*显露窗体的矩形内部*/
+long DiscoverRectInter(GOBJ_DESC *gobj, long xpos, long ypos, long xend, long yend);
+
+/*被祖父和祖伯父窗体覆盖*/
+long CoverRectByPar(GOBJ_DESC *gobj);
+
+/*强行删除剪切矩形链表*/
+long DeleteClipList(GOBJ_DESC *gobj);
+
+/**********窗体管理相关**********/
+
+/*根据绝对坐标查找窗体*/
+GOBJ_DESC *FindGobj(long *GobjXpos, long *GobjYpos);
+
+/*绘制窗体*/
+long DrawGobj(GOBJ_DESC *gobj, long xpos, long ypos);
+
+/*创建主桌面*/
+long CreateDesktop(THREAD_ID ptid, DWORD attr, long width, long height, DWORD *DesktopPic);
+
+/*创建窗体*/
+long CreateGobj(THREAD_ID ptid, DWORD attr, DWORD pid, long xpos, long ypos, long width, long height, DWORD *id);
+
+/*删除窗体*/
+long DeleteGobj(GOBJ_DESC *gobj);
+
+/*设置窗体的位置大小*/
+long MoveGobj(GOBJ_DESC *gobj, long xpos, long ypos, long width, long height);
+
+/*设置窗体为活动*/
+long ActiveGobj(GOBJ_DESC *gobj);
+
+/**********功能库相关**********/
+
+long LoadBmp(char *path, DWORD *buf, DWORD len, long *width, long *height);
+
+/**********桌面线程相关**********/
+
+void DesktopThread(void *args);
+
+/**********鼠标功能相关**********/
+
+extern long MouX, MouY;
+
+/*鼠标初始化*/
+long InitMouse();
+
+/*计算鼠标指针与区域是否重叠*/
+BOOL CheckMousePos(long xpos, long ypos, long xend, long yend);
+
+/*隐藏鼠标指针*/
+void HidMouse();
+
+/*显示鼠标指针*/
+void ShowMouse();
+
+/*设置鼠标位置*/
+void SetMousePos(long x, long y);
 
 #endif
