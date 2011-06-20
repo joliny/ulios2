@@ -155,7 +155,7 @@ void SetColor(char *args)
 /*退出*/
 void exitcmd(char *args)
 {
-	SendExitReq(FsPtid);
+	SendExitProcReq(FsPtid);
 	KExitProcess(NO_ERROR);
 }
 
@@ -244,7 +244,7 @@ void partlist(char *args)
 		Sprintf(buf, "/%u\t容量:%uMB\t剩余:%uMB\t格式:%s\t卷标:%s\n", pid, (DWORD)(pi.info.size / 0x100000), (DWORD)(pi.info.remain / 0x100000), pi.fstype, pi.info.label);
 		CUIPutS(CuiPtid, buf);
 		ptid = KbdPtid;
-		if (KRecvProcMsg(&ptid, (DWORD*)buf, 0) == NO_ERROR && ((DWORD*)buf)[0] == MSG_ATTR_KBD && buf[4] == 27)
+		if (KRecvProcMsg(&ptid, (DWORD*)buf, 0) == NO_ERROR && ((DWORD*)buf)[MSG_ATTR_ID] == MSG_ATTR_KBD && buf[4] == 27)
 		{
 			CUIPutS(CuiPtid, "用户取消！\n");
 			break;
@@ -274,7 +274,7 @@ void dir(char *args)
 		Sprintf(buf, "%d-%d-%d\t%d:%d:%d   \t%s\t%d\t%c%c%c%c%c%c\t%s\n", tm.yer, tm.mon, tm.day, tm.hor, tm.min, tm.sec, (fi.attr & FILE_ATTR_DIREC) ? "目录" : "文件", (DWORD)fi.size, (fi.attr & FILE_ATTR_RDONLY) ? 'R' : ' ', (fi.attr & FILE_ATTR_HIDDEN) ? 'H' : ' ', (fi.attr & FILE_ATTR_SYSTEM) ? 'S' : ' ', (fi.attr & FILE_ATTR_LABEL) ? 'L' : ' ', (fi.attr & FILE_ATTR_ARCH) ? 'A' : ' ', (fi.attr & FILE_ATTR_EXEC) ? 'X' : ' ', fi.name);
 		CUIPutS(CuiPtid, buf);
 		ptid = KbdPtid;
-		if (KRecvProcMsg(&ptid, (DWORD*)buf, 0) == NO_ERROR && ((DWORD*)buf)[0] == MSG_ATTR_KBD && buf[4] == 27)
+		if (KRecvProcMsg(&ptid, (DWORD*)buf, 0) == NO_ERROR && ((DWORD*)buf)[MSG_ATTR_ID] == MSG_ATTR_KBD && buf[4] == 27)
 		{
 			CUIPutS(CuiPtid, "用户取消！\n");
 			break;
@@ -314,7 +314,7 @@ void show(char *args)
 		buf[siz] = '\0';
 		CUIPutS(CuiPtid, buf);
 		ptid = KbdPtid;
-		if (KRecvProcMsg(&ptid, (DWORD*)buf, 0) == NO_ERROR && ((DWORD*)buf)[0] == MSG_ATTR_KBD && buf[4] == 27)
+		if (KRecvProcMsg(&ptid, (DWORD*)buf, 0) == NO_ERROR && ((DWORD*)buf)[MSG_ATTR_ID] == MSG_ATTR_KBD && buf[4] == 27)
 		{
 			CUIPutS(CuiPtid, "用户取消！\n");
 			break;
@@ -349,7 +349,7 @@ void proclist(char *args)
 		Sprintf(buf, "PID:%d\t%s\n", pid, fi.name);
 		CUIPutS(CuiPtid, buf);
 		ptid = KbdPtid;
-		if (KRecvProcMsg(&ptid, (DWORD*)buf, 0) == NO_ERROR && ((DWORD*)buf)[0] == MSG_ATTR_KBD && buf[4] == 27)
+		if (KRecvProcMsg(&ptid, (DWORD*)buf, 0) == NO_ERROR && ((DWORD*)buf)[MSG_ATTR_ID] == MSG_ATTR_KBD && buf[4] == 27)
 		{
 			CUIPutS(CuiPtid, "用户取消！\n");
 			break;
@@ -551,7 +551,7 @@ int main()
 
 		if ((res = KRecvMsg(&ptid, data, INVALID)) != NO_ERROR)
 			break;
-		if (ptid.ProcID == KbdPtid.ProcID && data[0] == MSG_ATTR_KBD)	/*键盘消息*/
+		if (data[MSG_ATTR_ID] == MSG_ATTR_KBD)	/*键盘消息*/
 			KeyProc(data[1]);
 	}
 	return NO_ERROR;

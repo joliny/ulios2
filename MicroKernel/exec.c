@@ -113,7 +113,7 @@ void ProcStart()
 			if ((msg = AllocMsg()) == NULL)	/*申请消息结构*/
 				DeleteThed();
 			msg->ptid = kpt[FS_KPORT];	/*通知文件服务器退出消息*/
-			msg->data[0] = MSG_ATTR_PROCEXIT;
+			msg->data[MSG_ATTR_ID] = MSG_ATTR_PROCEXIT;
 			if (SendMsg(msg) != NO_ERROR)
 				FreeMsg(msg);
 			DeleteThed();
@@ -127,7 +127,7 @@ void ProcStart()
 			if ((msg = AllocMsg()) == NULL)	/*申请消息结构*/
 				DeleteThed();
 			msg->ptid = kpt[FS_KPORT];	/*通知文件服务器退出消息*/
-			msg->data[0] = MSG_ATTR_PROCEXIT;
+			msg->data[MSG_ATTR_ID] = MSG_ATTR_PROCEXIT;
 			if (SendMsg(msg) != NO_ERROR)
 				FreeMsg(msg);
 			DeleteThed();
@@ -198,7 +198,7 @@ void ThedExit(DWORD ExitCode)
 	{
 		msg->ptid.ProcID = CurThed->id.ProcID;
 		msg->ptid.ThedID = CurThed->par;
-		msg->data[0] = MSG_ATTR_THEDEXIT;
+		msg->data[MSG_ATTR_ID] = MSG_ATTR_THEDEXIT;
 		msg->data[1] = ExitCode;
 		if (SendMsg(msg) != NO_ERROR)
 			FreeMsg(msg);
@@ -214,7 +214,7 @@ void ThedExit(DWORD ExitCode)
 		{
 			msg->ptid.ProcID = CurProc->par;
 			msg->ptid.ThedID = 0;
-			msg->data[0] = MSG_ATTR_PROCEXIT;
+			msg->data[MSG_ATTR_ID] = MSG_ATTR_PROCEXIT;
 			msg->data[1] = ExitCode;
 			if (SendMsg(msg) != NO_ERROR)
 				FreeMsg(msg);
@@ -222,7 +222,7 @@ void ThedExit(DWORD ExitCode)
 		if ((msg = AllocMsg()) != NULL)	/*通知文件服务器退出消息*/
 		{
 			msg->ptid = kpt[FS_KPORT];
-			msg->data[0] = MSG_ATTR_PROCEXIT;
+			msg->data[MSG_ATTR_ID] = MSG_ATTR_PROCEXIT;
 			if (SendMsg(msg) != NO_ERROR)
 				FreeMsg(msg);
 		}

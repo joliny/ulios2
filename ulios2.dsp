@@ -591,6 +591,10 @@ DEP_CPP_CMD_C=\
 # End Source File
 # Begin Source File
 
+SOURCE=.\apps\guitest.c
+# End Source File
+# Begin Source File
+
 SOURCE=.\apps\jpg.c
 DEP_CPP_JPG_C=\
 	".\driver\basesrv.h"\

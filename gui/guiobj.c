@@ -5,7 +5,6 @@
 */
 
 #include "gui.h"
-#include "../lib/gdi.h"
 
 GOBJ_DESC gobjt[GOBJT_LEN], *FstGobj;		/*窗体描述符管理表指针*/
 
@@ -13,7 +12,7 @@ GOBJ_DESC gobjt[GOBJT_LEN], *FstGobj;		/*窗体描述符管理表指针*/
 static GOBJ_DESC *AllocGobj()
 {
 	GOBJ_DESC *gobj;
-	
+
 	if (FstGobj == NULL)
 		return NULL;
 	FstGobj = (gobj = FstGobj)->nxt;
@@ -34,27 +33,35 @@ static void FreeGobjList(GOBJ_DESC *gobj)
 	GOBJ_DESC *ChlGobj;
 
 	ChlGobj = gobj->chl;
-	FreeGobj(gobj);
 	while (ChlGobj)
 	{
-		gobj = ChlGobj->nxt;
+		GOBJ_DESC *TmpGobj;
+		TmpGobj = ChlGobj->nxt;
 		FreeGobjList(ChlGobj);
-		ChlGobj = gobj;
+		ChlGobj = TmpGobj;
 	}
+	if (gobj->vbuf)
+	{
+		DWORD data[MSG_DATA_LEN];
+		data[MSG_API_ID] = GM_DESTROY;
+		data[GUIMSG_GOBJ_ID] = gobj - gobjt;
+		KUnmapProcAddr(gobj->vbuf, data);
+	}
+	FreeGobj(gobj);
 }
 
 /*取得窗体的绝对坐标*/
-static void GetGobjPos(GOBJ_DESC *gobj, long *GobjXpos, long *GobjYpos)
+static void GetGobjPos(GOBJ_DESC *gobj, long *AbsXpos, long *AbsYpos)
 {
-	for (*GobjYpos = *GobjXpos = 0; gobj; gobj = gobj->par)
+	for (*AbsYpos = *AbsXpos = 0; gobj; gobj = gobj->par)
 	{
-		*GobjXpos += gobj->rect.xpos;
-		*GobjYpos += gobj->rect.ypos;
+		*AbsXpos += gobj->rect.xpos;
+		*AbsYpos += gobj->rect.ypos;
 	}
 }
 
 /*根据绝对坐标查找窗体*/
-GOBJ_DESC *FindGobj(long *GobjXpos, long *GobjYpos)
+GOBJ_DESC *FindGobj(long *AbsXpos, long *AbsYpos)
 {
 	GOBJ_DESC *gobj, *CurGobj;
 
@@ -62,10 +69,10 @@ GOBJ_DESC *FindGobj(long *GobjXpos, long *GobjYpos)
 	CurGobj = &gobjt[0];
 	while (CurGobj)
 	{
-		if (*GobjXpos >= CurGobj->rect.xpos && *GobjXpos < CurGobj->rect.xend && *GobjYpos >= CurGobj->rect.ypos && *GobjYpos < CurGobj->rect.yend)
+		if (*AbsXpos >= CurGobj->rect.xpos && *AbsXpos < CurGobj->rect.xend && *AbsYpos >= CurGobj->rect.ypos && *AbsYpos < CurGobj->rect.yend)
 		{
-			*GobjXpos -= CurGobj->rect.xpos;
-			*GobjYpos -= CurGobj->rect.ypos;
+			*AbsXpos -= CurGobj->rect.xpos;
+			*AbsYpos -= CurGobj->rect.ypos;
 			gobj = CurGobj;
 			CurGobj = CurGobj->chl;
 		}
@@ -75,43 +82,10 @@ GOBJ_DESC *FindGobj(long *GobjXpos, long *GobjYpos)
 	return gobj;
 }
 
-/*绘制窗体*/
-long DrawGobj(GOBJ_DESC *gobj, long xpos, long ypos)
-{
-	CLIPRECT *clip;
-
-	if (gobj->vbuf)
-		for (clip = gobj->ClipList; clip; clip = clip->nxt)
-		{
-			BOOL isRefreshMouse;
-			isRefreshMouse = CheckMousePos(xpos + clip->rect.xpos, ypos + clip->rect.ypos, xpos + clip->rect.xend, ypos + clip->rect.yend);
-			if (isRefreshMouse)
-				HidMouse();
-			GDIBitBlt(xpos + clip->rect.xpos, ypos + clip->rect.ypos, gobj->vbuf, gobj->rect.xend - gobj->rect.xpos, gobj->rect.yend - gobj->rect.ypos, clip->rect.xpos, clip->rect.ypos, clip->rect.xend - clip->rect.xpos, clip->rect.yend - clip->rect.ypos);
-			if (isRefreshMouse)
-				ShowMouse();
-		}
-	else
-		for (clip = gobj->ClipList; clip; clip = clip->nxt)
-		{
-			BOOL isRefreshMouse;
-			isRefreshMouse = CheckMousePos(xpos + clip->rect.xpos, ypos + clip->rect.ypos, xpos + clip->rect.xend, ypos + clip->rect.yend);
-			if (isRefreshMouse)
-				HidMouse();
-			GDIFillRect(xpos + clip->rect.xpos, ypos + clip->rect.ypos, clip->rect.xend - clip->rect.xpos, clip->rect.yend - clip->rect.ypos, 0);
-			if (isRefreshMouse)
-				ShowMouse();
-		}
-	for (gobj = gobj->chl; gobj; gobj = gobj->nxt)
-		DrawGobj(gobj, xpos + gobj->rect.xpos, ypos + gobj->rect.ypos);
-	return NO_ERROR;
-}
-
 /*创建主桌面*/
-long CreateDesktop(THREAD_ID ptid, DWORD attr, long width, long height, DWORD *DesktopPic)
+long CreateDesktop(THREAD_ID ptid, DWORD attr, long width, long height, DWORD *vbuf)
 {
 	GOBJ_DESC *gobj;
-	long xpos, ypos;
 
 	if ((gobj = AllocGobj()) == NULL)
 		return GUI_ERR_HAVENO_MEMORY;
@@ -122,28 +96,41 @@ long CreateDesktop(THREAD_ID ptid, DWORD attr, long width, long height, DWORD *D
 	gobj->rect.ypos = 0;
 	gobj->rect.xend = width;
 	gobj->rect.yend = height;
-	gobj->vbuf = DesktopPic;
+	gobj->vbuf = vbuf;
 	DiscoverRectInter(gobj, 0, 0, width, height);	/*为桌面创建最初的剪切矩形*/
-	GetGobjPos(gobj, &xpos, &ypos);
-	DrawGobj(gobj, xpos, ypos);
 
 	return NO_ERROR;
 }
 
 /*创建窗体*/
-long CreateGobj(THREAD_ID ptid, DWORD attr, DWORD pid, long xpos, long ypos, long width, long height, DWORD *id)
+long CreateGobj(THREAD_ID ptid, DWORD pid, DWORD attr, long xpos, long ypos, long width, long height, DWORD *vbuf, DWORD len, DWORD *gid)
 {
 	GOBJ_DESC *gobj;
 	GOBJ_DESC *ParGobj;	/*父节点*/
 	long res;
 
 	if (pid >= GOBJT_LEN)	/*检查父节点ID*/
-		return GUI_ERR_WRONG_GOBJID;
+		return GUI_ERR_INVALID_GOBJID;
 	ParGobj = &gobjt[pid];
 	if (ParGobj->attr == INVALID)	/*无效窗口*/
-		return GUI_ERR_WRONG_GOBJID;
-	if (width <= 0 || height <= 0)
-		return GUI_ERR_WRONG_WNDSIZE;
+		return GUI_ERR_INVALID_GOBJID;
+	if (width <= 0 || height <= 0)	/*尺寸错误*/
+		return GUI_ERR_WRONG_GOBJSIZE;
+	if (vbuf && width * height > len)	/*显示缓冲太小*/
+		return GUI_ERR_WRONG_VBUF;
+	width += xpos;
+	height += ypos;
+	if (vbuf == NULL)	/*没有指定显示缓冲*/
+	{
+		if (ptid.ProcID == ParGobj->ptid.ProcID)	/*与父窗体所属进程相同*/
+		{
+			if (xpos < 0 || width > ParGobj->rect.xend - ParGobj->rect.xpos ||	/*无显示缓冲位置越界*/
+				ypos < 0 || height > ParGobj->rect.yend - ParGobj->rect.ypos)
+				return GUI_ERR_WRONG_GOBJLOC;
+		}
+		else
+			return GUI_ERR_HAVENO_VBUF;
+	}
 	if ((gobj = AllocGobj()) == NULL)
 		return GUI_ERR_HAVENO_MEMORY;
 
@@ -152,8 +139,9 @@ long CreateGobj(THREAD_ID ptid, DWORD attr, DWORD pid, long xpos, long ypos, lon
 	gobj->attr = attr;
 	gobj->rect.xpos = xpos;
 	gobj->rect.ypos = ypos;
-	gobj->rect.xend = xpos + width;
-	gobj->rect.yend = ypos + height;
+	gobj->rect.xend = width;
+	gobj->rect.yend = height;
+	gobj->vbuf = vbuf;
 	gobj->nxt = ParGobj->chl;
 	gobj->par = ParGobj;
 	res = CoverRectInter(ParGobj, gobj->rect.xpos, gobj->rect.ypos, gobj->rect.xend, gobj->rect.yend);	/*处理父窗体被新窗体掩盖的区域*/
@@ -165,18 +153,27 @@ long CreateGobj(THREAD_ID ptid, DWORD attr, DWORD pid, long xpos, long ypos, lon
 		DiscoverRectInter(gobj, 0, 0, gobj->rect.xend - gobj->rect.xpos, gobj->rect.yend - gobj->rect.ypos);	/*显露新窗体*/
 		CoverRectByPar(gobj);	/*覆盖窗体*/
 		GetGobjPos(gobj, &xpos, &ypos);
-		DrawGobj(gobj, xpos, ypos);
+		DrawGobj(gobj, 0, 0, width - xpos, height - ypos, xpos, ypos, NULL);
 	}
-	*id = gobj - gobjt;
+	*gid = gobj - gobjt;
 
 	return NO_ERROR;
 }
 
 /*删除窗体*/
-long DeleteGobj(GOBJ_DESC *gobj)
+long DeleteGobj(THREAD_ID ptid, DWORD gid)
 {
+	GOBJ_DESC *gobj;
 	GOBJ_DESC *ParGobj;	/*父节点*/
-	long xpos, ypos, res;
+	long TmpXpos, TmpYpos, TmpXend, TmpYend, xpos, ypos, res;
+
+	if (gid >= GOBJT_LEN)	/*检查窗体ID*/
+		return GUI_ERR_INVALID_GOBJID;
+	gobj = &gobjt[gid];
+	if (gobj->attr == INVALID)	/*无效窗口*/
+		return GUI_ERR_INVALID_GOBJID;
+	if (ptid.ProcID != gobj->ptid.ProcID)	/*不允许删除其他进程的窗体*/
+		return GUI_ERR_INVALID_GOBJID;
 
 	res = DeleteClipList(gobj);
 	ParGobj = gobj->par;
@@ -186,6 +183,10 @@ long DeleteGobj(GOBJ_DESC *gobj)
 		gobj->pre->nxt = gobj->nxt;
 	if (gobj->nxt)
 		gobj->nxt->pre = gobj->pre;
+	TmpXpos = gobj->rect.xpos;
+	TmpYpos = gobj->rect.ypos;
+	TmpXend = gobj->rect.xend;
+	TmpYend = gobj->rect.yend;
 	FreeGobjList(gobj);
 	if (res == NO_ERROR)
 	{
@@ -193,33 +194,110 @@ long DeleteGobj(GOBJ_DESC *gobj)
 		DiscoverRectInter(ParGobj, 0, 0, ParGobj->rect.xend - ParGobj->rect.xpos, ParGobj->rect.yend - ParGobj->rect.ypos);	/*显露新窗体*/
 		CoverRectByPar(ParGobj);	/*覆盖窗体*/
 		GetGobjPos(ParGobj, &xpos, &ypos);
-		DrawGobj(ParGobj, xpos, ypos);
+		DrawGobj(ParGobj, TmpXpos, TmpYpos, TmpXend, TmpYend, xpos, ypos, NULL);
 	}
 
 	return NO_ERROR;
 }
 
-/*设置窗体的位置大小*/
-long MoveGobj(GOBJ_DESC *gobj, long xpos, long ypos, long width, long height)
+/*移动窗体*/
+long MoveGobj(THREAD_ID ptid, DWORD gid, long xpos, long ypos)
 {
-	GOBJ_DESC *ParGobj;	/*父节点*/
-	long res;
+	GOBJ_DESC *gobj, *ParGobj;	/*父节点*/
+	long xend, yend, TmpXpos, TmpYpos, TmpXend, TmpYend, res;
 
-	if (width <= 0 || height <= 0)
-		return GUI_ERR_WRONG_WNDSIZE;
-
+	if (gid >= GOBJT_LEN)	/*检查窗体ID*/
+		return GUI_ERR_INVALID_GOBJID;
+	gobj = &gobjt[gid];
+	if (gobj->attr == INVALID)	/*无效窗口*/
+		return GUI_ERR_INVALID_GOBJID;
+	if (ptid.ProcID != gobj->ptid.ProcID)	/*不允许移动其他进程的窗体*/
+		return GUI_ERR_INVALID_GOBJID;
 	ParGobj = gobj->par;
+	xend = gobj->rect.xend - gobj->rect.xpos + xpos;
+	yend = gobj->rect.yend - gobj->rect.ypos + ypos;
+	if (gobj->vbuf == NULL)
+		if (xpos < 0 || xend > ParGobj->rect.xend - ParGobj->rect.xpos || ypos < 0 || yend > ParGobj->rect.yend - ParGobj->rect.ypos)	/*越界*/
+			return GUI_ERR_WRONG_GOBJLOC;
+
 	res = DeleteClipList(ParGobj);
+	TmpXpos = gobj->rect.xpos;
+	TmpYpos = gobj->rect.ypos;
+	TmpXend = gobj->rect.xend;
+	TmpYend = gobj->rect.yend;
 	gobj->rect.xpos = xpos;
 	gobj->rect.ypos = ypos;
-	gobj->rect.xend = xpos + width;
-	gobj->rect.yend = ypos + height;
+	gobj->rect.xend = xend;
+	gobj->rect.yend = yend;
 	if (res == NO_ERROR)
 	{
 		DiscoverRectInter(ParGobj, 0, 0, ParGobj->rect.xend - ParGobj->rect.xpos, ParGobj->rect.yend - ParGobj->rect.ypos);	/*显露新窗体*/
 		CoverRectByPar(ParGobj);	/*覆盖窗体*/
 		GetGobjPos(ParGobj, &xpos, &ypos);
-		DrawGobj(ParGobj, xpos, ypos);
+		DrawGobj(ParGobj, TmpXpos, TmpYpos, TmpXend, TmpYend, xpos, ypos, gobj);
+		DrawGobj(gobj, 0, 0, gobj->rect.xend - gobj->rect.xpos, gobj->rect.yend - gobj->rect.ypos, xpos + gobj->rect.xpos, ypos + gobj->rect.ypos, NULL);
+	}
+
+	return NO_ERROR;
+}
+
+/*设置窗体的大小*/
+long SizeGobj(THREAD_ID ptid, DWORD gid, long xpos, long ypos, long width, long height, DWORD *vbuf, DWORD len)
+{
+	GOBJ_DESC *gobj, *ParGobj;	/*父节点*/
+	long TmpXpos, TmpYpos, TmpXend, TmpYend, res;
+
+	if (gid >= GOBJT_LEN)	/*检查窗体ID*/
+		return GUI_ERR_INVALID_GOBJID;
+	gobj = &gobjt[gid];
+	if (gobj->attr == INVALID)	/*无效窗口*/
+		return GUI_ERR_INVALID_GOBJID;
+	if (ptid.ProcID != gobj->ptid.ProcID)	/*不允许设置其他进程的窗体*/
+		return GUI_ERR_INVALID_GOBJID;
+	if (width <= 0 || height <= 0)	/*尺寸错误*/
+		return GUI_ERR_WRONG_GOBJSIZE;
+	if (vbuf && width * height > len)	/*显示缓冲太小*/
+		return GUI_ERR_WRONG_VBUF;
+	ParGobj = gobj->par;
+	width += xpos;
+	height += ypos;
+	if (vbuf == NULL)	/*没有指定显示缓冲*/
+	{
+		if (ptid.ProcID == ParGobj->ptid.ProcID)	/*与父窗体所属进程相同*/
+		{
+			if (xpos < 0 || width > ParGobj->rect.xend - ParGobj->rect.xpos ||	/*无显示缓冲位置越界*/
+				ypos < 0 || height > ParGobj->rect.yend - ParGobj->rect.ypos)
+				return GUI_ERR_WRONG_GOBJLOC;
+		}
+		else
+			return GUI_ERR_HAVENO_VBUF;
+	}
+
+	ParGobj = gobj->par;
+	if (gobj->vbuf)
+	{
+		DWORD data[MSG_DATA_LEN];
+		data[MSG_API_ID] = GM_UNMAPVBUF;
+		data[GUIMSG_GOBJ_ID] = gobj - gobjt;
+		KUnmapProcAddr(gobj->vbuf, data);
+	}
+	res = DeleteClipList(ParGobj);
+	TmpXpos = gobj->rect.xpos;
+	TmpYpos = gobj->rect.ypos;
+	TmpXend = gobj->rect.xend;
+	TmpYend = gobj->rect.yend;
+	gobj->rect.xpos = xpos;
+	gobj->rect.ypos = ypos;
+	gobj->rect.xend = width;
+	gobj->rect.yend = height;
+	gobj->vbuf = vbuf;
+	if (res == NO_ERROR)
+	{
+		DiscoverRectInter(ParGobj, 0, 0, ParGobj->rect.xend - ParGobj->rect.xpos, ParGobj->rect.yend - ParGobj->rect.ypos);	/*显露新窗体*/
+		CoverRectByPar(ParGobj);	/*覆盖窗体*/
+		GetGobjPos(ParGobj, &xpos, &ypos);
+		DrawGobj(ParGobj, TmpXpos, TmpYpos, TmpXend, TmpYend, xpos, ypos, gobj);
+		DrawGobj(gobj, 0, 0, gobj->rect.xend - gobj->rect.xpos, gobj->rect.yend - gobj->rect.ypos, xpos + gobj->rect.xpos, ypos + gobj->rect.ypos, NULL);
 	}
 
 	return NO_ERROR;
@@ -249,7 +327,19 @@ long ActiveGobj(GOBJ_DESC *gobj)
 	DiscoverRectInter(gobj, 0, 0, gobj->rect.xend - gobj->rect.xpos, gobj->rect.yend - gobj->rect.ypos);	/*显露新窗体*/
 	CoverRectByPar(gobj);	/*覆盖窗体*/
 	GetGobjPos(gobj, &xpos, &ypos);
-	DrawGobj(gobj, xpos, ypos);
+	DrawGobj(gobj, 0, 0, gobj->rect.xend - gobj->rect.xpos, gobj->rect.yend - gobj->rect.ypos, xpos, ypos, NULL);
+
+	return NO_ERROR;
+}
+
+/*设置窗体显示缓冲*/
+long SetGobjVbuf(GOBJ_DESC *gobj, DWORD *vbuf)
+{
+	long xpos, ypos;
+
+	gobj->vbuf = vbuf;
+	GetGobjPos(gobj, &xpos, &ypos);
+	DrawGobj(gobj, 0, 0, gobj->rect.xend - gobj->rect.xpos, gobj->rect.yend - gobj->rect.ypos, xpos, ypos, NULL);
 
 	return NO_ERROR;
 }

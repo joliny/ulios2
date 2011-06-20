@@ -10,7 +10,6 @@ extern int main(int argc, char *argv[]);
 
 void start(char *args)
 {
-	long res;
 	int argc;
 	char *argv[0x100];
 
@@ -36,6 +35,5 @@ void start(char *args)
 			break;
 		*args++ = '\0';
 	}
-	res = main(argc, argv);
-	KExitProcess(res);
+	KExitProcess(main(argc, argv));
 }

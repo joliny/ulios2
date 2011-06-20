@@ -74,7 +74,7 @@ extern BYTE KnlValue[];		/*内核零散变量区4KB*/
 /*地址映射管理*/
 #define FstMap		(*((MAPBLK_DESC**)	(KnlValue + 0x0024)))	/*地址映射管理表指针*/
 /*零散变量*/
-#define clock		(*((DWORD*)			(KnlValue + 0x0028)))	/*时钟计数器*/
+#define clock		(*((volatile DWORD*)(KnlValue + 0x0028)))	/*时钟计数器*/
 #define SleepList	(*((THREAD_DESC**)	(KnlValue + 0x002C)))	/*延时阻塞链表指针*/
 #define LastI387	(*((I387**)			(KnlValue + 0x0030)))	/*被推迟保存的协处理器寄存器指针*/
 /*锁变量*/

@@ -200,9 +200,10 @@ int main()
 
 		if ((res = KRecvMsg(&ptid, data, INVALID)) != NO_ERROR)	/*等待消息*/
 			break;
-		if ((data[0] & 0xFFFF0000) == MSG_ATTR_USER)	/*普通服务消息*/
+		switch (data[MSG_ATTR_ID] & MSG_ATTR_MASK)
 		{
-			switch (data[3])
+		case MSG_ATTR_CUI:	/*普通服务消息*/
+			switch (data[MSG_API_ID] & MSG_API_MASK)
 			{
 			case CUI_API_GETCOL:	/*取得字符界面颜色*/
 				data[1] = CharColor;
@@ -244,25 +245,28 @@ int main()
 				if (data[1] == '\b')
 					BackSp();
 				else
-					PutStr((const char*)&data[1]);
-				break;
-			}
-		}
-		else if ((data[0] & 0xFFFF0000) == MSG_ATTR_MAP)	/*映射消息*/
-		{
-			switch (data[3])
-			{
-			case CUI_API_PUTS:	/*输出字符串*/
-				if (((const char*)data[2])[data[1] - 1])
-					data[0] = CUI_ERR_ARGS;
-				else
 				{
-					PutStr((const char*)data[2]);
-					data[0] = NO_ERROR;
+					data[1] &= 0xFF;
+					PutStr((const char*)&data[1]);
 				}
 				break;
 			}
-			KUnmapProcAddr((void*)data[2], data);
+			break;
+		case MSG_ATTR_ROMAP:	/*映射消息*/
+		case MSG_ATTR_RWMAP:
+			switch (data[MSG_API_ID] & MSG_API_MASK)
+			{
+			case CUI_API_PUTS:	/*输出字符串*/
+				if (((const char*)data[MSG_ADDR_ID])[data[MSG_SIZE_ID] - 1])
+					data[MSG_RES_ID] = CUI_ERR_ARGS;
+				else
+				{
+					PutStr((const char*)data[MSG_ADDR_ID]);
+					data[MSG_RES_ID] = NO_ERROR;
+				}
+				break;
+			}
+			KUnmapProcAddr((void*)data[MSG_ADDR_ID], data);
 		}
 	}
 	GDIrelease();

@@ -27,7 +27,7 @@ static inline long InitPMM()
 
 	i = (((MemEnd - UPHYMEM_ADDR) + 0x0001FFFF) >> 17);	/*取得进程物理页管理表长度*/
 	if ((pmmap = (DWORD*)kmalloc(i * sizeof(DWORD))) == NULL)	/*建立用户内存位图,以4字节为单位*/
-		return ERROR_HAVENO_KMEM;
+		return KERR_OUT_OF_KNLMEM;
 	memset32(pmmap, 0xFFFFFFFF, i);	/*先标记为已用*/
 	PmmLen = (i << 5);	/*用户内存总页数*/
 	PmpID = INVALID;
@@ -76,7 +76,7 @@ static inline long InitMsg()
 	MESSAGE_DESC *msg;
 
 	if ((FstMsg = (MESSAGE_DESC*)kmalloc(MSGMT_LEN * sizeof(MESSAGE_DESC))) == NULL)
-		return ERROR_HAVENO_KMEM;
+		return KERR_OUT_OF_KNLMEM;
 	for (msg = FstMsg; msg < &FstMsg[MSGMT_LEN - 1]; msg++)
 		msg->nxt = msg + 1;
 	msg->nxt = NULL;
@@ -89,7 +89,7 @@ static inline long InitMap()
 	MAPBLK_DESC *map;
 
 	if ((FstMap = (MAPBLK_DESC*)kmalloc(MAPMT_LEN * sizeof(MAPBLK_DESC))) == NULL)
-		return ERROR_HAVENO_KMEM;
+		return KERR_OUT_OF_KNLMEM;
 	for (map = FstMap; map < &FstMap[MAPMT_LEN - 1]; map++)
 		map->nxt = map + 1;
 	map->nxt = NULL;

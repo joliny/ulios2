@@ -9,35 +9,52 @@
 
 #define NO_ERROR					0	/*无错*/
 
-#define ERROR_WRONG_APIN			-1	/*错误的系统调用号*/
-#define ERROR_WRONG_THEDID			-2	/*错误的线程ID*/
-#define ERROR_WRONG_PROCID			-3	/*错误的进程ID*/
-#define ERROR_WRONG_KPTN			-4	/*错误的内核端口号*/
-#define ERROR_WRONG_IRQN			-5	/*错误的IRQ号*/
-#define ERROR_WRONG_APPMSG			-6	/*错误的应用程序消息*/
+/*内核资源错误*/
+#define KERR_OUT_OF_KNLMEM			-1	/*内核内存不足*/
+#define KERR_OUT_OF_PHYMEM			-2	/*物理内存不足*/
+#define KERR_OUT_OF_LINEADDR		-3	/*线性地址空间不足*/
 
-#define ERROR_HAVENO_KMEM			-7	/*没有内核内存*/
-#define ERROR_HAVENO_PMEM			-8	/*没有物理内存*/
-#define ERROR_HAVENO_THEDID			-9	/*没有线程管理节点*/
-#define ERROR_HAVENO_PROCID			-10	/*没有进程管理节点*/
-#define ERROR_HAVENO_EXECID			-11	/*没有可执行体描述符*/
-#define ERROR_HAVENO_MSGDESC		-12	/*没有消息描述符*/
-#define ERROR_HAVENO_LINEADDR		-13	/*没有线性地址空间*/
+/*进程线程错误*/
+#define KERR_INVALID_PROCID			-4	/*非法进程ID*/
+#define KERR_PROC_NOT_EXIST			-5	/*进程不存在*/
+#define KERR_PROC_NOT_ENOUGH		-6	/*进程管理结构不足*/
+#define KERR_INVALID_THEDID			-7	/*非法线程ID*/
+#define KERR_THED_NOT_EXIST			-8	/*线程不存在*/
+#define KERR_THED_NOT_ENOUGH		-9	/*线程管理结构不足*/
 
-#define ERROR_KPT_ISENABLED			-14	/*内核端口已经被注册*/
-#define ERROR_KPT_ISDISABLED		-15	/*内核端口没有被注册*/
-#define ERROR_KPT_WRONG_CURPROC		-16	/*当前进程无法改动内核端口*/
-#define ERROR_IRQ_ISENABLED			-17	/*IRQ已经开启*/
-#define ERROR_IRQ_ISDISABLED		-18	/*IRQ已经关闭*/
-#define ERROR_IRQ_WRONG_CURPROC		-19	/*当前线程无法改动IRQ*/
+/*内核注册表错误*/
+#define KERR_INVALID_KPTNUN			-10	/*非法内核端口号*/
+#define KERR_KPT_ALREADY_REGISTERED	-11	/*内核端口已被注册*/
+#define KERR_KPT_NOT_REGISTERED		-12	/*内核端口未被注册*/
+#define KERR_INVALID_IRQNUM			-13	/*非法IRQ号*/
+#define KERR_IRQ_ALREADY_REGISTERED	-14	/*IRQ已被注册*/
+#define KERR_IRQ_NOT_REGISTERED		-15	/*IRQ未被注册*/
+#define KERR_CURPROC_NOT_REGISTRANT	-16	/*当前进程不是注册者*/
 
-#define ERROR_NOT_DRIVER			-20	/*非法执行驱动API*/
-#define ERROR_INVALID_ADDR			-21	/*无效的地址*/
-#define ERROR_INVALID_MAPADDR		-22	/*非法的映射地址*/
-#define ERROR_INVALID_MAPSIZE		-23	/*非法的映射大小*/
+/*消息错误*/
+#define KERR_INVALID_USERMSG_ATTR	-17	/*非法用户消息属性*/
+#define KERR_MSG_NOT_ENOUGH			-18	/*消息结构不足*/
+#define KERR_MSG_QUEUE_FULL			-19	/*消息队列满*/
+#define KERR_MSG_QUEUE_EMPTY		-20	/*消息队列空*/
 
-#define ERROR_OUT_OF_TIME			-24	/*超时错误*/
-#define ERROR_PROC_EXCEP			-25	/*程序异常*/
-#define ERROR_THED_KILLED			-26	/*线程被杀死*/
+/*地址映射错误*/
+#define KERR_MAPSIZE_IS_ZERO		-21	/*映射长度为0*/
+#define KERR_MAPSIZE_TOO_LONG		-22	/*映射长度太大*/
+#define KERR_PROC_SELF_MAPED		-23	/*映射进程自身*/
+#define KERR_ILLEGAL_PHYADDR_MAPED	-24	/*映射不允许的物理地址*/
+#define KERR_ADDRARGS_NOT_FOUND		-25	/*地址参数未找到*/
+
+/*程序执行错误*/
+#define KERR_OUT_OF_TIME			-26	/*超时错误*/
+#define KERR_ACCESS_ILLEGAL_ADDR	-27	/*访问非法地址*/
+#define KERR_WRITE_RDONLY_ADDR		-28	/*写只读地址*/
+#define KERR_THED_EXCEPTION			-29	/*线程执行异常*/
+#define KERR_THED_KILLED			-30	/*线程被杀死*/
+
+/*调用错误*/
+#define KERR_INVALID_APINUM			-31	/*非法系统调用号*/
+#define KERR_ARGS_TOO_LONG			-32	/*参数字串超长*/
+#define KERR_INVALID_MEMARGS_ADDR	-33	/*非法内存参数地址*/
+#define KERR_NO_DRIVER_PRIVILEGE	-34	/*没有执行驱动功能的特权*/
 
 #endif

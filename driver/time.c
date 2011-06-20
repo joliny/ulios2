@@ -128,9 +128,9 @@ int main()
 
 		if ((res = KRecvMsg(&ptid, data, INVALID)) != NO_ERROR)	/*等待消息*/
 			break;
-		if ((data[0] & 0xFFFF0000) == MSG_ATTR_USER)	/*应用请求消息*/
+		if ((data[MSG_ATTR_ID] & MSG_ATTR_MASK) == MSG_ATTR_TIME)	/*应用请求消息*/
 		{
-			switch (data[1])
+			switch (data[MSG_API_ID] & MSG_API_MASK)
 			{
 			case TIME_API_CURSECOND:	/*取得1970年经过的秒*/
 				KGetClock(&clk);
@@ -144,12 +144,11 @@ int main()
 				KSendMsg(&ptid, data, 0);
 				break;
 			case TIME_API_MKTIME:		/*TM结构转换为秒*/
-				if ((res = Tm2Sec(&data[1], (TM*)&data[2])) != NO_ERROR)
-					data[1] = res;
+				data[MSG_RES_ID] = Tm2Sec(&data[1], (TM*)&data[1]);
 				KSendMsg(&ptid, data, 0);
 				break;
 			case TIME_API_LOCALTIME:	/*秒转换为TM结构*/
-				Sec2Tm(data[2], (TM*)&data[1]);
+				Sec2Tm(data[1], (TM*)&data[1]);
 				((TM*)&data[1])->mil = 0;
 				KSendMsg(&ptid, data, 0);
 				break;

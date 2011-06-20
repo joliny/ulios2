@@ -16,10 +16,11 @@ typedef struct _BLK_DESC
 }BLK_DESC;	/*线性地址块描述符*/
 
 #define THED_ATTR_SLEEP		0x0001	/*0:就绪状态1:阻塞状态*/
-#define THED_ATTR_WAITTIME	0x0002	/*0:不等待时钟1:等待时钟*/
-#define THED_ATTR_APPS		0x0004	/*0:系统调用态1:应用程序态*/
-#define THED_ATTR_DEL		0x0008	/*0:正常状态1:正在被删除*/
-#define THED_ATTR_KILLED	0x0010	/*0:正常状态1:被杀死标志*/
+#define THED_ATTR_WAITMSG	0x0002	/*0:不等待消息1:消息可唤醒*/
+#define THED_ATTR_WAITTIME	0x0004	/*0:不等待时钟1:时钟可唤醒*/
+#define THED_ATTR_APPS		0x0008	/*0:系统调用态1:应用程序态*/
+#define THED_ATTR_DEL		0x0010	/*0:正常状态1:正在被删除*/
+#define THED_ATTR_KILLED	0x0020	/*0:正常状态1:被杀死标志*/
 #define KSTK_LEN			512		/*内核堆栈双字数*/
 #define THEDSTK_SIZ			0x00100000	/*线程默认堆栈大小*/
 typedef struct _THREAD_DESC
@@ -75,7 +76,7 @@ typedef struct _PROCESS_DESC
 void wakeup(THREAD_DESC *thed);
 
 /*阻塞线程*/
-void sleep(DWORD cs);
+void sleep(BOOL isWaitMsg, DWORD cs);
 
 /*创建线程*/
 long CreateThed(DWORD attr, DWORD proc, DWORD args, THREAD_ID *ptid);
@@ -113,10 +114,10 @@ static inline void CliWakeup(THREAD_DESC *thed)
 }
 
 /*阻塞线程(关中断方式)*/
-static inline void CliSleep(DWORD cs)
+static inline void CliSleep(BOOL isWaitMsg, DWORD cs)
 {
 	cli();
-	sleep(cs);
+	sleep(isWaitMsg, cs);
 	sti();
 }
 

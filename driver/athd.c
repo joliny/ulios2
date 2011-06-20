@@ -153,13 +153,13 @@ int main()
 	{
 		THREAD_ID ptid;
 		DWORD data[MSG_DATA_LEN];
+		ATHD_REQ *CurReq;
 
 		if ((res = KRecvMsg(&ptid, data, INVALID)) != NO_ERROR)	/*等待消息*/
 			break;
-		if ((data[0] & 0xFFFF0000) == MSG_ATTR_IRQ && data[1] == ATHD_IRQ)	/*磁盘中断请求消息*/
+		switch (data[MSG_ATTR_ID] & MSG_ATTR_MASK)
 		{
-			ATHD_REQ *CurReq;
-
+		case MSG_ATTR_IRQ:	/*磁盘中断请求消息,只可能是ATHD_IRQ*/
 			CurReq = ReqList;
 			if (CurReq->isWrite)	/*写中断*/
 			{
@@ -175,7 +175,7 @@ int main()
 				if (CurReq->cou)
 					continue;
 			}
-			data[0] = NO_ERROR;
+			data[MSG_RES_ID] = NO_ERROR;
 			KUnmapProcAddr(CurReq->addr, data);
 			DelReq(&ReqList);
 			FreeReq(&FstReq, CurReq);
@@ -183,35 +183,34 @@ int main()
 				OutCmd(ReqList);
 			else
 				state = STATE_WAIT;
-		}
-		else if ((data[0] & 0xFFFF0000) == MSG_ATTR_MAP)	/*磁盘驱动服务消息*/
-		{
-			ATHD_REQ *CurReq;
-
-			if (secou[data[4] & 1] == 0)	/*驱动器不存在*/
+			break;
+		case MSG_ATTR_ROMAP:	/*磁盘驱动服务消息*/
+		case MSG_ATTR_RWMAP:	/*RO:写磁盘,RW读磁盘*/
+			if (secou[data[3] & 1] == 0)	/*驱动器不存在*/
 			{
-				data[0] = ATHD_ERR_WRONG_DRV;
-				KUnmapProcAddr((void*)data[2], data);
+				data[MSG_RES_ID] = ATHD_ERR_WRONG_DRV;
+				KUnmapProcAddr((void*)data[MSG_ADDR_ID], data);
 				continue;
 			}
 			if ((CurReq = AllocReq(&FstReq)) == NULL)	/*服务请求列表已满*/
 			{
-				data[0] = ATHD_ERR_HAVENO_REQ;
-				KUnmapProcAddr((void*)data[2], data);
+				data[MSG_RES_ID] = ATHD_ERR_HAVENO_REQ;
+				KUnmapProcAddr((void*)data[MSG_ADDR_ID], data);
 				continue;
 			}
 			CurReq->ptid = ptid;
-			CurReq->CurAddr = CurReq->addr = (void*)data[2];
-			CurReq->sec = data[5];
-			CurReq->cou = (data[1] + ATHD_BPS - 1) / ATHD_BPS;
-			CurReq->cmd = CurReq->isWrite = (~data[0]) & 1;
-			CurReq->drv = data[4] & 1;
+			CurReq->CurAddr = CurReq->addr = (void*)data[MSG_ADDR_ID];
+			CurReq->sec = data[4];
+			CurReq->cou = (data[MSG_SIZE_ID] + ATHD_BPS - 1) / ATHD_BPS;
+			CurReq->cmd = CurReq->isWrite = ((~data[MSG_ATTR_ID]) >> 16) & 1;
+			CurReq->drv = data[3] & 1;
 			AddReq(&ReqList, &LstReq, CurReq);
 			if (state == STATE_WAIT)
 			{
 				state = STATE_BUSY;
 				OutCmd(ReqList);
 			}
+			break;
 		}
 	}
 	KUnregIrq(ATHD_IRQ);

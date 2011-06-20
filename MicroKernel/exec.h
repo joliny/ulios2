@@ -13,11 +13,11 @@
 #define EXEC_ARGV_DRIVER	0x00000002	/*0:应用进程1:驱动进程*/
 #define PROC_EXEC_SIZE		0x400		/*进程路径名最大字节数*/
 #define PROC_ARGS_SIZE		0x200		/*进程参数最大字节数*/
-#define FS_KPORT			0			/*文件系统线程端口*/
+#define REP_KPORT			0			/*接收系统报告线程端口*/
+#define FS_KPORT			1			/*文件系统线程端口*/
 #define FS_API_GETEXEC		0			/*请求文件系统取得可执行文件信息功能号*/
 #define FS_API_READPAGE		1			/*请求文件系统读取可执行文件页功能号*/
 #define FS_OUT_TIME			6000		/*文件系统超时时间*/
-#define REP_KPORT			1			/*接收系统报告线程端口*/
 
 typedef struct _EXEC_DESC
 {

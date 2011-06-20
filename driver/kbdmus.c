@@ -93,9 +93,8 @@ int main()
 	DWORD code;	/*端口取码*/
 	DWORD KbdFlag, KbdState;	/*键码扫描码,前缀标志,控制键状态*/
 	DWORD MusId, MusCou, MusKey;		/*鼠标ID,鼠标数据包计数,键状态*/
-	long MusX, MusY, MusZ, MusMaxX, MusMaxY;	/*移动范围,位置*/
+	long MusX, MusY, MusZ;	/*三维偏移*/
 	THREAD_ID RecvPtid[RECVPTID_LEN], *CurRecv;	/*接收消息线程ID栈*/
-	void *addr;
 	long res;	/*返回结果*/
 
 	if ((res = KRegKnlPort(SRV_KBDMUS_PORT)) != NO_ERROR)	/*注册服务端口号*/
@@ -124,11 +123,6 @@ int main()
 		return res;
 	if ((res = KRegIrq(MUS_IRQ)) != NO_ERROR)	/*注册鼠标中断请求号*/
 		return res;
-	if ((res = KMapPhyAddr(&addr, VS_MODE_ADDR, 0x100)) != NO_ERROR)	/*从显卡启动数据里获得屏幕像素数*/
-		return res;
-	MusMaxX = *((WORD*)(addr + 18)) - 1;
-	MusMaxY = *((WORD*)(addr + 20)) - 1;
-	KFreeAddr(addr);
 	KbdState = KbdFlag = 0;
 	MusKey = MusCou = 0;
 	MusZ = MusY = MusX = 0;
@@ -140,11 +134,13 @@ int main()
 
 		if ((res = KRecvMsg(&ptid, data, INVALID)) != NO_ERROR)	/*等待消息*/
 			break;
-		if ((data[0] & 0xFFFF0000) == MSG_ATTR_IRQ)
+		switch (data[MSG_ATTR_ID] & MSG_ATTR_MASK)
 		{
+		case MSG_ATTR_IRQ:	/*中断请求消息*/
 			code = inb(0x60);
-			if (data[1] == KBD_IRQ)	/*键盘中断消息*/
+			switch (data[1])
 			{
+			case KBD_IRQ:	/*键盘中断消息*/
 				if (code == 0xE0)	/*前缀,后面跟1个键码*/
 				{
 					KbdFlag = 1;
@@ -306,12 +302,12 @@ int main()
 					else
 						KbdKey = code << 8;	/*不能处理的键直接放入队列*/
 					KbdKey |= KbdState;
-					data[0] = MSG_ATTR_KBD;
+					data[MSG_ATTR_ID] = MSG_ATTR_KBD;
 					data[1] = KbdKey;
 					while (CurRecv)
 					{
 						res = KSendMsg(CurRecv, data, 0);
-						if (res != ERROR_WRONG_PROCID && res != ERROR_WRONG_THEDID)
+						if (res != KERR_PROC_NOT_EXIST && res != KERR_THED_NOT_EXIST)
 							break;
 						if (CurRecv != RecvPtid)	/*无法发送到栈中的线程则忽略该线程*/
 							CurRecv--;
@@ -320,9 +316,8 @@ int main()
 					}
 				}
 				KbdFlag = 0;
-			}
-			else if (data[1] == MUS_IRQ)
-			{
+				break;
+			case MUS_IRQ:	/*鼠标中断消息*/
 				switch (MusCou)
 				{
 				case 0:	/*收到第一字节,按键信息*/
@@ -334,21 +329,13 @@ int main()
 				case 1:	/*收到第二字节,x的位移量*/
 					if (MusKey & MUS_STATE_XSIGN)
 						code |= 0xFFFFFF00;
-					MusX += (long)code;
-					if (MusX < 0)
-						MusX = 0;
-					else if (MusX > MusMaxX)
-						MusX = MusMaxX;
+					MusX = (long)code;
 					MusCou++;
 					continue;
 				case 2:	/*收到第三字节,y的位移量*/
 					if (MusKey & MUS_STATE_YSIGN)
 						code |= 0xFFFFFF00;
-					MusY -= (long)code;
-					if (MusY < 0)
-						MusY = 0;
-					else if (MusY > MusMaxY)
-						MusY = MusMaxY;
+					MusY = -(long)code;
 					if (MusId)
 					{
 						MusCou++;
@@ -361,7 +348,7 @@ int main()
 					MusCou = 0;
 					break;
 				}
-				data[0] = MSG_ATTR_MUS;
+				data[MSG_ATTR_ID] = MSG_ATTR_MUS;
 				data[1] = MusKey;
 				data[2] = MusX;
 				data[3] = MusY;
@@ -369,18 +356,18 @@ int main()
 				while (CurRecv)
 				{
 					res = KSendMsg(CurRecv, data, 0);
-					if (res != ERROR_WRONG_PROCID && res != ERROR_WRONG_THEDID)
+					if (res != KERR_PROC_NOT_EXIST && res != KERR_THED_NOT_EXIST)
 						break;
 					if (CurRecv != RecvPtid)	/*无法发送到栈中的线程则忽略该线程*/
 						CurRecv--;
 					else
 						CurRecv = NULL;
 				}
+				break;
 			}
-		}
-		else if ((data[0] & 0xFFFF0000) == MSG_ATTR_USER)	/*应用请求消息*/
-		{
-			if (data[1] == KBDMUS_API_SETRECV && CurRecv != &RecvPtid[RECVPTID_LEN - 1])	/*PTID栈不满时注册接收键盘鼠标消息的线程*/
+			break;
+		case MSG_ATTR_KBDMUS:	/*应用请求消息*/
+			if ((data[MSG_API_ID] & MSG_API_MASK) == KBDMUS_API_SETRECV && CurRecv != &RecvPtid[RECVPTID_LEN - 1])	/*PTID栈不满时注册接收键盘鼠标消息的线程*/
 			{
 				if (CurRecv)
 					CurRecv++;
@@ -388,6 +375,7 @@ int main()
 					CurRecv = RecvPtid;
 				*CurRecv = ptid;
 			}
+			break;
 		}
 	}
 	KUnregIrq(KBD_IRQ);

@@ -49,12 +49,12 @@ BYTE pg0[PG_LEN];			/*当前页副本4MB*/
 long RegKnlPort(DWORD PortN)
 {
 	if (PortN >= KPT_LEN)
-		return ERROR_WRONG_KPTN;
+		return KERR_INVALID_KPTNUN;
 	cli();
 	if (*(DWORD*)(&kpt[PortN]) != INVALID)
 	{
 		sti();
-		return ERROR_KPT_ISENABLED;
+		return KERR_KPT_ALREADY_REGISTERED;
 	}
 	kpt[PortN] = CurPmd->CurTmd->id;
 	sti();
@@ -65,17 +65,17 @@ long RegKnlPort(DWORD PortN)
 long UnregKnlPort(DWORD PortN)
 {
 	if (PortN >= KPT_LEN)
-		return ERROR_WRONG_KPTN;
+		return KERR_INVALID_KPTNUN;
 	cli();
 	if (*(DWORD*)(&kpt[PortN]) == INVALID)
 	{
 		sti();
-		return ERROR_KPT_ISDISABLED;
+		return KERR_KPT_NOT_REGISTERED;
 	}
 	if (kpt[PortN].ProcID != CurPmd->CurTmd->id.ProcID)
 	{
 		sti();
-		return ERROR_KPT_WRONG_CURPROC;
+		return KERR_CURPROC_NOT_REGISTRANT;
 	}
 	*(DWORD*)(&kpt[PortN]) = INVALID;
 	sti();
@@ -86,12 +86,12 @@ long UnregKnlPort(DWORD PortN)
 long GetKptThed(DWORD PortN, THREAD_ID *ptid)
 {
 	if (PortN >= KPT_LEN)
-		return ERROR_WRONG_KPTN;
+		return KERR_INVALID_KPTNUN;
 	cli();
 	if (*(DWORD*)(&kpt[PortN]) == INVALID)
 	{
 		sti();
-		return ERROR_KPT_ISDISABLED;
+		return KERR_KPT_NOT_REGISTERED;
 	}
 	*ptid = kpt[PortN];
 	sti();

@@ -36,9 +36,6 @@ long GDIPutImage(long x, long y, DWORD *img, long w, long h);
 /*È¥±³¾°É«ÌùÍ¼*/
 long GDIPutBCImage(long x, long y, DWORD *img, long w, long h, DWORD bc);
 
-/*ÇøÓòÌùÍ¼*/
-long GDIBitBlt(long x, long y, DWORD *img, long w, long h, long subx, long suby, long subw, long subh);
-
 /*½ØÍ¼*/
 long GDIGetImage(long x, long y, DWORD *img, long w, long h);
 

@@ -71,50 +71,50 @@ int main()
 
 		if ((res = KRecvMsg(&ptid, data, INVALID)) != NO_ERROR)	/*等待消息*/
 			break;
-		if ((data[0] & 0xFFFF0000) == MSG_ATTR_USER)
+		switch (data[MSG_ATTR_ID] & MSG_ATTR_MASK)
 		{
-			switch (data[3])
+		case MSG_ATTR_VESA:
+			switch (data[MSG_API_ID] & MSG_API_MASK)
 			{
 			case VESA_API_GETVMEM:
-				data[0] = NO_ERROR;
-				data[1] = width;	/*像素/字符分辨率*/
-				data[2] = height;
-				data[3] = PixBits;	/*色彩位数*/
+				data[MSG_RES_ID] = NO_ERROR;
+				data[3] = width;	/*像素/字符分辨率*/
+				data[4] = height;
+				data[5] = PixBits;	/*色彩位数*/
 				KReadProcAddr(vm, VmSiz, &ptid, data, 0);
 				break;
 			case VESA_API_GETFONT:
 				if (CurMode)	/*图形模式*/
 				{
-					data[0] = NO_ERROR;
-					data[1] = 6;	/*字符大小*/
-					data[2] = 12;
+					data[MSG_RES_ID] = NO_ERROR;
+					data[3] = 6;	/*字符大小*/
+					data[4] = 12;
 					KWriteProcAddr(font, FONT_SIZE, &ptid, data, 0);
 				}
 				else	/*文本模式*/
 				{
-					data[3] = VESA_ERR_TEXTMODE;
+					data[MSG_RES_ID] = VESA_ERR_TEXTMODE;
 					KSendMsg(&ptid, data, 0);
 				}
 				break;
 			}
-		}
-		else if ((data[0] & 0xFFFF0000) == MSG_ATTR_MAP)
-		{
-			switch (data[3])
+			break;
+		case MSG_ATTR_ROMAP:
+			data[MSG_RES_ID] = VESA_ERR_ARGS;
+			KUnmapProcAddr((void*)data[MSG_ADDR_ID], data);
+			break;
+		case MSG_ATTR_RWMAP:
+			if ((data[MSG_API_ID] & MSG_API_MASK) == VESA_API_GETMODE && data[MSG_SIZE_ID] >= (((ModeCou + 1) >> 1) << 2))
 			{
-			case VESA_API_GETMODE:
-				if ((data[0] & 1) && data[1] >= (((ModeCou + 1) >> 1) << 2))
-				{
-					memcpy32((void*)data[2], ModeList, (ModeCou + 1) >> 1);
-					data[0] = NO_ERROR;
-					data[1] = ModeCou;
-					data[3] = CurMode;
-				}
-				else
-					data[0] = VESA_ERR_ARGS;
-				break;
+				memcpy32((void*)data[MSG_ADDR_ID], ModeList, (ModeCou + 1) >> 1);
+				data[MSG_RES_ID] = NO_ERROR;
+				data[MSG_SIZE_ID] = ModeCou;
+				data[3] = CurMode;
 			}
-			KUnmapProcAddr((void*)data[2], data);
+			else
+				data[MSG_RES_ID] = VESA_ERR_ARGS;
+			KUnmapProcAddr((void*)data[MSG_ADDR_ID], data);
+			break;
 		}
 	}
 	KFreeAddr(vm);
