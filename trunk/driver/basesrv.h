@@ -12,44 +12,46 @@
 #define SRV_OUT_TIME	6000	/*服务调用超时厘秒数INVALID:无限等待*/
 
 /**********进程异常报告**********/
-#define SRV_REP_PORT	1	/*进程异常报告服务端口*/
+#define SRV_REP_PORT	0	/*进程异常报告服务端口*/
 
 /**********AT硬盘相关**********/
 #define SRV_ATHD_PORT	2	/*AT硬盘驱动服务端口*/
 #define ATHD_BPS		512	/*磁盘每扇区字节数*/
 
-#define ATHD_API_READSECTOR		0	/*读硬盘扇区功能号*/
-#define ATHD_API_WRITESECTOR	1	/*写硬盘扇区功能号*/
+#define ATHD_API_WRITESECTOR	0	/*写硬盘扇区功能号*/
+#define ATHD_API_READSECTOR		1	/*读硬盘扇区功能号*/
 
 #define ATHD_ERR_WRONG_DRV		-512	/*错误的驱动器号*/
 #define ATHD_ERR_HAVENO_REQ		-513	/*无法接受更多的服务请求*/
-
-/*读硬盘扇区*/
-static inline long HDReadSector(THREAD_ID ptid, DWORD drv, DWORD sec, BYTE cou, void *buf)
-{
-	DWORD data[MSG_DATA_LEN];
-	data[0] = ATHD_API_READSECTOR;
-	data[1] = drv;
-	data[2] = sec;
-	if ((data[0] = KReadProcAddr(buf, ATHD_BPS * cou, &ptid, data, SRV_OUT_TIME)) != NO_ERROR)
-		return data[0];
-	return data[2];
-}
 
 /*写硬盘扇区*/
 static inline long HDWriteSector(THREAD_ID ptid, DWORD drv, DWORD sec, BYTE cou, void *buf)
 {
 	DWORD data[MSG_DATA_LEN];
-	data[0] = ATHD_API_WRITESECTOR;
-	data[1] = drv;
-	data[2] = sec;
+	data[MSG_API_ID] = ATHD_API_WRITESECTOR;
+	data[3] = drv;
+	data[4] = sec;
 	if ((data[0] = KWriteProcAddr(buf, ATHD_BPS * cou, &ptid, data, SRV_OUT_TIME)) != NO_ERROR)
 		return data[0];
-	return data[2];
+	return data[MSG_RES_ID];
+}
+
+/*读硬盘扇区*/
+static inline long HDReadSector(THREAD_ID ptid, DWORD drv, DWORD sec, BYTE cou, void *buf)
+{
+	DWORD data[MSG_DATA_LEN];
+	data[MSG_API_ID] = ATHD_API_READSECTOR;
+	data[3] = drv;
+	data[4] = sec;
+	if ((data[0] = KReadProcAddr(buf, ATHD_BPS * cou, &ptid, data, SRV_OUT_TIME)) != NO_ERROR)
+		return data[0];
+	return data[MSG_RES_ID];
 }
 
 /**********时间服务相关**********/
 #define SRV_TIME_PORT	3	/*时间服务端口*/
+
+#define MSG_ATTR_TIME	0x01030000	/*时间服务消息*/
 
 #define TIME_API_CURSECOND		0	/*取得1970年经过的秒功能号*/
 #define TIME_API_CURTIME		1	/*取得当前时间功能号*/
@@ -76,8 +78,7 @@ typedef struct _TM
 static inline long TMCurSecond(THREAD_ID ptid, DWORD *sec)
 {
 	DWORD data[MSG_DATA_LEN];
-	data[0] = MSG_ATTR_USER;
-	data[1] = TIME_API_CURSECOND;
+	data[MSG_API_ID] = MSG_ATTR_TIME | TIME_API_CURSECOND;
 	if ((data[0] = KSendMsg(&ptid, data, SRV_OUT_TIME)) != NO_ERROR)
 		return data[0];
 	*sec = data[1];
@@ -88,8 +89,7 @@ static inline long TMCurSecond(THREAD_ID ptid, DWORD *sec)
 static inline long TMCurTime(THREAD_ID ptid, TM *tm)
 {
 	DWORD data[MSG_DATA_LEN];
-	data[0] = MSG_ATTR_USER;
-	data[1] = TIME_API_CURTIME;
+	data[MSG_API_ID] = MSG_ATTR_TIME | TIME_API_CURTIME;
 	if ((data[0] = KSendMsg(&ptid, data, SRV_OUT_TIME)) != NO_ERROR)
 		return data[0];
 	memcpy32(tm, &data[1], sizeof(TM) / sizeof(DWORD));
@@ -100,11 +100,12 @@ static inline long TMCurTime(THREAD_ID ptid, TM *tm)
 static inline long TMMkTime(THREAD_ID ptid, DWORD *sec, const TM *tm)
 {
 	DWORD data[MSG_DATA_LEN];
-	data[0] = MSG_ATTR_USER;
-	data[1] = TIME_API_MKTIME;
-	memcpy32(&data[2], tm, sizeof(TM) / sizeof(DWORD));
+	data[MSG_API_ID] = MSG_ATTR_TIME | TIME_API_MKTIME;
+	memcpy32(&data[1], tm, sizeof(TM) / sizeof(DWORD));
 	if ((data[0] = KSendMsg(&ptid, data, SRV_OUT_TIME)) != NO_ERROR)
 		return data[0];
+	if (data[MSG_RES_ID] != NO_ERROR)
+		return data[MSG_RES_ID];
 	*sec = data[1];
 	return NO_ERROR;
 }
@@ -113,9 +114,8 @@ static inline long TMMkTime(THREAD_ID ptid, DWORD *sec, const TM *tm)
 static inline long TMLocalTime(THREAD_ID ptid, DWORD sec, TM *tm)
 {
 	DWORD data[MSG_DATA_LEN];
-	data[0] = MSG_ATTR_USER;
-	data[1] = TIME_API_LOCALTIME;
-	data[2] = sec;
+	data[MSG_API_ID] = MSG_ATTR_TIME | TIME_API_LOCALTIME;
+	data[1] = sec;
 	if ((data[0] = KSendMsg(&ptid, data, SRV_OUT_TIME)) != NO_ERROR)
 		return data[0];
 	memcpy32(tm, &data[1], sizeof(TM) / sizeof(DWORD));
@@ -126,8 +126,7 @@ static inline long TMLocalTime(THREAD_ID ptid, DWORD sec, TM *tm)
 static inline long TMGetRand(THREAD_ID ptid)
 {
 	DWORD data[MSG_DATA_LEN];
-	data[0] = MSG_ATTR_USER;
-	data[1] = TIME_API_GETRAND;
+	data[MSG_API_ID] = MSG_ATTR_TIME | TIME_API_GETRAND;
 	if ((data[0] = KSendMsg(&ptid, data, SRV_OUT_TIME)) != NO_ERROR)
 		return data[0];
 	return data[1];
@@ -135,6 +134,10 @@ static inline long TMGetRand(THREAD_ID ptid)
 
 /**********键盘鼠标服务相关**********/
 #define SRV_KBDMUS_PORT	4	/*键盘鼠标服务端口*/
+
+#define MSG_ATTR_KBDMUS	0x01040000	/*键盘鼠标消息*/
+#define MSG_ATTR_KBD	0x01040001	/*键盘按键消息*/
+#define MSG_ATTR_MUS	0x01040002	/*鼠标状态消息*/
 
 #define KBD_STATE_LSHIFT	0x00010000
 #define KBD_STATE_RSHIFT	0x00020000
@@ -159,21 +162,19 @@ static inline long TMGetRand(THREAD_ID ptid)
 
 #define KBDMUS_API_SETRECV		0	/*注册接收键盘鼠标消息的线程功能号*/
 
-#define MSG_ATTR_KBD	(MSG_ATTR_USER + 0x40000)	/*键盘按键消息*/
-#define MSG_ATTR_MUS	(MSG_ATTR_USER + 0x40001)	/*鼠标状态消息*/
-
 /*注册接收键盘鼠标消息的线程*/
 static inline long KMSetRecv(THREAD_ID ptid)
 {
 	DWORD data[MSG_DATA_LEN];
-	data[0] = MSG_ATTR_USER;
-	data[1] = KBDMUS_API_SETRECV;
+	data[MSG_API_ID] = MSG_ATTR_KBDMUS | KBDMUS_API_SETRECV;
 	return KSendMsg(&ptid, data, 0);
 }
 
 /**********VESA显卡驱动服务和GDI库相关**********/
 #define SRV_VESA_PORT	5	/*VESA显卡服务端口*/
 #define VESA_MAX_MODE	512	/*显示模式列表最大数量*/
+
+#define MSG_ATTR_VESA	0x01050000	/*VESA显卡消息*/
 
 #define VESA_API_GETVMEM	0	/*取得显存映射功能号*/
 #define VESA_API_GETFONT	1	/*取得字体映射功能号*/
@@ -186,16 +187,15 @@ static inline long KMSetRecv(THREAD_ID ptid)
 static inline long VSGetVmem(THREAD_ID ptid, void **vm, DWORD *width, DWORD *height, DWORD *PixBits)
 {
 	DWORD data[MSG_DATA_LEN];
-	data[0] = MSG_ATTR_USER;
-	data[3] = VESA_API_GETVMEM;
+	data[MSG_API_ID] = MSG_ATTR_VESA | VESA_API_GETVMEM;
 	if ((data[0] = KSendMsg(&ptid, data, SRV_OUT_TIME)) != NO_ERROR)
 		return data[0];
-	if (data[3] != NO_ERROR)
-		return data[3];
-	*vm = (void*)data[2];
-	*width = data[4];
-	*height = data[5];
-	*PixBits = data[6];
+	if (data[MSG_RES_ID] != NO_ERROR)
+		return data[MSG_RES_ID];
+	*vm = (void*)data[MSG_ADDR_ID];
+	*width = data[3];
+	*height = data[4];
+	*PixBits = data[5];
 	return NO_ERROR;
 }
 
@@ -203,15 +203,14 @@ static inline long VSGetVmem(THREAD_ID ptid, void **vm, DWORD *width, DWORD *hei
 static inline long VSGetFont(THREAD_ID ptid, const BYTE **font, DWORD *CharWidth, DWORD *CharHeight)
 {
 	DWORD data[MSG_DATA_LEN];
-	data[0] = MSG_ATTR_USER;
-	data[3] = VESA_API_GETFONT;
+	data[MSG_API_ID] = MSG_ATTR_VESA | VESA_API_GETFONT;
 	if ((data[0] = KSendMsg(&ptid, data, SRV_OUT_TIME)) != NO_ERROR)
 		return data[0];
-	if (data[3] != NO_ERROR)
-		return data[3];
-	*font = (const BYTE*)data[2];
-	*CharWidth = data[4];
-	*CharHeight = data[5];
+	if (data[MSG_RES_ID] != NO_ERROR)
+		return data[MSG_RES_ID];
+	*font = (const BYTE*)data[MSG_ADDR_ID];
+	*CharWidth = data[3];
+	*CharHeight = data[4];
 	return NO_ERROR;
 }
 
@@ -219,18 +218,20 @@ static inline long VSGetFont(THREAD_ID ptid, const BYTE **font, DWORD *CharWidth
 static inline long VSGetMode(THREAD_ID ptid, WORD mode[VESA_MAX_MODE], DWORD *ModeCou, DWORD *CurMode)
 {
 	DWORD data[MSG_DATA_LEN];
-	data[0] = VESA_API_GETMODE;
+	data[MSG_API_ID] = VESA_API_GETMODE;
 	if ((data[0] = KReadProcAddr(mode, VESA_MAX_MODE * sizeof(WORD), &ptid, data, SRV_OUT_TIME)) != NO_ERROR)
 		return data[0];
-	if (data[2] != NO_ERROR)
-		return data[2];
-	*ModeCou = data[3];
-	*CurMode = data[5];
+	if (data[MSG_RES_ID] != NO_ERROR)
+		return data[MSG_RES_ID];
+	*ModeCou = data[MSG_SIZE_ID];
+	*CurMode = data[3];
 	return NO_ERROR;
 }
 
 /**********CUI字符界面服务相关**********/
 #define SRV_CUI_PORT	6	/*CUI字符界面服务端口*/
+
+#define MSG_ATTR_CUI	0x01060000	/*CUI字符界面消息*/
 
 #define CUI_API_GETCOL	0	/*取得字符界面颜色功能号*/
 #define CUI_API_SETCOL	1	/*设置字符界面颜色功能号*/
@@ -246,8 +247,7 @@ static inline long VSGetMode(THREAD_ID ptid, WORD mode[VESA_MAX_MODE], DWORD *Mo
 static inline long CUIGetCol(THREAD_ID ptid, DWORD *CharColor, DWORD *BgColor)
 {
 	DWORD data[MSG_DATA_LEN];
-	data[0] = MSG_ATTR_USER;
-	data[3] = CUI_API_GETCOL;
+	data[MSG_API_ID] = MSG_ATTR_CUI | CUI_API_GETCOL;
 	if ((data[0] = KSendMsg(&ptid, data, SRV_OUT_TIME)) != NO_ERROR)
 		return data[0];
 	*CharColor = data[1];
@@ -259,10 +259,9 @@ static inline long CUIGetCol(THREAD_ID ptid, DWORD *CharColor, DWORD *BgColor)
 static inline long CUISetCol(THREAD_ID ptid, DWORD CharColor, DWORD BgColor)
 {
 	DWORD data[MSG_DATA_LEN];
-	data[0] = MSG_ATTR_USER;
+	data[MSG_API_ID] = MSG_ATTR_CUI | CUI_API_SETCOL;
 	data[1] = CharColor;
 	data[2] = BgColor;
-	data[3] = CUI_API_SETCOL;
 	return KSendMsg(&ptid, data, 0);
 }
 
@@ -270,8 +269,7 @@ static inline long CUISetCol(THREAD_ID ptid, DWORD CharColor, DWORD BgColor)
 static inline long CUIGetCur(THREAD_ID ptid, DWORD *CursX, DWORD *CursY)
 {
 	DWORD data[MSG_DATA_LEN];
-	data[0] = MSG_ATTR_USER;
-	data[3] = CUI_API_GETCUR;
+	data[MSG_API_ID] = MSG_ATTR_CUI | CUI_API_GETCUR;
 	if ((data[0] = KSendMsg(&ptid, data, SRV_OUT_TIME)) != NO_ERROR)
 		return data[0];
 	*CursX = data[1];
@@ -283,10 +281,9 @@ static inline long CUIGetCur(THREAD_ID ptid, DWORD *CursX, DWORD *CursY)
 static inline long CUISetCur(THREAD_ID ptid, DWORD CursX, DWORD CursY)
 {
 	DWORD data[MSG_DATA_LEN];
-	data[0] = MSG_ATTR_USER;
+	data[MSG_API_ID] = MSG_ATTR_CUI | CUI_API_SETCUR;
 	data[1] = CursX;
 	data[2] = CursY;
-	data[3] = CUI_API_SETCUR;
 	return KSendMsg(&ptid, data, 0);
 }
 
@@ -294,8 +291,7 @@ static inline long CUISetCur(THREAD_ID ptid, DWORD CursX, DWORD CursY)
 static inline long CUIClrScr(THREAD_ID ptid)
 {
 	DWORD data[MSG_DATA_LEN];
-	data[0] = MSG_ATTR_USER;
-	data[3] = CUI_API_CLRSCR;
+	data[MSG_API_ID] = MSG_ATTR_CUI | CUI_API_CLRSCR;
 	return KSendMsg(&ptid, data, 0);
 }
 
@@ -303,9 +299,8 @@ static inline long CUIClrScr(THREAD_ID ptid)
 static inline long CUIPutC(THREAD_ID ptid, char c)
 {
 	DWORD data[MSG_DATA_LEN];
-	data[0] = MSG_ATTR_USER;
+	data[MSG_API_ID] = MSG_ATTR_CUI | CUI_API_PUTC;
 	data[1] = c;
-	data[3] = CUI_API_PUTC;
 	return KSendMsg(&ptid, data, 0);
 }
 
@@ -313,14 +308,16 @@ static inline long CUIPutC(THREAD_ID ptid, char c)
 static inline long CUIPutS(THREAD_ID ptid, const char *str)
 {
 	DWORD data[MSG_DATA_LEN];
-	data[0] = CUI_API_PUTS;
+	data[MSG_API_ID] = CUI_API_PUTS;
 	if ((data[0] = KWriteProcAddr((void*)str, strlen(str) + 1, &ptid, data, SRV_OUT_TIME)) != NO_ERROR)
 		return data[0];
-	return data[2];
+	return data[MSG_RES_ID];
 }
 
 /**********系统喇叭服务相关**********/
 #define SRV_SPK_PORT	7	/*系统喇叭服务端口*/
+
+#define MSG_ATTR_SPK	0x01070000	/*系统喇叭消息*/
 
 #define SPK_API_SOUND	0	/*发声功能号*/
 #define SPK_API_NOSOUND	1	/*停止发声功能号*/
@@ -329,9 +326,8 @@ static inline long CUIPutS(THREAD_ID ptid, const char *str)
 static inline long SPKSound(THREAD_ID ptid, DWORD freq)
 {
 	DWORD data[MSG_DATA_LEN];
-	data[0] = MSG_ATTR_USER;
-	data[1] = SPK_API_SOUND;
-	data[2] = freq;
+	data[MSG_API_ID] = MSG_ATTR_SPK | SPK_API_SOUND;
+	data[1] = freq;
 	return KSendMsg(&ptid, data, 0);
 }
 
@@ -339,18 +335,19 @@ static inline long SPKSound(THREAD_ID ptid, DWORD freq)
 static inline long SPKNosound(THREAD_ID ptid)
 {
 	DWORD data[MSG_DATA_LEN];
-	data[0] = MSG_ATTR_USER;
-	data[1] = SPK_API_NOSOUND;
+	data[MSG_API_ID] = MSG_ATTR_SPK | SPK_API_NOSOUND;
 	return KSendMsg(&ptid, data, 0);
 }
 
 /**********COM串口服务相关**********/
 #define SRV_UART_PORT	8	/*COM串口服务端口*/
 
+#define MSG_ATTR_UART	0x01080000	/*COM串口消息*/
+
 #define UART_API_OPENCOM	0	/*打开串口功能号*/
 #define UART_API_CLOSECOM	1	/*关闭串口功能号*/
-#define UART_API_READCOM	2	/*读串口功能号*/
-#define UART_API_WRITECOM	3	/*写串口功能号*/
+#define UART_API_WRITECOM	2	/*写串口功能号*/
+#define UART_API_READCOM	3	/*读串口功能号*/
 
 #define UART_ARGS_BITS_5		0x00	/*5个数据位*/
 #define UART_ARGS_BITS_6		0x01	/*6个数据位*/
@@ -372,46 +369,48 @@ static inline long SPKNosound(THREAD_ID ptid)
 static inline long UARTOpenCom(THREAD_ID ptid, DWORD com, DWORD baud, DWORD args)
 {
 	DWORD data[MSG_DATA_LEN];
-	data[0] = MSG_ATTR_USER;
+	data[MSG_API_ID] = MSG_ATTR_UART | UART_API_OPENCOM;
 	data[1] = com;
 	data[2] = baud;
-	data[3] = UART_API_OPENCOM;
-	data[4] = args;
-	return KSendMsg(&ptid, data, 0);
+	data[3] = args;
+	if ((data[0] = KSendMsg(&ptid, data, SRV_OUT_TIME)) != NO_ERROR)
+		return data[0];
+	return data[MSG_RES_ID];
 }
 
 /*关闭串口*/
 static inline long UARTCloseCom(THREAD_ID ptid, DWORD com)
 {
 	DWORD data[MSG_DATA_LEN];
-	data[0] = MSG_ATTR_USER;
+	data[MSG_API_ID] = MSG_ATTR_UART | UART_API_CLOSECOM;
 	data[1] = com;
-	data[3] = UART_API_CLOSECOM;
-	return KSendMsg(&ptid, data, 0);
-}
-
-/*读串口*/
-static inline long UARTReadCom(THREAD_ID ptid, DWORD com, void *buf, DWORD siz, DWORD time)
-{
-	DWORD data[MSG_DATA_LEN];
-	data[0] = UART_API_READCOM;
-	data[1] = com;
-	data[2] = time;
-	if ((data[0] = KReadProcAddr(buf, siz, &ptid, data, INVALID)) != NO_ERROR)
+	if ((data[0] = KSendMsg(&ptid, data, SRV_OUT_TIME)) != NO_ERROR)
 		return data[0];
-	return data[2];
+	return data[MSG_RES_ID];
 }
 
 /*写串口*/
 static inline long UARTWriteCom(THREAD_ID ptid, DWORD com, void *buf, DWORD siz, DWORD time)
 {
 	DWORD data[MSG_DATA_LEN];
-	data[0] = UART_API_WRITECOM;
-	data[1] = com;
-	data[2] = time;
+	data[MSG_API_ID] = UART_API_WRITECOM;
+	data[3] = com;
+	data[4] = time;
 	if ((data[0] = KWriteProcAddr(buf, siz, &ptid, data, INVALID)) != NO_ERROR)
 		return data[0];
-	return data[2];
+	return data[MSG_RES_ID];
+}
+
+/*读串口*/
+static inline long UARTReadCom(THREAD_ID ptid, DWORD com, void *buf, DWORD siz, DWORD time)
+{
+	DWORD data[MSG_DATA_LEN];
+	data[MSG_API_ID] = UART_API_READCOM;
+	data[3] = com;
+	data[4] = time;
+	if ((data[0] = KReadProcAddr(buf, siz, &ptid, data, INVALID)) != NO_ERROR)
+		return data[0];
+	return data[MSG_RES_ID];
 }
 
 #endif

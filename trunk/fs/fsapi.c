@@ -33,10 +33,6 @@ extern long SetAttr(PROCRES_DESC *pres, const char *path, DWORD attr);
 extern long SetTime(PROCRES_DESC *pres, const char *path, DWORD time, DWORD cma);
 extern long ProcInfo(DWORD *pid, FILE_INFO *fi);
 
-#define ATTR_ID	0
-#define SIZE_ID	1
-#define ADDR_ID	2
-#define API_ID	3
 #define PTID_ID	MSG_DATA_LEN
 
 static const char *CheckPathSize(const char *path, DWORD siz)
@@ -58,17 +54,17 @@ void ApiGetExec(DWORD *argv)
 	const char *path;
 	DWORD exec[8];
 
-	if ((argv[ATTR_ID] & 0xFFFF0000) != MSG_ATTR_MAP)
+	if ((argv[MSG_ATTR_ID] & MSG_MAP_MASK) != MSG_ATTR_ROMAP)
 		return;
-	path = (const char*)argv[ADDR_ID];
-	if (CheckPathSize(path, argv[SIZE_ID]) == NULL)
-		argv[0] = FS_ERR_ARGS_TOOLONG;
+	path = (const char*)argv[MSG_ADDR_ID];
+	if (CheckPathSize(path, argv[MSG_SIZE_ID]) == NULL)
+		argv[MSG_RES_ID] = FS_ERR_ARGS_TOOLONG;
 	else
-		argv[0] = GetExec(pret[((THREAD_ID*)&argv[PTID_ID])->ProcID], path, argv[API_ID + 1], exec);
+		argv[MSG_RES_ID] = GetExec(pret[((THREAD_ID*)&argv[PTID_ID])->ProcID], path, argv[3], exec);
 	KUnmapProcAddr((void*)path, argv);
-	if (argv[0] == NO_ERROR)
+	if (argv[MSG_RES_ID] == NO_ERROR)
 	{
-		exec[0] |= MSG_ATTR_USER;
+		exec[MSG_ATTR_ID] |= MSG_ATTR_FS;
 		KSendMsg((THREAD_ID*)&argv[PTID_ID], exec, 0);
 	}
 }
@@ -77,16 +73,16 @@ void ApiReadPage(DWORD *argv)
 {
 	void *buf;
 
-	if ((argv[ATTR_ID] & 0xFFFF0000) != MSG_ATTR_MAP)
+	if ((argv[MSG_ATTR_ID] & MSG_MAP_MASK) != MSG_ATTR_ROMAP)
 		return;
-	if (!(argv[ATTR_ID] & 1))
+	if ((argv[MSG_ATTR_ID] & MSG_ATTR_MASK) == MSG_ATTR_ROMAP)
 	{
-		argv[0] = FS_ERR_WRONG_ARGS;
-		KUnmapProcAddr((void*)argv[ADDR_ID], argv);
+		argv[MSG_RES_ID] = FS_ERR_WRONG_ARGS;
+		KUnmapProcAddr((void*)argv[MSG_ADDR_ID], argv);
 		return;
 	}
-	buf = (void*)argv[ADDR_ID];
-	argv[0] = ReadPage(pret[((THREAD_ID*)&argv[PTID_ID])->ProcID], buf, argv[SIZE_ID], argv[API_ID + 1]);
+	buf = (void*)argv[MSG_ADDR_ID];
+	argv[MSG_RES_ID] = ReadPage(pret[((THREAD_ID*)&argv[PTID_ID])->ProcID], buf, argv[MSG_SIZE_ID], argv[3]);
 	KUnmapProcAddr(buf, argv);
 }
 
@@ -102,57 +98,55 @@ void ApiProcExit(DWORD *argv)
 
 void ApiEnumPart(DWORD *argv)
 {
-	if ((argv[ATTR_ID] & 0xFFFF0000) == MSG_ATTR_MAP)
+	if ((argv[MSG_ATTR_ID] & MSG_MAP_MASK) == MSG_ATTR_ROMAP)
 	{
-		argv[0] = FS_ERR_WRONG_ARGS;
-		KUnmapProcAddr((void*)argv[ADDR_ID], argv);
+		argv[MSG_RES_ID] = FS_ERR_WRONG_ARGS;
+		KUnmapProcAddr((void*)argv[MSG_ADDR_ID], argv);
 		return;
 	}
-	argv[0] = MSG_ATTR_USER;
-	argv[1] = EnumPart(&argv[API_ID + 1]);
-	argv[2] = argv[API_ID + 1];
+	argv[MSG_RES_ID] = EnumPart(&argv[1]);
 	KSendMsg((THREAD_ID*)&argv[PTID_ID], argv, 0);
 }
 
 void ApiGetPart(DWORD *argv)
 {
-	if ((argv[ATTR_ID] & 0xFFFF0000) != MSG_ATTR_MAP)
+	if ((argv[MSG_ATTR_ID] & MSG_MAP_MASK) != MSG_ATTR_ROMAP)
 		return;
-	if (!(argv[ATTR_ID] & 1) || argv[SIZE_ID] < sizeof(PART_INFO) + 8)
+	if ((argv[MSG_ATTR_ID] & MSG_ATTR_MASK) == MSG_ATTR_ROMAP || argv[MSG_SIZE_ID] < sizeof(PART_INFO) + 8)
 	{
-		argv[0] = FS_ERR_WRONG_ARGS;
-		KUnmapProcAddr((void*)argv[ADDR_ID], argv);
+		argv[MSG_RES_ID] = FS_ERR_WRONG_ARGS;
+		KUnmapProcAddr((void*)argv[MSG_ADDR_ID], argv);
 		return;
 	}
-	argv[0] = GetPart(argv[API_ID + 1], (PART_INFO*)argv[ADDR_ID]);
-	KUnmapProcAddr((void*)argv[ADDR_ID], argv);
+	argv[MSG_RES_ID] = GetPart(argv[3], (PART_INFO*)argv[MSG_ADDR_ID]);
+	KUnmapProcAddr((void*)argv[MSG_ADDR_ID], argv);
 }
 
 void ApiSetPart(DWORD *argv)
 {
-	if ((argv[ATTR_ID] & 0xFFFF0000) != MSG_ATTR_MAP)
+	if ((argv[MSG_ATTR_ID] & MSG_MAP_MASK) != MSG_ATTR_ROMAP)
 		return;
-	if (argv[SIZE_ID] < sizeof(PART_INFO))
+	if (argv[MSG_SIZE_ID] < sizeof(PART_INFO))
 	{
-		argv[0] = FS_ERR_WRONG_ARGS;
-		KUnmapProcAddr((void*)argv[ADDR_ID], argv);
+		argv[MSG_RES_ID] = FS_ERR_WRONG_ARGS;
+		KUnmapProcAddr((void*)argv[MSG_ADDR_ID], argv);
 		return;
 	}
-	argv[0] = SetPart(argv[API_ID + 1], (PART_INFO*)argv[ADDR_ID]);
-	KUnmapProcAddr((void*)argv[ADDR_ID], argv);
+	argv[MSG_RES_ID] = SetPart(argv[3], (PART_INFO*)argv[MSG_ADDR_ID]);
+	KUnmapProcAddr((void*)argv[MSG_ADDR_ID], argv);
 }
 
 void ApiCreat(DWORD *argv)
 {
 	const char *path;
 
-	if ((argv[ATTR_ID] & 0xFFFF0000) != MSG_ATTR_MAP)
+	if ((argv[MSG_ATTR_ID] & MSG_MAP_MASK) != MSG_ATTR_ROMAP)
 		return;
-	path = (const char*)argv[ADDR_ID];
-	if (CheckPathSize(path, argv[SIZE_ID]) == NULL)
-		argv[0] = FS_ERR_ARGS_TOOLONG;
+	path = (const char*)argv[MSG_ADDR_ID];
+	if (CheckPathSize(path, argv[MSG_SIZE_ID]) == NULL)
+		argv[MSG_RES_ID] = FS_ERR_ARGS_TOOLONG;
 	else
-		argv[0] = creat(pret[((THREAD_ID*)&argv[PTID_ID])->ProcID], path, &argv[1]);
+		argv[MSG_RES_ID] = creat(pret[((THREAD_ID*)&argv[PTID_ID])->ProcID], path, &argv[2]);
 	KUnmapProcAddr((void*)path, argv);
 }
 
@@ -160,26 +154,25 @@ void ApiOpen(DWORD *argv)
 {
 	const char *path;
 
-	if ((argv[ATTR_ID] & 0xFFFF0000) != MSG_ATTR_MAP)
+	if ((argv[MSG_ATTR_ID] & MSG_MAP_MASK) != MSG_ATTR_ROMAP)
 		return;
-	path = (const char*)argv[ADDR_ID];
-	if (CheckPathSize(path, argv[SIZE_ID]) == NULL)
-		argv[0] = FS_ERR_ARGS_TOOLONG;
+	path = (const char*)argv[MSG_ADDR_ID];
+	if (CheckPathSize(path, argv[MSG_SIZE_ID]) == NULL)
+		argv[MSG_RES_ID] = FS_ERR_ARGS_TOOLONG;
 	else
-		argv[0] = open(pret[((THREAD_ID*)&argv[PTID_ID])->ProcID], path, argv[API_ID + 1], &argv[1]);
+		argv[MSG_RES_ID] = open(pret[((THREAD_ID*)&argv[PTID_ID])->ProcID], path, argv[3], &argv[2]);
 	KUnmapProcAddr((void*)path, argv);
 }
 
 void ApiClose(DWORD *argv)
 {
-	if ((argv[ATTR_ID] & 0xFFFF0000) == MSG_ATTR_MAP)
+	if ((argv[MSG_ATTR_ID] & MSG_MAP_MASK) == MSG_ATTR_ROMAP)
 	{
-		argv[0] = FS_ERR_WRONG_ARGS;
-		KUnmapProcAddr((void*)argv[ADDR_ID], argv);
+		argv[MSG_RES_ID] = FS_ERR_WRONG_ARGS;
+		KUnmapProcAddr((void*)argv[MSG_ADDR_ID], argv);
 		return;
 	}
-	argv[0] = MSG_ATTR_USER;
-	argv[1] = close(pret[((THREAD_ID*)&argv[PTID_ID])->ProcID], argv[API_ID + 1]);
+	argv[MSG_RES_ID] = close(pret[((THREAD_ID*)&argv[PTID_ID])->ProcID], argv[1]);
 	KSendMsg((THREAD_ID*)&argv[PTID_ID], argv, 0);
 }
 
@@ -187,16 +180,16 @@ void ApiRead(DWORD *argv)
 {
 	void *buf;
 
-	if ((argv[ATTR_ID] & 0xFFFF0000) != MSG_ATTR_MAP)
+	if ((argv[MSG_ATTR_ID] & MSG_MAP_MASK) != MSG_ATTR_ROMAP)
 		return;
-	if (!(argv[ATTR_ID] & 1))
+	if ((argv[MSG_ATTR_ID] & MSG_ATTR_MASK) == MSG_ATTR_ROMAP)
 	{
-		argv[0] = FS_ERR_WRONG_ARGS;
-		KUnmapProcAddr((void*)argv[ADDR_ID], argv);
+		argv[MSG_RES_ID] = FS_ERR_WRONG_ARGS;
+		KUnmapProcAddr((void*)argv[MSG_ADDR_ID], argv);
 		return;
 	}
-	buf = (void*)argv[ADDR_ID];
-	argv[0] = read(pret[((THREAD_ID*)&argv[PTID_ID])->ProcID], argv[API_ID + 1], buf, &argv[SIZE_ID]);
+	buf = (void*)argv[MSG_ADDR_ID];
+	argv[MSG_RES_ID] = read(pret[((THREAD_ID*)&argv[PTID_ID])->ProcID], argv[3], buf, &argv[MSG_SIZE_ID]);
 	KUnmapProcAddr(buf, argv);
 }
 
@@ -204,36 +197,34 @@ void ApiWrite(DWORD *argv)
 {
 	void *buf;
 
-	if ((argv[ATTR_ID] & 0xFFFF0000) != MSG_ATTR_MAP)
+	if ((argv[MSG_ATTR_ID] & MSG_MAP_MASK) != MSG_ATTR_ROMAP)
 		return;
-	buf = (void*)argv[ADDR_ID];
-	argv[0] = write(pret[((THREAD_ID*)&argv[PTID_ID])->ProcID], argv[API_ID + 1], buf, &argv[SIZE_ID]);
+	buf = (void*)argv[MSG_ADDR_ID];
+	argv[MSG_RES_ID] = write(pret[((THREAD_ID*)&argv[PTID_ID])->ProcID], argv[3], buf, &argv[MSG_SIZE_ID]);
 	KUnmapProcAddr(buf, argv);
 }
 
 void ApiSeek(DWORD *argv)
 {
-	if ((argv[ATTR_ID] & 0xFFFF0000) == MSG_ATTR_MAP)
+	if ((argv[MSG_ATTR_ID] & MSG_MAP_MASK) == MSG_ATTR_ROMAP)
 	{
-		argv[0] = FS_ERR_WRONG_ARGS;
-		KUnmapProcAddr((void*)argv[ADDR_ID], argv);
+		argv[MSG_RES_ID] = FS_ERR_WRONG_ARGS;
+		KUnmapProcAddr((void*)argv[MSG_ADDR_ID], argv);
 		return;
 	}
-	argv[0] = MSG_ATTR_USER;
-	argv[1] = seek(pret[((THREAD_ID*)&argv[PTID_ID])->ProcID], argv[API_ID + 1], *((SQWORD*)&argv[API_ID + 2]), argv[API_ID + 4]);
+	argv[MSG_RES_ID] = seek(pret[((THREAD_ID*)&argv[PTID_ID])->ProcID], argv[1], *((SQWORD*)&argv[2]), argv[4]);
 	KSendMsg((THREAD_ID*)&argv[PTID_ID], argv, 0);
 }
 
 void ApiSetSize(DWORD *argv)
 {
-	if ((argv[ATTR_ID] & 0xFFFF0000) == MSG_ATTR_MAP)
+	if ((argv[MSG_ATTR_ID] & MSG_MAP_MASK) == MSG_ATTR_ROMAP)
 	{
-		argv[0] = FS_ERR_WRONG_ARGS;
-		KUnmapProcAddr((void*)argv[ADDR_ID], argv);
+		argv[MSG_RES_ID] = FS_ERR_WRONG_ARGS;
+		KUnmapProcAddr((void*)argv[MSG_ADDR_ID], argv);
 		return;
 	}
-	argv[0] = MSG_ATTR_USER;
-	argv[1] = SetSize(pret[((THREAD_ID*)&argv[PTID_ID])->ProcID], argv[API_ID + 1], *((QWORD*)&argv[API_ID + 2]));
+	argv[MSG_RES_ID] = SetSize(pret[((THREAD_ID*)&argv[PTID_ID])->ProcID], argv[1], *((QWORD*)&argv[2]));
 	KSendMsg((THREAD_ID*)&argv[PTID_ID], argv, 0);
 }
 
@@ -241,13 +232,13 @@ void ApiOpenDir(DWORD *argv)
 {
 	const char *path;
 
-	if ((argv[ATTR_ID] & 0xFFFF0000) != MSG_ATTR_MAP)
+	if ((argv[MSG_ATTR_ID] & MSG_MAP_MASK) != MSG_ATTR_ROMAP)
 		return;
-	path = (const char*)argv[ADDR_ID];
-	if (CheckPathSize(path, argv[SIZE_ID]) == NULL)
-		argv[0] = FS_ERR_ARGS_TOOLONG;
+	path = (const char*)argv[MSG_ADDR_ID];
+	if (CheckPathSize(path, argv[MSG_SIZE_ID]) == NULL)
+		argv[MSG_RES_ID] = FS_ERR_ARGS_TOOLONG;
 	else
-		argv[0] = OpenDir(pret[((THREAD_ID*)&argv[PTID_ID])->ProcID], path, &argv[1]);
+		argv[MSG_RES_ID] = OpenDir(pret[((THREAD_ID*)&argv[PTID_ID])->ProcID], path, &argv[2]);
 	KUnmapProcAddr((void*)path, argv);
 }
 
@@ -255,16 +246,16 @@ void ApiReadDir(DWORD *argv)
 {
 	FILE_INFO *buf;
 
-	if ((argv[ATTR_ID] & 0xFFFF0000) != MSG_ATTR_MAP)
+	if ((argv[MSG_ATTR_ID] & MSG_MAP_MASK) != MSG_ATTR_ROMAP)
 		return;
-	if (!(argv[ATTR_ID] & 1) || argv[SIZE_ID] < sizeof(FILE_INFO))
+	if ((argv[MSG_ATTR_ID] & MSG_ATTR_MASK) == MSG_ATTR_ROMAP || argv[MSG_SIZE_ID] < sizeof(FILE_INFO))
 	{
-		argv[0] = FS_ERR_WRONG_ARGS;
-		KUnmapProcAddr((void*)argv[ADDR_ID], argv);
+		argv[MSG_RES_ID] = FS_ERR_WRONG_ARGS;
+		KUnmapProcAddr((void*)argv[MSG_ADDR_ID], argv);
 		return;
 	}
-	buf = (FILE_INFO*)argv[ADDR_ID];
-	argv[0] = ReadDir(pret[((THREAD_ID*)&argv[PTID_ID])->ProcID], argv[API_ID + 1], buf);
+	buf = (FILE_INFO*)argv[MSG_ADDR_ID];
+	argv[MSG_RES_ID] = ReadDir(pret[((THREAD_ID*)&argv[PTID_ID])->ProcID], argv[3], buf);
 	KUnmapProcAddr((void*)buf, argv);
 }
 
@@ -272,13 +263,13 @@ void ApiChDir(DWORD *argv)
 {
 	const char *path;
 
-	if ((argv[ATTR_ID] & 0xFFFF0000) != MSG_ATTR_MAP)
+	if ((argv[MSG_ATTR_ID] & MSG_MAP_MASK) != MSG_ATTR_ROMAP)
 		return;
-	path = (const char*)argv[ADDR_ID];
-	if (CheckPathSize(path, argv[SIZE_ID]) == NULL)
-		argv[0] = FS_ERR_ARGS_TOOLONG;
+	path = (const char*)argv[MSG_ADDR_ID];
+	if (CheckPathSize(path, argv[MSG_SIZE_ID]) == NULL)
+		argv[MSG_RES_ID] = FS_ERR_ARGS_TOOLONG;
 	else
-		argv[0] = ChDir(pret[((THREAD_ID*)&argv[PTID_ID])->ProcID], path);
+		argv[MSG_RES_ID] = ChDir(pret[((THREAD_ID*)&argv[PTID_ID])->ProcID], path);
 	KUnmapProcAddr((void*)path, argv);
 }
 
@@ -286,13 +277,13 @@ void ApiMkDir(DWORD *argv)
 {
 	const char *path;
 
-	if ((argv[ATTR_ID] & 0xFFFF0000) != MSG_ATTR_MAP)
+	if ((argv[MSG_ATTR_ID] & MSG_MAP_MASK) != MSG_ATTR_ROMAP)
 		return;
-	path = (const char*)argv[ADDR_ID];
-	if (CheckPathSize(path, argv[SIZE_ID]) == NULL)
-		argv[0] = FS_ERR_ARGS_TOOLONG;
+	path = (const char*)argv[MSG_ADDR_ID];
+	if (CheckPathSize(path, argv[MSG_SIZE_ID]) == NULL)
+		argv[MSG_RES_ID] = FS_ERR_ARGS_TOOLONG;
 	else
-		argv[0] = MkDir(pret[((THREAD_ID*)&argv[PTID_ID])->ProcID], path);
+		argv[MSG_RES_ID] = MkDir(pret[((THREAD_ID*)&argv[PTID_ID])->ProcID], path);
 	KUnmapProcAddr((void*)path, argv);
 }
 
@@ -300,13 +291,13 @@ void ApiRemove(DWORD *argv)
 {
 	const char *path;
 
-	if ((argv[ATTR_ID] & 0xFFFF0000) != MSG_ATTR_MAP)
+	if ((argv[MSG_ATTR_ID] & MSG_MAP_MASK) != MSG_ATTR_ROMAP)
 		return;
-	path = (const char*)argv[ADDR_ID];
-	if (CheckPathSize(path, argv[SIZE_ID]) == NULL)
-		argv[0] = FS_ERR_ARGS_TOOLONG;
+	path = (const char*)argv[MSG_ADDR_ID];
+	if (CheckPathSize(path, argv[MSG_SIZE_ID]) == NULL)
+		argv[MSG_RES_ID] = FS_ERR_ARGS_TOOLONG;
 	else
-		argv[0] = remove(pret[((THREAD_ID*)&argv[PTID_ID])->ProcID], path);
+		argv[MSG_RES_ID] = remove(pret[((THREAD_ID*)&argv[PTID_ID])->ProcID], path);
 	KUnmapProcAddr((void*)path, argv);
 }
 
@@ -314,15 +305,15 @@ void ApiReName(DWORD *argv)
 {
 	const char *path, *name;
 
-	if ((argv[ATTR_ID] & 0xFFFF0000) != MSG_ATTR_MAP)
+	if ((argv[MSG_ATTR_ID] & MSG_MAP_MASK) != MSG_ATTR_ROMAP)
 		return;
-	path = (const char*)argv[ADDR_ID];
-	if ((name = CheckPathSize(path, argv[SIZE_ID])) == NULL)
-		argv[0] = FS_ERR_ARGS_TOOLONG;
-	else if (name++, CheckPathSize(name, argv[SIZE_ID] - (name - path)) == NULL)
-		argv[0] = FS_ERR_ARGS_TOOLONG;
+	path = (const char*)argv[MSG_ADDR_ID];
+	if ((name = CheckPathSize(path, argv[MSG_SIZE_ID])) == NULL)
+		argv[MSG_RES_ID] = FS_ERR_ARGS_TOOLONG;
+	else if (name++, CheckPathSize(name, argv[MSG_SIZE_ID] - (name - path)) == NULL)
+		argv[MSG_RES_ID] = FS_ERR_ARGS_TOOLONG;
 	else
-		argv[0] = rename(pret[((THREAD_ID*)&argv[PTID_ID])->ProcID], path, name);
+		argv[MSG_RES_ID] = rename(pret[((THREAD_ID*)&argv[PTID_ID])->ProcID], path, name);
 	KUnmapProcAddr((void*)path, argv);
 }
 
@@ -330,19 +321,19 @@ void ApiGetAttr(DWORD *argv)
 {
 	char *path;
 
-	if ((argv[ATTR_ID] & 0xFFFF0000) != MSG_ATTR_MAP)
+	if ((argv[MSG_ATTR_ID] & MSG_MAP_MASK) != MSG_ATTR_ROMAP)
 		return;
-	if (!(argv[ATTR_ID] & 1) || argv[SIZE_ID] < sizeof(FILE_INFO))
+	if ((argv[MSG_ATTR_ID] & MSG_ATTR_MASK) == MSG_ATTR_ROMAP || argv[MSG_SIZE_ID] < sizeof(FILE_INFO))
 	{
-		argv[0] = FS_ERR_WRONG_ARGS;
-		KUnmapProcAddr((void*)argv[ADDR_ID], argv);
+		argv[MSG_RES_ID] = FS_ERR_WRONG_ARGS;
+		KUnmapProcAddr((void*)argv[MSG_ADDR_ID], argv);
 		return;
 	}
-	path = (char*)argv[ADDR_ID];
-	if (CheckPathSize(path, argv[SIZE_ID]) == NULL)
-		argv[0] = FS_ERR_ARGS_TOOLONG;
+	path = (char*)argv[MSG_ADDR_ID];
+	if (CheckPathSize(path, argv[MSG_SIZE_ID]) == NULL)
+		argv[MSG_RES_ID] = FS_ERR_ARGS_TOOLONG;
 	else
-		argv[0] = GetAttr(pret[((THREAD_ID*)&argv[PTID_ID])->ProcID], path, (FILE_INFO*)path);
+		argv[MSG_RES_ID] = GetAttr(pret[((THREAD_ID*)&argv[PTID_ID])->ProcID], path, (FILE_INFO*)path);
 	KUnmapProcAddr(path, argv);
 }
 
@@ -350,13 +341,13 @@ void ApiSetAttr(DWORD *argv)
 {
 	const char *path;
 
-	if ((argv[ATTR_ID] & 0xFFFF0000) != MSG_ATTR_MAP)
+	if ((argv[MSG_ATTR_ID] & MSG_MAP_MASK) != MSG_ATTR_ROMAP)
 		return;
-	path = (const char*)argv[ADDR_ID];
-	if (CheckPathSize(path, argv[SIZE_ID]) == NULL)
-		argv[0] = FS_ERR_ARGS_TOOLONG;
+	path = (const char*)argv[MSG_ADDR_ID];
+	if (CheckPathSize(path, argv[MSG_SIZE_ID]) == NULL)
+		argv[MSG_RES_ID] = FS_ERR_ARGS_TOOLONG;
 	else
-		argv[0] = SetAttr(pret[((THREAD_ID*)&argv[PTID_ID])->ProcID], path, argv[API_ID + 1]);
+		argv[MSG_RES_ID] = SetAttr(pret[((THREAD_ID*)&argv[PTID_ID])->ProcID], path, argv[3]);
 	KUnmapProcAddr((void*)path, argv);
 }
 
@@ -364,13 +355,13 @@ void ApiSetTime(DWORD *argv)
 {
 	const char *path;
 
-	if ((argv[ATTR_ID] & 0xFFFF0000) != MSG_ATTR_MAP)
+	if ((argv[MSG_ATTR_ID] & MSG_MAP_MASK) != MSG_ATTR_ROMAP)
 		return;
-	path = (const char*)argv[ADDR_ID];
-	if (CheckPathSize(path, argv[SIZE_ID]) == NULL)
-		argv[0] = FS_ERR_ARGS_TOOLONG;
+	path = (const char*)argv[MSG_ADDR_ID];
+	if (CheckPathSize(path, argv[MSG_SIZE_ID]) == NULL)
+		argv[MSG_RES_ID] = FS_ERR_ARGS_TOOLONG;
 	else
-		argv[0] = SetTime(pret[((THREAD_ID*)&argv[PTID_ID])->ProcID], path, argv[API_ID + 1], argv[API_ID + 2]);
+		argv[MSG_RES_ID] = SetTime(pret[((THREAD_ID*)&argv[PTID_ID])->ProcID], path, argv[3], argv[4]);
 	KUnmapProcAddr((void*)path, argv);
 }
 
@@ -378,17 +369,16 @@ void ApiProcInfo(DWORD *argv)
 {
 	FILE_INFO *buf;
 
-	if ((argv[ATTR_ID] & 0xFFFF0000) != MSG_ATTR_MAP)
+	if ((argv[MSG_ATTR_ID] & MSG_MAP_MASK) != MSG_ATTR_ROMAP)
 		return;
-	if (!(argv[ATTR_ID] & 1) || argv[SIZE_ID] < sizeof(FILE_INFO))
+	if ((argv[MSG_ATTR_ID] & MSG_ATTR_MASK) == MSG_ATTR_ROMAP || argv[MSG_SIZE_ID] < sizeof(FILE_INFO))
 	{
-		argv[0] = FS_ERR_WRONG_ARGS;
-		KUnmapProcAddr((void*)argv[ADDR_ID], argv);
+		argv[MSG_RES_ID] = FS_ERR_WRONG_ARGS;
+		KUnmapProcAddr((void*)argv[MSG_ADDR_ID], argv);
 		return;
 	}
-	buf = (FILE_INFO*)argv[ADDR_ID];
-	argv[0] = ProcInfo(&argv[API_ID + 1], buf);
-	argv[1] = argv[API_ID + 1];
+	buf = (FILE_INFO*)argv[MSG_ADDR_ID];
+	argv[MSG_RES_ID] = ProcInfo(&argv[3], buf);
 	KUnmapProcAddr((void*)buf, argv);
 }
 
@@ -417,70 +407,67 @@ void ApiProc(DWORD *argv)
 	{
 		if ((CurPres = (PROCRES_DESC*)malloc(sizeof(PROCRES_DESC))) == NULL)
 		{
-			if ((argv[ATTR_ID] & 0xFFFF0000) == MSG_ATTR_MAP)
-			{
-				argv[0] = FS_ERR_HAVENO_MEMORY;
-				KUnmapProcAddr((void*)argv[ADDR_ID], argv);
-			}
-			else if ((argv[ATTR_ID] & 0xFFFF0000) == MSG_ATTR_USER)
-			{
-				argv[0] = MSG_ATTR_USER;
-				argv[1] = FS_ERR_HAVENO_MEMORY;
+			argv[MSG_RES_ID] = FS_ERR_HAVENO_MEMORY;
+			if (argv[MSG_ATTR_ID] < MSG_ATTR_USER)
+				KUnmapProcAddr((void*)argv[MSG_ADDR_ID], argv);
+			else
 				KSendMsg((THREAD_ID*)&argv[PTID_ID], argv, 0);
-			}
 			free(argv, sizeof(DWORD) * (MSG_DATA_LEN + 1));
-			KExitThread(NO_ERROR);
+			KExitThread(FS_ERR_HAVENO_MEMORY);
 		}
 		memset32(CurPres, 0, sizeof(PROCRES_DESC) / sizeof(DWORD));
 		pret[((THREAD_ID*)&argv[PTID_ID])->ProcID] = CurPres;
 	}
-	ApiTable[argv[API_ID]](argv);
+	ApiTable[argv[MSG_API_ID] & MSG_API_MASK](argv);
 	free(argv, sizeof(DWORD) * (MSG_DATA_LEN + 1));
 	KExitThread(NO_ERROR);
 }
 
 int main()
 {
-	THREAD_ID CachePtid;
+	THREAD_ID ptid;
 	long res;
 
 	if ((res = InitFS()) != NO_ERROR)
 		return res;
 	InitPart();
-	KCreateThread((void(*)(void*))CacheProc, 0x40000, (void*)PROC_INTERVAL, &CachePtid);	/*启动后台定时缓冲保存线程*/
+	KCreateThread((void(*)(void*))CacheProc, 0x40000, (void*)PROC_INTERVAL, &ptid);	/*启动后台定时缓冲保存线程*/
 	for (;;)
 	{
 		DWORD data[MSG_DATA_LEN + 1];
-		THREAD_ID ptid;
 
 		if ((res = KRecvMsg((THREAD_ID*)&data[PTID_ID], data, INVALID)) != NO_ERROR)	/*等待消息*/
 			break;
-		if ((data[ATTR_ID] & 0xFFFF0000) == MSG_ATTR_PROCEXIT)
-			data[API_ID] = FS_API_PROCEXIT;
-		else if ((data[ATTR_ID] & 0xFFFF0000) == MSG_ATTR_EXITREQ)
-			break;
-		if (((data[ATTR_ID] & 0xFFFF0000) == MSG_ATTR_MAP || (data[ATTR_ID] & 0xFFFF0000) == MSG_ATTR_USER || (data[ATTR_ID] & 0xFFFF0000) == MSG_ATTR_PROCEXIT) && data[API_ID] < sizeof(ApiTable) / sizeof(void*))
+		if ((data[MSG_ATTR_ID] & MSG_ATTR_MASK) == MSG_ATTR_PROCEXIT)
+			data[MSG_ATTR_ID] = MSG_ATTR_FS | FS_API_PROCEXIT;
+		if ((data[MSG_ATTR_ID] & MSG_MAP_MASK) == MSG_ATTR_ROMAP || (data[MSG_ATTR_ID] & MSG_ATTR_MASK) == MSG_ATTR_FS)
 		{
 			DWORD *buf;
 
-			if ((buf = (DWORD*)malloc(sizeof(DWORD) * (MSG_DATA_LEN + 1))) == NULL)
+			if ((data[MSG_API_ID] & MSG_API_MASK) >= sizeof(ApiTable) / sizeof(void*))
 			{
-				if ((data[ATTR_ID] & 0xFFFF0000) == MSG_ATTR_MAP)
-				{
-					data[0] = FS_ERR_HAVENO_MEMORY;
-					KUnmapProcAddr((void*)data[ADDR_ID], data);
-				}
-				else if ((data[ATTR_ID] & 0xFFFF0000) == MSG_ATTR_USER)
-				{
-					data[0] = MSG_ATTR_USER;
-					data[1] = FS_ERR_HAVENO_MEMORY;
+				data[MSG_RES_ID] = FS_ERR_WRONG_ARGS;
+				if (data[MSG_ATTR_ID] < MSG_ATTR_USER)
+					KUnmapProcAddr((void*)data[MSG_ADDR_ID], data);
+				else
 					KSendMsg((THREAD_ID*)&data[PTID_ID], data, 0);
-				}
-				continue;
 			}
-			memcpy32(buf, data, MSG_DATA_LEN + 1);
-			KCreateThread((void(*)(void*))ApiProc, 0x40000, buf, &ptid);
+			else if ((buf = (DWORD*)malloc(sizeof(DWORD) * (MSG_DATA_LEN + 1))) == NULL)
+			{
+				data[MSG_RES_ID] = FS_ERR_HAVENO_MEMORY;
+				if (data[MSG_ATTR_ID] < MSG_ATTR_USER)
+					KUnmapProcAddr((void*)data[MSG_ADDR_ID], data);
+				else
+					KSendMsg((THREAD_ID*)&data[PTID_ID], data, 0);
+			}
+			else
+			{
+				memcpy32(buf, data, MSG_DATA_LEN + 1);
+				KCreateThread((void(*)(void*))ApiProc, 0x40000, buf, &ptid);
+			}
 		}
+		else if (data[MSG_ATTR_ID] == MSG_ATTR_EXTPROCREQ)
+			break;
 	}
 	KSleep(100);
 	CloseFS();

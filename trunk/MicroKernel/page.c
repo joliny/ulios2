@@ -81,7 +81,7 @@ long FillPt(PAGE_DESC *FstPg, PAGE_DESC *EndPg, DWORD attr)
 			DWORD PtAddr;	/*页表的物理地址*/
 
 			if ((PtAddr = LockAllocPage()) == 0)
-				return ERROR_HAVENO_PMEM;
+				return KERR_OUT_OF_PHYMEM;
 			pt[(DWORD)FstPg >> 12] = attr | PtAddr;
 			memset32(FstPg, 0, 0x400);	/*清空页表*/
 		}
@@ -100,7 +100,7 @@ long FillPage(EXEC_DESC *exec, void *addr, DWORD ErrCode)
 	CurPt = &pt[(DWORD)CurPg >> 12];
 	CurPt0 = &pt[(DWORD)CurPg0 >> 12];
 	if ((ErrCode & PAGE_ATTR_W) && (*CurPt & PAGE_ATTR_ROMAP))	/*页表为映射只读*/
-		return ERROR_INVALID_MAPADDR;
+		return KERR_WRITE_RDONLY_ADDR;
 	if (!(ErrCode & PAGE_ATTR_P) && !(*CurPt & PAGE_ATTR_P))	/*页表不存在*/
 	{
 		if (*CurPt0 & PAGE_ATTR_P)	/*副本中存在*/
@@ -111,7 +111,7 @@ long FillPage(EXEC_DESC *exec, void *addr, DWORD ErrCode)
 			void *fst, *end;
 
 			if ((PtAddr = LockAllocPage()) == 0)	/*申请新页表*/
-				return ERROR_HAVENO_PMEM;
+				return KERR_OUT_OF_PHYMEM;
 			PtAddr |= PAGE_ATTR_P | PAGE_ATTR_U;	/*设为只读*/
 			*CurPt |= PtAddr;	/*修改页目录表*/
 			memset32((void*)((DWORD)CurPg & 0xFFFFF000), 0, 0x400);	/*清空页表*/
@@ -129,7 +129,7 @@ long FillPage(EXEC_DESC *exec, void *addr, DWORD ErrCode)
 			DWORD PtAddr;	/*页表的物理地址*/
 
 			if ((PtAddr = LockAllocPage()) == 0)	/*申请新页表*/
-				return ERROR_HAVENO_PMEM;
+				return KERR_OUT_OF_PHYMEM;
 			*CurPt = PAGE_ATTR_P | PAGE_ATTR_W | PAGE_ATTR_U | PtAddr;	/*修改页目录表,开启写权限*/
 			RefreshTlb();
 			memcpy32((void*)((DWORD)CurPg & 0xFFFFF000), (void*)((DWORD)CurPg0 & 0xFFFFF000), 0x400);	/*页表写时复制*/
@@ -141,7 +141,7 @@ long FillPage(EXEC_DESC *exec, void *addr, DWORD ErrCode)
 		}
 	}
 	if ((ErrCode & PAGE_ATTR_W) && (*CurPg & PAGE_ATTR_ROMAP))	/*页为映射只读*/
-		return ERROR_INVALID_MAPADDR;
+		return KERR_WRITE_RDONLY_ADDR;
 	if (!(ErrCode & PAGE_ATTR_P) && !(*CurPg & PAGE_ATTR_P))	/*页不存在*/
 	{
 		if ((*CurPt0 & PAGE_ATTR_P) && (*CurPg0 & PAGE_ATTR_P))	/*副本页表和副本页存在*/
@@ -152,7 +152,7 @@ long FillPage(EXEC_DESC *exec, void *addr, DWORD ErrCode)
 			void *fst, *end;
 
 			if ((PgAddr = LockAllocPage()) == 0)	/*申请新页*/
-				return ERROR_HAVENO_PMEM;
+				return KERR_OUT_OF_PHYMEM;
 			PgAddr |= PAGE_ATTR_P | PAGE_ATTR_U;	/*设为只读*/
 			*CurPg |= PgAddr;	/*修改页表*/
 			memset32((void*)((DWORD)addr & 0xFFFFF000), 0, 0x400);	/*清空页*/
@@ -167,13 +167,13 @@ long FillPage(EXEC_DESC *exec, void *addr, DWORD ErrCode)
 
 				buf = (fst < exec->CodeOff ? exec->CodeOff : fst);
 				siz = (end > exec->CodeEnd ? exec->CodeEnd : end) - buf;
-				data[0] = FS_API_READPAGE;	/*向文件系统发出消息读取可执行文件页*/
-				data[1] = buf - exec->CodeOff + exec->CodeSeek;
+				data[MSG_API_ID] = FS_API_READPAGE;	/*向文件系统发出消息读取可执行文件页*/
+				data[3] = buf - exec->CodeOff + exec->CodeSeek;
 				ptid = kpt[FS_KPORT];
-				if ((data[0] = MapProcAddr(buf, siz, &ptid, TRUE, FALSE, data, FS_OUT_TIME)) != NO_ERROR)
-					return data[0];
-				if (data[2] != NO_ERROR)
-					return data[2];
+				if ((data[MSG_API_ID] = MapProcAddr(buf, siz, &ptid, TRUE, FALSE, data, FS_OUT_TIME)) != NO_ERROR)
+					return data[MSG_API_ID];
+				if (data[MSG_RES_ID] != NO_ERROR)
+					return data[MSG_RES_ID];
 				*CurPg0 = PgAddr;
 			}
 			if (exec->DataOff < exec->DataEnd && exec->DataOff < end && exec->DataEnd > fst)	/*数据段与缺页覆盖区有重合*/
@@ -185,13 +185,13 @@ long FillPage(EXEC_DESC *exec, void *addr, DWORD ErrCode)
 
 				buf = (fst < exec->DataOff ? exec->DataOff : fst);
 				siz = (end > exec->DataEnd ? exec->DataEnd : end) - buf;
-				data[0] = FS_API_READPAGE;	/*向文件系统发出消息读取可执行文件页*/
-				data[1] = buf - exec->DataOff + exec->DataSeek;
+				data[MSG_API_ID] = FS_API_READPAGE;	/*向文件系统发出消息读取可执行文件页*/
+				data[3] = buf - exec->DataOff + exec->DataSeek;
 				ptid = kpt[FS_KPORT];
-				if ((data[0] = MapProcAddr(buf, siz, &ptid, TRUE, FALSE, data, FS_OUT_TIME)) != NO_ERROR)
-					return data[0];
-				if (data[2] != NO_ERROR)
-					return data[2];
+				if ((data[MSG_API_ID] = MapProcAddr(buf, siz, &ptid, TRUE, FALSE, data, FS_OUT_TIME)) != NO_ERROR)
+					return data[MSG_API_ID];
+				if (data[MSG_RES_ID] != NO_ERROR)
+					return data[MSG_RES_ID];
 				*CurPg0 = PgAddr;
 			}
 		}
@@ -204,7 +204,7 @@ long FillPage(EXEC_DESC *exec, void *addr, DWORD ErrCode)
 			PAGE_DESC *Pg0Pt;
 
 			if ((PgAddr = LockAllocPage()) == 0)	/*申请新页*/
-				return ERROR_HAVENO_PMEM;
+				return KERR_OUT_OF_PHYMEM;
 			*CurPg = PAGE_ATTR_P | PAGE_ATTR_W | PAGE_ATTR_U | PgAddr;	/*修改页表,开启写权限*/
 			RefreshTlb();
 			Pg0Pt = (PAGE_DESC*)(((DWORD)CurPt & 0xFFFFF000) | (PG0_ID * sizeof(PAGE_DESC)));
@@ -391,19 +391,19 @@ long MapPhyAddr(void **addr, DWORD PhyAddr, DWORD siz)
 
 	CurProc = CurPmd;
 	if (CurProc->attr & PROC_ATTR_APPS)
-		return ERROR_NOT_DRIVER;	/*驱动进程特权API*/
+		return KERR_NO_DRIVER_PRIVILEGE;	/*驱动进程特权API*/
 	if (siz == 0)
-		return ERROR_INVALID_MAPSIZE;
+		return KERR_MAPSIZE_IS_ZERO;
 	siz = (PhyAddr + siz + 0x00000FFF) & 0xFFFFF000;	/*调整PhyAddr,siz到页边界,siz临时用做结束地址*/
 	*((DWORD*)addr) = PhyAddr & 0x00000FFF;	/*记录地址参数的零头*/
 	PhyAddr &= 0xFFFFF000;
 	if (siz <= PhyAddr)	/*长度越界*/
-		return ERROR_INVALID_MAPSIZE;
+		return KERR_MAPSIZE_TOO_LONG;
 	if (PhyAddr < BOOTDAT_ADDR || (PhyAddr < UPHYMEM_ADDR + (PmmLen << 12) && siz > (DWORD)kdat))	/*与不允许被映射的区域有重合*/
-		return ERROR_INVALID_MAPADDR;
+		return KERR_ILLEGAL_PHYADDR_MAPED;
 	siz -= PhyAddr;	/*siz恢复为映射字节数*/
 	if ((CurBlk = LockAllocUBlk(CurProc, siz)) == NULL)
-		return ERROR_HAVENO_LINEADDR;
+		return KERR_OUT_OF_LINEADDR;
 	MapAddr = CurBlk->addr;
 	FstPg = &pt[(DWORD)MapAddr >> 12];
 	EndPg = &pt[((DWORD)MapAddr + siz) >> 12];
@@ -414,7 +414,7 @@ long MapPhyAddr(void **addr, DWORD PhyAddr, DWORD siz)
 		ClearPage(FstPg, EndPg, TRUE);
 		ulock(&CurProc->Page_l);
 		LockFreeUBlk(CurProc, CurBlk);
-		return ERROR_HAVENO_PMEM;
+		return KERR_OUT_OF_PHYMEM;
 	}
 	PhyAddr |= PAGE_ATTR_P | PAGE_ATTR_W | PAGE_ATTR_U;
 	for (; FstPg < EndPg; FstPg++)	/*修改页表,映射地址*/
@@ -434,9 +434,9 @@ long MapUserAddr(void **addr, DWORD siz)
 
 	siz = (siz + 0x00000FFF) & 0xFFFFF000;	/*siz调整到页边界*/
 	if (siz == 0)
-		return ERROR_INVALID_MAPSIZE;
+		return KERR_MAPSIZE_IS_ZERO;
 	if ((CurBlk = LockAllocUBlk(CurPmd, siz)) == NULL)	/*只申请空间即可*/
-		return ERROR_HAVENO_LINEADDR;
+		return KERR_OUT_OF_LINEADDR;
 	*addr = CurBlk->addr;
 	return NO_ERROR;
 }
@@ -450,7 +450,7 @@ long UnmapAddr(void *addr)
 	CurProc = CurPmd;
 	*((DWORD*)&addr) &= 0xFFFFF000;
 	if ((blk = LockFindUBlk(CurProc, addr)) == NULL)
-		return ERROR_INVALID_ADDR;
+		return KERR_ADDRARGS_NOT_FOUND;
 	lock(&CurProc->Page_l);
 	ClearPage(&pt[(DWORD)addr >> 12], &pt[((DWORD)addr + blk->siz) >> 12], TRUE);
 	ulock(&CurProc->Page_l);
@@ -471,23 +471,23 @@ long MapProcAddr(void *addr, DWORD siz, THREAD_ID *ptid, BOOL isWrite, BOOL isCh
 	long res;
 
 	if (siz == 0)
-		return ERROR_INVALID_MAPSIZE;
+		return KERR_MAPSIZE_IS_ZERO;
 	dsiz = siz;
 	siz = ((DWORD)addr + siz + 0x00000FFF) & 0xFFFFF000;	/*调整ProcAddr,siz到页边界,siz临时用做结束地址*/
 	*((DWORD*)&daddr) = (DWORD)addr & 0x00000FFF;	/*记录地址参数的零头*/
 	*((DWORD*)&addr) &= 0xFFFFF000;
 	if (siz <= (DWORD)addr)	/*长度越界*/
-		return ERROR_INVALID_MAPSIZE;
+		return KERR_MAPSIZE_TOO_LONG;
 	if (addr < UADDR_OFF)	/*与不允许被映射的区域有重合*/
-		return ERROR_INVALID_MAPADDR;
+		return KERR_ACCESS_ILLEGAL_ADDR;
 	if (ptid->ProcID >= PMT_LEN)
-		return ERROR_WRONG_PROCID;
+		return KERR_INVALID_PROCID;
 	if (ptid->ThedID >= TMT_LEN)
-		return ERROR_WRONG_THEDID;
+		return KERR_INVALID_THEDID;
 	CurProc = CurPmd;
 	CurThed = CurProc->CurTmd;
 	if (ptid->ProcID == CurThed->id.ProcID)	/*不允许进程自身映射*/
-		return ERROR_WRONG_PROCID;
+		return KERR_PROC_SELF_MAPED;
 	if (isChkExec)
 	{
 		EXEC_DESC *CurExec;
@@ -537,18 +537,18 @@ long MapProcAddr(void *addr, DWORD siz, THREAD_ID *ptid, BOOL isWrite, BOOL isCh
 	if (DstProc == NULL || (DstProc->attr & PROC_ATTR_DEL))
 	{
 		sti();
-		return ERROR_WRONG_PROCID;
+		return KERR_PROC_NOT_EXIST;
 	}
 	DstThed = DstProc->tmt[ptid->ThedID];
 	if (DstThed == NULL || (DstThed->attr & THED_ATTR_DEL))
 	{
 		sti();
-		return ERROR_WRONG_THEDID;
+		return KERR_THED_NOT_EXIST;
 	}
 	if (DstProc->MapCou >= PROC_MAP_LEN)
 	{
 		sti();
-		return ERROR_HAVENO_LINEADDR;
+		return KERR_OUT_OF_LINEADDR;
 	}
 	DstProc->Map_l++;
 	sti();
@@ -556,13 +556,13 @@ long MapProcAddr(void *addr, DWORD siz, THREAD_ID *ptid, BOOL isWrite, BOOL isCh
 	if ((MapAddr = LockAllocUFData(DstProc, siz)) == NULL)	/*申请用户空间*/
 	{
 		clisub(&DstProc->Map_l);
-		return ERROR_HAVENO_LINEADDR;
+		return KERR_OUT_OF_LINEADDR;
 	}
 	if ((map = AllocMap(DstProc, siz)) == NULL)	/*申请映射管理结构*/
 	{
 		LockFreeUFData(DstProc, MapAddr, siz);
 		clisub(&DstProc->Map_l);
-		return ERROR_HAVENO_LINEADDR;
+		return KERR_OUT_OF_LINEADDR;
 	}
 	FstPg = &pt[(DWORD)addr >> 12];
 	EndPg = &pt[((DWORD)addr + siz) >> 12];
@@ -582,7 +582,7 @@ long MapProcAddr(void *addr, DWORD siz, THREAD_ID *ptid, BOOL isWrite, BOOL isCh
 			FreeMap(map);
 			LockFreeUFData(DstProc, MapAddr, siz);
 			clisub(&DstProc->Map_l);
-			return ERROR_INVALID_MAPADDR;
+			return KERR_WRITE_RDONLY_ADDR;
 		}
 		if (PtAddr & PAGE_ATTR_P)	/*源页表存在*/
 		{
@@ -598,7 +598,7 @@ long MapProcAddr(void *addr, DWORD siz, THREAD_ID *ptid, BOOL isWrite, BOOL isCh
 					FreeMap(map);
 					LockFreeUFData(DstProc, MapAddr, siz);
 					clisub(&DstProc->Map_l);
-					return ERROR_INVALID_MAPADDR;
+					return KERR_WRITE_RDONLY_ADDR;
 				}
 				if (PgAddr & PAGE_ATTR_P)	/*源页存在*/
 				{
@@ -617,7 +617,7 @@ long MapProcAddr(void *addr, DWORD siz, THREAD_ID *ptid, BOOL isWrite, BOOL isCh
 							FreeMap(map);
 							LockFreeUFData(DstProc, MapAddr, siz);
 							clisub(&DstProc->Map_l);
-							return ERROR_HAVENO_PMEM;
+							return KERR_OUT_OF_PHYMEM;
 						}
 						*CurPt2 = PAGE_ATTR_P | PAGE_ATTR_U | PtAddr;	/*开启用户权限*/
 						memset32((void*)((DWORD)FstPg2 & 0xFFFFF000), 0, 0x400);	/*清空页表*/
@@ -661,12 +661,12 @@ long MapProcAddr(void *addr, DWORD siz, THREAD_ID *ptid, BOOL isWrite, BOOL isCh
 	DstProc->Map_l--;
 	sti();	/*到此映射完成*/
 	if ((msg = AllocMsg()) == NULL)	/*申请消息结构*/
-		return ERROR_HAVENO_MSGDESC;
+		return KERR_MSG_NOT_ENOUGH;
 	msg->ptid = *ptid;	/*设置消息*/
-	msg->data[0] = isWrite ? (MSG_ATTR_MAP | TRUE) : MSG_ATTR_MAP;
-	msg->data[1] = dsiz;
-	msg->data[2] = *((DWORD*)&MapAddr) | *((DWORD*)&daddr);
-	memcpy32(msg->data + 3, argv, MSG_DATA_LEN - 3);
+	memcpy32(msg->data, argv, MSG_DATA_LEN);
+	msg->data[MSG_ATTR_ID] = (argv[MSG_API_ID] & MSG_API_MASK) | (isWrite ? MSG_ATTR_RWMAP : MSG_ATTR_ROMAP);
+	msg->data[MSG_ADDR_ID] = *((DWORD*)&MapAddr) | *((DWORD*)&daddr);
+	msg->data[MSG_SIZE_ID] = dsiz;
 	if (!isChkExec)
 		CurProc->PageReadAddr = map->addr2;
 	if ((res = SendMsg(msg)) != NO_ERROR)	/*发送映射消息*/
@@ -703,7 +703,7 @@ long UnmapProcAddr(void *addr, const DWORD *argv)
 
 	CurProc = CurPmd;
 	if ((map = GetMap(CurProc, addr)) == NULL)
-		return ERROR_INVALID_ADDR;
+		return KERR_ADDRARGS_NOT_FOUND;
 	ptid = map->ptid2;
 	addr2 = map->addr2;
 	DstProc = pmt[ptid.ProcID];
@@ -780,7 +780,7 @@ skip:		continue;
 
 						if ((PtAddr = LockAllocPage()) == 0)	/*申请目的页表*/
 						{
-							res = ERROR_HAVENO_PMEM;
+							res = KERR_OUT_OF_PHYMEM;
 							goto skip2;
 						}
 						pt[(DWORD)FstPg2 >> 12] |= PAGE_ATTR_P | PAGE_ATTR_W | PAGE_ATTR_U | PtAddr;	/*开启用户写权限*/
@@ -812,13 +812,13 @@ skip2:
 	LockFreeUFData(CurProc, (void*)((DWORD)addr & 0xFFFFF000), map->siz);
 	FreeMap(map);
 	if ((msg = AllocMsg()) == NULL)	/*申请消息结构*/
-		return ERROR_HAVENO_MSGDESC;
+		return KERR_MSG_NOT_ENOUGH;
 	msg->ptid = ptid;	/*设置消息*/
-	msg->data[0] = MSG_ATTR_UNMAP;
-	msg->data[1] = (DWORD)addr2;
-	memcpy32(msg->data + 2, argv, MSG_DATA_LEN - 2);
+	memcpy32(msg->data, argv, MSG_DATA_LEN);
+	msg->data[MSG_ATTR_ID] = (argv[MSG_API_ID] & MSG_API_MASK) | MSG_ATTR_UNMAP;
+	msg->data[MSG_ADDR_ID] = (DWORD)addr2;
 	if (res != NO_ERROR)
-		msg->data[2] = res;
+		msg->data[MSG_RES_ID] = res;
 	if ((res = SendMsg(msg)) != NO_ERROR)	/*发送撤销映射消息*/
 	{
 		FreeMsg(msg);
@@ -840,7 +840,7 @@ long CnlmapProcAddr(void *addr, const DWORD *argv)
 
 	CurProc = CurPmd;
 	if ((map = GetMap2(CurProc, addr)) == NULL)
-		return ERROR_INVALID_ADDR;
+		return KERR_ADDRARGS_NOT_FOUND;
 	ptid = map->ptid;
 	addr2 = map->addr;
 	DstProc = pmt[ptid.ProcID];
@@ -895,11 +895,11 @@ skip:		continue;
 	LockFreeUFData(DstProc, (void*)((DWORD)addr2 & 0xFFFFF000), map->siz);
 	FreeMap(map);
 	if ((msg = AllocMsg()) == NULL)	/*申请消息结构*/
-		return ERROR_HAVENO_MSGDESC;
+		return KERR_MSG_NOT_ENOUGH;
 	msg->ptid = ptid;	/*设置消息*/
-	msg->data[0] = MSG_ATTR_CNLMAP;
-	msg->data[1] = (DWORD)addr2;
-	memcpy32(msg->data + 2, argv, MSG_DATA_LEN - 2);
+	memcpy32(msg->data, argv, MSG_DATA_LEN);
+	msg->data[MSG_ATTR_ID] = (argv[MSG_API_ID] & MSG_API_MASK) | MSG_ATTR_CNLMAP;
+	msg->data[MSG_ADDR_ID] = (DWORD)addr2;
 	if ((res = SendMsg(msg)) != NO_ERROR)	/*发送取消映射消息*/
 	{
 		FreeMsg(msg);
@@ -913,9 +913,9 @@ void FreeAllMap()
 {
 	PROCESS_DESC *CurProc;
 	MAPBLK_DESC *CurMap, *map;
-	DWORD data[MSG_DATA_LEN - 2];
+	DWORD data[MSG_DATA_LEN];
 
-	data[0] = MSG_ATTR_PROCEXIT;
+	data[MSG_API_ID] = (MSG_ATTR_PROCEXIT >> 16);
 	CurProc = CurPmd;
 	while (CurProc->Map_l)	/*等待其它进程映射完成*/
 		schedul();
@@ -957,14 +957,14 @@ void PageFaultProc(DWORD edi, DWORD esi, DWORD ebp, DWORD esp, DWORD ebx, DWORD 
 		if ((msg = AllocMsg()) != NULL)	/*通知报告服务器异常消息*/
 		{
 			msg->ptid = kpt[REP_KPORT];
-			msg->data[0] = MSG_ATTR_EXCEP;
-			msg->data[1] = ERROR_INVALID_ADDR;
-			msg->data[2] = (DWORD)addr;
-			msg->data[3] = eip;
+			msg->data[MSG_ATTR_ID] = MSG_ATTR_EXCEP;
+			msg->data[MSG_ADDR_ID] = (DWORD)addr;
+			msg->data[MSG_SIZE_ID] = eip;
+			msg->data[MSG_RES_ID] = KERR_ACCESS_ILLEGAL_ADDR;
 			if (SendMsg(msg) != NO_ERROR)
 				FreeMsg(msg);
 		}
-		ThedExit(ERROR_PROC_EXCEP);
+		ThedExit(KERR_ACCESS_ILLEGAL_ADDR);
 	}
 	CurExec = CurProc->exec;
 	lock(&CurProc->Page_l);
@@ -979,10 +979,10 @@ void PageFaultProc(DWORD edi, DWORD esi, DWORD ebp, DWORD esp, DWORD ebx, DWORD 
 		if ((msg = AllocMsg()) != NULL)	/*通知报告服务器异常消息*/
 		{
 			msg->ptid = kpt[REP_KPORT];
-			msg->data[0] = MSG_ATTR_EXCEP;
-			msg->data[1] = res;
-			msg->data[2] = (DWORD)addr;
-			msg->data[3] = eip;
+			msg->data[MSG_ATTR_ID] = MSG_ATTR_EXCEP;
+			msg->data[MSG_ADDR_ID] = (DWORD)addr;
+			msg->data[MSG_SIZE_ID] = eip;
+			msg->data[MSG_RES_ID] = res;
 			if (SendMsg(msg) != NO_ERROR)
 				FreeMsg(msg);
 		}

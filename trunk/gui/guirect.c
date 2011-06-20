@@ -5,6 +5,7 @@
 */
 
 #include "gui.h"
+#include "../lib/gdi.h"
 
 CLIPRECT ClipRectt[CLIPRECTT_LEN], *FstClipRect;	/*剪切矩形管理表指针*/
 
@@ -24,24 +25,6 @@ static void FreeClipRect(CLIPRECT *clip)
 {
 	clip->nxt = FstClipRect;
 	FstClipRect = clip;
-}
-
-/*释放剪切矩形链*/
-static inline long FreeClipList(CLIPRECT *clip)
-{
-	if (clip)
-	{
-		CLIPRECT *CurClip;
-
-		CurClip = clip;	/*查找链尾节点*/
-		while (CurClip->nxt)
-			CurClip = CurClip->nxt;
-		CurClip->nxt = FstClipRect;
-		FstClipRect = clip;
-		return NO_ERROR;
-	}
-	else
-		return GUI_ERR_NOCHG_CLIPRECT;
 }
 
 #define MIN(a, b)	((a) < (b) ? (a) : (b))
@@ -229,7 +212,7 @@ long DiscoverRectInter(GOBJ_DESC *gobj, long xpos, long ypos, long xend, long ye
 }
 
 /*被祖父和祖伯父窗体覆盖*/
-long CoverRectByPar(GOBJ_DESC *gobj)
+void CoverRectByPar(GOBJ_DESC *gobj)
 {
 	GOBJ_DESC *ParGobj, *PreGobj;
 	long xpos, ypos;
@@ -247,19 +230,25 @@ long CoverRectByPar(GOBJ_DESC *gobj)
 		ParGobj = ParGobj->par;	/*被祖父窗体覆盖外部*/
 		CoverRectExter(gobj, xpos, ypos, xpos + ParGobj->rect.xend - ParGobj->rect.xpos, ypos + ParGobj->rect.yend - ParGobj->rect.ypos);
 	}
-
-	return NO_ERROR;
 }
 
-/*强行删除剪切矩形链表*/
+/*删除剪切矩形链表*/
 long DeleteClipList(GOBJ_DESC *gobj)
 {
-	BOOL isNoChg;
+	BOOL isNoChg = TRUE;
 
-	isNoChg = TRUE;
-	if (FreeClipList(gobj->ClipList) == NO_ERROR)
+	if (gobj->ClipList)
+	{
+		CLIPRECT *CurClip;
+
+		CurClip = gobj->ClipList;	/*查找链尾节点*/
+		while (CurClip->nxt)
+			CurClip = CurClip->nxt;
+		CurClip->nxt = FstClipRect;
+		FstClipRect = gobj->ClipList;
+		gobj->ClipList = NULL;
 		isNoChg = FALSE;
-	gobj->ClipList = NULL;
+	}
 	for (gobj = gobj->chl; gobj; gobj = gobj->nxt)	/*递归处理子窗体*/
 		if (DeleteClipList(gobj) == NO_ERROR)
 			isNoChg = FALSE;
@@ -267,4 +256,46 @@ long DeleteClipList(GOBJ_DESC *gobj)
 		return GUI_ERR_NOCHG_CLIPRECT;
 
 	return NO_ERROR;
+}
+
+/*绘制窗体矩形内部*/
+void DrawGobj(GOBJ_DESC *gobj, long xpos, long ypos, long xend, long yend, long AbsXpos, long AbsYpos, GOBJ_DESC *ExcludeGobj)
+{
+	CLIPRECT *CurClip;
+
+	if (xend <= 0 || xpos >= gobj->rect.xend - gobj->rect.xpos ||	/*没有重叠区域*/
+		yend <= 0 || ypos >= gobj->rect.yend - gobj->rect.ypos)
+		return;
+	for (CurClip = gobj->ClipList; CurClip; CurClip = CurClip->nxt)	/*处理父窗体*/
+	{
+		long TmpXpos, TmpYpos, TmpXend, TmpYend;
+
+		TmpXpos = MAX(xpos, CurClip->rect.xpos);
+		TmpYpos = MAX(ypos, CurClip->rect.ypos);
+		TmpXend = MIN(xend, CurClip->rect.xend);
+		TmpYend = MIN(yend, CurClip->rect.yend);
+		if (TmpXpos < TmpXend && TmpYpos < TmpYend)	/*有重叠区域*/
+		{
+			GOBJ_DESC *ParGobj;
+			long ParXpos, ParYpos;
+			BOOL isRefreshMouse;
+
+			isRefreshMouse = CheckMousePos(AbsXpos + TmpXpos, AbsYpos + TmpYpos, AbsXpos + TmpXend, AbsYpos + TmpYend);
+			for (ParGobj = gobj, ParXpos = AbsXpos, ParYpos = AbsYpos, TmpXend -= TmpXpos, TmpYend -= TmpYpos; ParGobj->vbuf == NULL; ParGobj = ParGobj->par)	/*有显示缓冲则直接绘图,没有则使用祖父窗体的显示缓冲*/
+			{
+				ParXpos -= ParGobj->rect.xpos;
+				ParYpos -= ParGobj->rect.ypos;
+				TmpXpos += ParGobj->rect.xpos;
+				TmpYpos += ParGobj->rect.ypos;
+			}
+			if (isRefreshMouse)
+				HidMouse();
+			GuiPutImage(ParXpos + TmpXpos, ParYpos + TmpYpos, ParGobj->vbuf + (TmpXpos + TmpYpos * (ParGobj->rect.xend - ParGobj->rect.xpos)), ParGobj->rect.xend - ParGobj->rect.xpos, TmpXend, TmpYend);
+			if (isRefreshMouse)
+				ShowMouse();
+		}
+	}
+	for (gobj = gobj->chl; gobj; gobj = gobj->nxt)	/*递归处理子窗体*/
+		if (gobj != ExcludeGobj)
+			DrawGobj(gobj, xpos - gobj->rect.xpos, ypos - gobj->rect.ypos, xend - gobj->rect.xpos, yend - gobj->rect.ypos, AbsXpos + gobj->rect.xpos, AbsYpos + gobj->rect.ypos, NULL);
 }

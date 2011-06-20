@@ -39,12 +39,12 @@ int main()
 
 		if ((res = KRecvMsg(&ptid, data, INVALID)) != NO_ERROR)	/*等待消息*/
 			break;
-		if ((data[0] & 0xFFFF0000) == MSG_ATTR_USER)	/*应用请求消息*/
+		if ((data[MSG_ATTR_ID] & MSG_ATTR_MASK) == MSG_ATTR_SPK)	/*应用请求消息*/
 		{
-			switch (data[1])
+			switch (data[MSG_API_ID] & MSG_API_MASK)
 			{
 			case SPK_API_SOUND:	/*发声*/
-				sound(data[2]);
+				sound(data[1]);
 				break;
 			case SPK_API_NOSOUND:	/*停止发声*/
 				nosound();

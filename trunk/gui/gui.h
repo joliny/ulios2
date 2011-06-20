@@ -33,10 +33,10 @@ typedef struct _GOBJ_DESC
 	THREAD_ID ptid;					/*所属线程ID*/
 	DWORD attr;						/*属性*/
 	RECT rect;						/*相对父窗体的位置*/
+	DWORD *vbuf;					/*可视内存缓冲,NULL使用父辈窗体的缓冲*/
 	struct _GOBJ_DESC *pre, *nxt;	/*兄/弟对象链指针*/
 	struct _GOBJ_DESC *par, *chl;	/*父/子对象链指针*/
 	CLIPRECT *ClipList;				/*自身剪切矩形列表*/
-	DWORD *vbuf;					/*可视内存缓冲*/
 }GOBJ_DESC;	/*GUI对象(窗体)描述符*/
 
 /**********剪切矩形管理相关**********/
@@ -51,45 +51,54 @@ long CoverRectInter(GOBJ_DESC *gobj, long xpos, long ypos, long xend, long yend)
 long DiscoverRectInter(GOBJ_DESC *gobj, long xpos, long ypos, long xend, long yend);
 
 /*被祖父和祖伯父窗体覆盖*/
-long CoverRectByPar(GOBJ_DESC *gobj);
+void CoverRectByPar(GOBJ_DESC *gobj);
 
-/*强行删除剪切矩形链表*/
+/*删除剪切矩形链表*/
 long DeleteClipList(GOBJ_DESC *gobj);
+
+/*绘制窗体矩形内部*/
+void DrawGobj(GOBJ_DESC *gobj, long xpos, long ypos, long xend, long yend, long AbsXpos, long AbsYpos, GOBJ_DESC *ExcludeGobj);
 
 /**********窗体管理相关**********/
 
 /*根据绝对坐标查找窗体*/
-GOBJ_DESC *FindGobj(long *GobjXpos, long *GobjYpos);
-
-/*绘制窗体*/
-long DrawGobj(GOBJ_DESC *gobj, long xpos, long ypos);
+GOBJ_DESC *FindGobj(long *AbsXpos, long *AbsYpos);
 
 /*创建主桌面*/
-long CreateDesktop(THREAD_ID ptid, DWORD attr, long width, long height, DWORD *DesktopPic);
+long CreateDesktop(THREAD_ID ptid, DWORD attr, long width, long height, DWORD *vbuf);
 
 /*创建窗体*/
-long CreateGobj(THREAD_ID ptid, DWORD attr, DWORD pid, long xpos, long ypos, long width, long height, DWORD *id);
+long CreateGobj(THREAD_ID ptid, DWORD pid, DWORD attr, long xpos, long ypos, long width, long height, DWORD *vbuf, DWORD len, DWORD *gid);
 
 /*删除窗体*/
-long DeleteGobj(GOBJ_DESC *gobj);
+long DeleteGobj(THREAD_ID ptid, DWORD gid);
 
 /*设置窗体的位置大小*/
-long MoveGobj(GOBJ_DESC *gobj, long xpos, long ypos, long width, long height);
+long MoveGobj(THREAD_ID ptid, DWORD gid, long xpos, long ypos);
+
+/*设置窗体的大小*/
+long SizeGobj(THREAD_ID ptid, DWORD gid, long xpos, long ypos, long width, long height, DWORD *vbuf, DWORD len);
 
 /*设置窗体为活动*/
 long ActiveGobj(GOBJ_DESC *gobj);
 
+/*设置窗体显示缓冲*/
+long SetGobjVbuf(GOBJ_DESC *gobj, DWORD *vbuf);
+
 /**********功能库相关**********/
 
+/*GUI矩形块贴图*/
+void GuiPutImage(long x, long y, DWORD *img, long memw, long w, long h);
+
+/*加载BMP图像文件*/
 long LoadBmp(char *path, DWORD *buf, DWORD len, long *width, long *height);
 
 /**********桌面线程相关**********/
 
-void DesktopThread(void *args);
+/*桌面消息处理线程*/
+void DesktopThread(GOBJ_DESC *gobj);
 
 /**********鼠标功能相关**********/
-
-extern long MouX, MouY;
 
 /*鼠标初始化*/
 long InitMouse();
@@ -103,7 +112,7 @@ void HidMouse();
 /*显示鼠标指针*/
 void ShowMouse();
 
-/*设置鼠标位置*/
-void SetMousePos(long x, long y);
+/*鼠标消息处理*/
+void MouseProc(DWORD key, long x, long y, long z);
 
 #endif

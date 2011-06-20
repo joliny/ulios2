@@ -56,10 +56,10 @@ void WriteCom(UART_REQ *req)
 		outb(ComPort[req->com] + SER_DR, *(req->writer.CurAddr++));
 		if (--(req->writer.cou) == 0)
 		{
-			DWORD data[MSG_DATA_LEN - 2];
+			DWORD data[MSG_DATA_LEN];
 
-			data[0] = NO_ERROR;
-			data[1] = req->writer.cou;
+			data[MSG_RES_ID] = NO_ERROR;
+			data[MSG_SIZE_ID] = req->writer.cou;
 			KUnmapProcAddr(req->writer.addr, data);
 			req->writer.addr = NULL;
 		}
@@ -81,10 +81,10 @@ void ReadCom(UART_REQ *req)
 			*(req->reader.CurAddr++) = b;
 			if (--(req->reader.cou) == 0)	/*已完成复制*/
 			{
-				DWORD data[MSG_DATA_LEN - 2];
+				DWORD data[MSG_DATA_LEN];
 
-				data[0] = NO_ERROR;
-				data[1] = req->reader.cou;
+				data[MSG_RES_ID] = NO_ERROR;
+				data[MSG_SIZE_ID] = req->reader.cou;
 				KUnmapProcAddr(req->reader.addr, data);
 				req->reader.addr = NULL;
 			}
@@ -120,7 +120,7 @@ void ComProc(UART_REQ *req)
 
 		if ((res = KRecvMsg(&ptid, data, INVALID)) != NO_ERROR)	/*等待消息*/
 			break;
-		if ((data[0] & 0xFFFF0000) == MSG_ATTR_IRQ)	/*COM口中断请求消息*/
+		if ((data[MSG_ATTR_ID] & MSG_ATTR_MASK) == MSG_ATTR_IRQ)	/*COM口中断请求消息*/
 		{
 			UART_REQ *CurReq;
 
@@ -177,19 +177,19 @@ static inline void CopyQue(UART_REQ *req)
 	ulock(&req->quel);
 	if (req->reader.cou == 0)	/*已完成复制*/
 	{
-		DWORD data[MSG_DATA_LEN - 2];
+		DWORD data[MSG_DATA_LEN];
 
-		data[0] = NO_ERROR;
-		data[1] = req->reader.cou;
+		data[MSG_RES_ID] = NO_ERROR;
+		data[MSG_SIZE_ID] = req->reader.cou;
 		KUnmapProcAddr(req->reader.addr, data);
 		req->reader.addr = NULL;
 	}
 	else if (req->reader.clock == 0)	/*超时*/
 	{
-		DWORD data[MSG_DATA_LEN - 2];
+		DWORD data[MSG_DATA_LEN];
 
-		data[0] = UART_ERR_NOTIME;
-		data[1] = req->reader.cou;
+		data[MSG_RES_ID] = UART_ERR_NOTIME;
+		data[MSG_SIZE_ID] = req->reader.cou;
 		KUnmapProcAddr(req->reader.addr, data);
 		req->reader.addr = NULL;
 	}
@@ -255,58 +255,63 @@ int main()
 	for (;;)
 	{
 		DWORD data[MSG_DATA_LEN];
+		UART_REQ *CurReq;
 
 		if ((res = KRecvMsg(&ptid, data, INVALID)) != NO_ERROR)	/*等待消息*/
 			break;
-		if ((data[0] & 0xFFFF0000) == MSG_ATTR_USER)	/*COM控制消息*/
+		switch (data[MSG_ATTR_ID] & MSG_ATTR_MASK)
 		{
-			switch (data[3])
+		case MSG_ATTR_UART:	/*COM控制消息*/
+			switch (data[data[MSG_API_ID] & MSG_API_MASK])
 			{
 			case UART_API_OPENCOM:
-				data[1] = OpenCom(req, data[1], data[2], data[4]);
+				data[MSG_RES_ID] = OpenCom(req, data[1], data[2], data[3]);
+				KSendMsg(&ptid, data, 0);
 				break;
 			case UART_API_CLOSECOM:
-				data[1] = CloseCom(data[1]);
+				data[MSG_RES_ID] = CloseCom(data[1]);
+				KSendMsg(&ptid, data, 0);
 				break;
 			}
-		}
-		else if ((data[0] & 0xFFFF0000) == MSG_ATTR_MAP)	/*COM读写消息*/
-		{
-			UART_REQ *CurReq;
-
-			if (data[4] >= PORT_LEN)
+			break;
+		case MSG_ATTR_ROMAP:	/*写串口消息*/
+			if (data[3] >= PORT_LEN)
 			{
-				data[0] = UART_ERR_NOPORT;
-				KUnmapProcAddr((void*)data[2], data);
+				data[MSG_RES_ID] = UART_ERR_NOPORT;
+				KUnmapProcAddr((void*)data[MSG_ADDR_ID], data);
 				continue;
 			}
-			CurReq = &req[data[4]];
-			if (data[0] & 1)	/*读串口*/
+			CurReq = &req[data[3]];
+			if (CurReq->writer.addr)
 			{
-				if (CurReq->reader.addr)
-				{
-					data[0] = UART_ERR_BUSY;
-					KUnmapProcAddr((void*)data[2], data);
-					continue;
-				}
-				CurReq->reader.CurAddr = CurReq->reader.addr = (BYTE*)data[2];
-				CurReq->reader.cou = data[1];
-				CurReq->reader.clock = data[5];
-				CopyQue(CurReq);
+				data[MSG_RES_ID] = UART_ERR_BUSY;
+				KUnmapProcAddr((void*)data[MSG_ADDR_ID], data);
+				continue;
 			}
-			else	/*写串口*/
+			CurReq->writer.CurAddr = CurReq->writer.addr = (BYTE*)data[MSG_ADDR_ID];
+			CurReq->writer.cou = data[MSG_SIZE_ID];
+			CurReq->writer.clock = data[4];
+			WriteCom(CurReq);
+			break;
+		case MSG_ATTR_RWMAP:	/*读串口消息*/
+			if (data[3] >= PORT_LEN)
 			{
-				if (CurReq->writer.addr)
-				{
-					data[0] = UART_ERR_BUSY;
-					KUnmapProcAddr((void*)data[2], data);
-					continue;
-				}
-				CurReq->writer.CurAddr = CurReq->writer.addr = (BYTE*)data[2];
-				CurReq->writer.cou = data[1];
-				CurReq->writer.clock = data[5];
-				WriteCom(CurReq);
+				data[MSG_RES_ID] = UART_ERR_NOPORT;
+				KUnmapProcAddr((void*)data[MSG_ADDR_ID], data);
+				continue;
 			}
+			CurReq = &req[data[3]];
+			if (CurReq->reader.addr)
+			{
+				data[MSG_RES_ID] = UART_ERR_BUSY;
+				KUnmapProcAddr((void*)data[MSG_ADDR_ID], data);
+				continue;
+			}
+			CurReq->reader.CurAddr = CurReq->reader.addr = (BYTE*)data[MSG_ADDR_ID];
+			CurReq->reader.cou = data[MSG_SIZE_ID];
+			CurReq->reader.clock = data[4];
+			CopyQue(CurReq);
+			break;
 		}
 	}
 	KUnregKnlPort(SRV_UART_PORT);

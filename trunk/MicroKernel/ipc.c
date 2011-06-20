@@ -57,27 +57,27 @@ long SendMsg(MESSAGE_DESC *msg)
 
 	ptid = msg->ptid;
 	if (ptid.ProcID >= PMT_LEN)
-		return ERROR_WRONG_PROCID;
+		return KERR_INVALID_PROCID;
 	if (ptid.ThedID >= TMT_LEN)
-		return ERROR_WRONG_THEDID;
-	CurThed = (msg->data[0] == MSG_ATTR_IRQ) ? NULL : CurPmd->CurTmd;	/*IRQ消息可能在任何线程中发出,所以消息发送者是无效的*/
+		return KERR_INVALID_THEDID;
+	CurThed = (msg->data[MSG_ATTR_ID] == MSG_ATTR_IRQ) ? NULL : CurPmd->CurTmd;	/*IRQ消息可能在任何线程中发出,所以消息发送者无意义*/
 	cli();	/*要访问其他进程的信息,所以防止任务切换*/
 	DstProc = pmt[ptid.ProcID];
 	if (DstProc == NULL || (DstProc->attr & PROC_ATTR_DEL))
 	{
 		sti();
-		return ERROR_WRONG_PROCID;
+		return KERR_PROC_NOT_EXIST;
 	}
 	DstThed = DstProc->tmt[ptid.ThedID];
 	if (DstThed == NULL || (DstThed->attr & THED_ATTR_DEL))
 	{
 		sti();
-		return ERROR_WRONG_THEDID;
+		return KERR_THED_NOT_EXIST;
 	}
-	if (DstThed->MsgCou >= THED_MSG_LEN && msg->data[0] >= MSG_ATTR_USER && *(DWORD*)(&DstThed->WaitId) != *(DWORD*)(&CurThed->id))
+	if (DstThed->MsgCou >= THED_MSG_LEN && msg->data[MSG_ATTR_ID] >= MSG_ATTR_USER && *(DWORD*)(&DstThed->WaitId) != *(DWORD*)(&CurThed->id))
 	{
 		sti();
-		return ERROR_HAVENO_MSGDESC;	/*消息满且是用户消息且目标线程没有等待本线程的消息,取消发送消息*/
+		return KERR_MSG_QUEUE_FULL;	/*消息满且是用户消息且目标线程没有等待本线程的消息,取消发送消息*/
 	}
 	if (CurThed)	/*设置发送者ID*/
 		msg->ptid = CurThed->id;
@@ -90,7 +90,7 @@ long SendMsg(MESSAGE_DESC *msg)
 		DstThed->lst->nxt = msg;
 	DstThed->lst = msg;
 	DstThed->MsgCou++;
-	if (DstThed->attr & THED_ATTR_SLEEP)	/*线程阻塞,首先唤醒线程*/
+	if (DstThed->attr & THED_ATTR_WAITMSG)	/*线程阻塞,等待消息,首先唤醒线程*/
 		wakeup(DstThed);
 	sti();
 	return NO_ERROR;
@@ -108,13 +108,13 @@ long RecvMsg(MESSAGE_DESC **msg, DWORD cs)
 	if (cs == 0)	/*没有消息且不等待*/
 	{
 		sti();
-		return ERROR_HAVENO_MSGDESC;
+		return KERR_MSG_QUEUE_EMPTY;
 	}
-	sleep(cs);
+	sleep(TRUE, cs);
 	if (CurThed->msg == NULL)	/*仍然没有消息*/
 	{
 		sti();
-		return ERROR_OUT_OF_TIME;
+		return KERR_OUT_OF_TIME;
 	}
 getmsg:
 	*msg = CurThed->msg;
@@ -143,7 +143,7 @@ long RecvProcMsg(MESSAGE_DESC **msg, THREAD_ID ptid, DWORD cs)
 		CurClock = 0;
 		if (cs != INVALID)
 			CurClock = clock;
-		sleep(cs);
+		sleep(TRUE, cs);
 		if (PreMsg)
 			CurMsg = PreMsg->nxt;
 		else
@@ -152,7 +152,7 @@ long RecvProcMsg(MESSAGE_DESC **msg, THREAD_ID ptid, DWORD cs)
 		{
 			*(DWORD*)(&CurThed->WaitId) = INVALID;
 			sti();
-			return ERROR_OUT_OF_TIME;
+			return KERR_OUT_OF_TIME;
 		}
 		if (CurMsg->ptid.ProcID == ptid.ProcID)
 		{
@@ -165,7 +165,7 @@ long RecvProcMsg(MESSAGE_DESC **msg, THREAD_ID ptid, DWORD cs)
 			{
 				*(DWORD*)(&CurThed->WaitId) = INVALID;
 				sti();
-				return ERROR_OUT_OF_TIME;
+				return KERR_OUT_OF_TIME;
 			}
 			cs -= clock - CurClock;
 		}

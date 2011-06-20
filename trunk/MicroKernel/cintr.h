@@ -157,4 +157,7 @@ void ApiCnlmapProcAddr(DWORD *argv);
 /*取得开机经过的时钟*/
 void ApiGetClock(DWORD *argv);
 
+/*线程同步锁操作*/
+void ApiLock(DWORD *argv);
+
 #endif
