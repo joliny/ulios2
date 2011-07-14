@@ -27,7 +27,7 @@ void *alloc(FREE_BLK_DESC *fbt, DWORD siz)
 {
 	FREE_BLK_DESC *CurFblk, *PreFblk;
 
-	if (siz == 0 || siz > fbt->siz)	/*没有足够空间*/
+	if (siz > fbt->siz)	/*没有足够空间*/
 		return NULL;
 	for (CurFblk = (PreFblk = fbt)->nxt; CurFblk; CurFblk = (PreFblk = CurFblk)->nxt)
 		if (CurFblk->siz >= siz)	/*首次匹配法*/

@@ -13,7 +13,7 @@ _start:		;³õÊ¼»¯¶Î¼Ä´æÆ÷
 	mov	fs,	ax
 	mov	gs,	ax
 	mov	ss,	ax
-	mov	esp,	0x0009F000
+	mov	esp,	0x00090000
 
 	call	_main
 HltLoop:

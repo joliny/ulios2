@@ -13,7 +13,6 @@ SEG_GATE_DESC gdt[GDT_LEN];	/*全局描述符表2KB*/
 SEG_GATE_DESC idt[IDT_LEN];	/*中断描述符表2KB*/
 PAGE_DESC kpdt[PDT_LEN];	/*内核页目录表4KB*/
 PAGE_DESC pddt[PDT_LEN];	/*页目录表的目录表4KB*/
-PAGE_DESC pddt0[PDT_LEN];	/*页目录表副本的目录表4KB*/
 /*内核管理表*/
 FREE_BLK_DESC kmmt[FMT_LEN];/*内核自由数据管理表12KB(0项不用)*/
 PROCESS_DESC* pmt[PMT_LEN];	/*进程管理表4KB*/
@@ -31,15 +30,12 @@ MEM_ARDS ards[1];		/*20 * N字节内存结构体*/
 
 /**********内核大块数据区**********/
 
-BYTE gramem[0x20000];	/*图形显存128K*/
-BYTE txtmem[0x8000];	/*文本显存32K*/
 BYTE kdat[KDAT_SIZ];	/*内核自由数据*/
 
 /**********分页机制相关表**********/
 
-/*占用24M虚拟地址空间*/
+/*占用20M虚拟地址空间*/
 PAGE_DESC pdt[PT_LEN];		/*所有进程页目录表4MB*/
-PAGE_DESC pdt0[PT_LEN];		/*所有进程副本页目录表4MB*/
 PAGE_DESC pt[PT_LEN];		/*当前进程页表4MB*/
 PAGE_DESC pt0[PT_LEN];		/*当前进程副本页表4MB*/
 PAGE_DESC pt2[PT_LEN];		/*关系进程页表4MB*/

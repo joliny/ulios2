@@ -12,7 +12,7 @@
 typedef struct _FREE_BLK_DESC
 {
 	void *addr;					/*起始地址*/
-	DWORD siz;					/*字节数,0表示空项*/
+	DWORD siz;					/*字节数*/
 	struct _FREE_BLK_DESC *nxt;	/*后一项*/
 }FREE_BLK_DESC;	/*自由块描述符*/
 

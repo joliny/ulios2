@@ -49,16 +49,13 @@ void ProcStart()
 	THREAD_DESC *CurThed;
 	EXEC_DESC *NewExec;
 	BLK_DESC *blk;
-	DWORD NewPdt, PhyAddr;
+	DWORD NewPdt;
 
 	sti();
 	CurProc = CurPmd;
 	CurThed = CurProc->CurTmd;
 	if (CurThed->kstk[0] & EXEC_ARGV_BASESRV)	/*启动基础服务进程*/
 	{
-		PHYBLK_DESC *CurSrv;
-		PAGE_DESC *FstPg, *EndPg;
-
 		if ((NewExec = (EXEC_DESC*)LockKmalloc(sizeof(EXEC_DESC))) == NULL)
 			DeleteThed();
 		if ((NewPdt = LockAllocPage()) == 0)
@@ -67,27 +64,17 @@ void ProcStart()
 			DeleteThed();
 		}
 		memset32(NewExec, 0, sizeof(EXEC_DESC) / sizeof(DWORD));
-		CurSrv = (PHYBLK_DESC*)&CurThed->kstk[1];
 		NewExec->cou = 1;
 		NewExec->entry = NewExec->CodeOff = BASESRV_OFF;
-		NewExec->DataEnd = NewExec->DataOff = NewExec->CodeEnd = BASESRV_OFF + CurSrv->siz;
+		NewExec->DataEnd = NewExec->DataOff = NewExec->CodeEnd = BASESRV_OFF + CurThed->kstk[2];
 		NewPdt |= PAGE_ATTR_P;
-		pt[(PT_ID << 10) | PT0_ID] = pddt0[CurThed->id.ProcID] = NewPdt;	/*映射页目录表副本*/
+		pt[(PT_ID << 10) | PT0_ID] = NewPdt;	/*映射页目录表副本*/
 		memset32(&pt[PT0_ID << 10], 0, 0x400);
-		pt[(PT0_ID << 10) | PT_ID] = NewPdt;	/*映射页目录表副本自身*/
-		FstPg = &pt0[(DWORD)BASESRV_OFF >> 12];
-		EndPg = &pt0[((DWORD)NewExec->CodeEnd + 0x00000FFF) >> 12];
-		if (FillPt(FstPg, EndPg, PAGE_ATTR_P | PAGE_ATTR_U) != NO_ERROR)
+		if (FillConAddr(&pt0[(DWORD)BASESRV_OFF >> 12], &pt0[((DWORD)NewExec->CodeEnd + 0x00000FFF) >> 12], CurThed->kstk[1], PAGE_ATTR_P | PAGE_ATTR_U) != NO_ERROR)
 		{
 			LockFreePage(NewPdt);
 			LockKfree(NewExec, sizeof(EXEC_DESC));
 			DeleteThed();
-		}
-		PhyAddr = PAGE_ATTR_P | PAGE_ATTR_U | (DWORD)CurSrv->addr;
-		for (; FstPg < EndPg; FstPg++)
-		{
-			*FstPg = PhyAddr;
-			PhyAddr += PAGE_SIZE;
 		}
 	}
 	else	/*启动可执行文件进程*/
@@ -102,7 +89,7 @@ void ProcStart()
 			{
 				NewExec = pmt[pid]->exec;
 				NewExec->cou++;
-				pt[(PT_ID << 10) | PT0_ID] = pddt0[CurThed->id.ProcID] = pddt0[pid];	/*映射页目录表副本*/
+				pt[(PT_ID << 10) | PT0_ID] = pdt[(pid << 10) | PT0_ID];	/*映射页目录表副本*/
 				sti();
 				goto strset;
 			}
@@ -120,7 +107,7 @@ void ProcStart()
 		}
 		memcpy32(NewExec, &CurThed->kstk[1], 8);	/*复制可执行体信息*/
 		NewExec->cou = 1;
-		ulock(&NewExec->Page_l);
+		ulockw(&NewExec->Page_l);
 		if ((NewPdt = LockAllocPage()) == 0)
 		{
 			LockKfree(NewExec, sizeof(EXEC_DESC));
@@ -133,9 +120,8 @@ void ProcStart()
 			DeleteThed();
 		}
 		NewPdt |= PAGE_ATTR_P;
-		pt[(PT_ID << 10) | PT0_ID] = pddt0[CurThed->id.ProcID] = NewPdt;	/*映射页目录表副本*/
+		pt[(PT_ID << 10) | PT0_ID] = NewPdt;	/*映射页目录表副本*/
 		memset32(&pt[PT0_ID << 10], 0, 0x400);
-		pt[(PT0_ID << 10) | PT_ID] = NewPdt;	/*映射页目录表副本自身*/
 	}
 strset:
 	if (!(CurThed->kstk[0] & EXEC_ARGV_DRIVER))	/*设置用户应用进程*/
@@ -185,6 +171,9 @@ void ThedExit(DWORD ExitCode)
 	UnregAllIrq();	/*清除线程资源*/
 	UnregAllKnlPort();
 	FreeAllMsg();
+	lock(&CurProc->Page_l);
+	ClearPage(&pt[(DWORD)CurThed->ustk >> 12], &pt[((DWORD)CurThed->ustk + CurThed->UstkSiz) >> 12], TRUE);	/*清除堆栈页*/
+	ulock(&CurProc->Page_l);
 	LockFreeUFData(CurProc, CurThed->ustk, CurThed->UstkSiz);
 	if (CurThed->i387)	/*清除协处理器寄存器*/
 	{
@@ -228,9 +217,9 @@ void ThedExit(DWORD ExitCode)
 		}
 		if (--CurExec->cou == 0)	/*清除可执行体信息*/
 		{
-			lock(&CurExec->Page_l);
+			lockw(&CurExec->Page_l);
 			ClearPage(&pt0[(DWORD)UADDR_OFF >> 12], &pt0[(DWORD)SHRDLIB_OFF >> 12], TRUE);
-			ulock(&CurExec->Page_l);
+			ulockw(&CurExec->Page_l);
 			LockKfree(CurExec, sizeof(EXEC_DESC));
 			LockFreePage(pt[(PT_ID << 10) | PT0_ID]);
 		}

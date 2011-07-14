@@ -10,12 +10,11 @@
 #include "ulidef.h"
 
 #define MAPMT_LEN			0x1000	/*地址映射管理表长度*/
-#define PROC_MAP_LEN		0x100	/*进程中地址映射链表长度*/
 typedef struct _MAPBLK_DESC
 {
 	void *addr;					/*映射进程起始地址*/
 	void *addr2;				/*被映射进程起始地址*/
-	DWORD siz;					/*字节数,0表示空项*/
+	DWORD siz;					/*字节数*/
 	THREAD_ID ptid;				/*映射线程*/
 	THREAD_ID ptid2;			/*被映射线程*/
 	struct _MAPBLK_DESC *nxt;	/*映射进程后一项*/
@@ -36,8 +35,8 @@ MAPBLK_DESC *AllocMap();
 /*释放地址映射结构*/
 void FreeMap(MAPBLK_DESC *map);
 
-/*填充空页表*/
-long FillPt(PAGE_DESC *FstPg, PAGE_DESC *EndPg, DWORD attr);
+/*填充连续的页地址*/
+long FillConAddr(PAGE_DESC *FstPg, PAGE_DESC *EndPg, DWORD PhyAddr, DWORD attr);
 
 /*填充页内容*/
 long FillPage(EXEC_DESC *exec, void *addr, DWORD ErrCode);

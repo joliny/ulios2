@@ -341,10 +341,15 @@ long KillThed(WORD ThedID)
 	CurThed = CurProc->CurTmd;
 	cli();
 	DstThed = CurProc->tmt[ThedID];
-	if (DstThed == NULL || DstThed == CurThed || (DstThed->attr & THED_ATTR_DEL))
+	if (DstThed == NULL || (DstThed->attr & THED_ATTR_DEL))
 	{
 		sti();
 		return KERR_THED_NOT_EXIST;
+	}
+	if (DstThed == CurThed)
+	{
+		sti();
+		return KERR_THED_KILL_SELF;
 	}
 	DstThed->attr |= THED_ATTR_KILLED;	/*标记为被杀死*/
 	if (DstThed->attr & THED_ATTR_SLEEP)	/*线程阻塞,首先唤醒线程*/
@@ -449,7 +454,7 @@ long CreateProc(DWORD attr, DWORD exec, DWORD args, THREAD_ID *ptid)
 	pddt[pdti] = NewPdt;	/*映射新进程的页目录表*/
 	pdti <<= 10;
 	memset32(&pdt[pdti], 0, 0x400);
-	memcpy32(&pdt[pdti], kpdt, 4);	/*复制页目录表*/
+	memcpy32(&pdt[pdti], kpdt, 3);	/*复制页目录表*/
 	pdt[pdti | PT_ID] = NewPdt;	/*映射新进程的页表*/
 	if (CurProc)	/*有就绪进程,插入当前进程后*/
 	{
@@ -512,10 +517,15 @@ long KillProc(WORD ProcID)
 	CurProc = CurPmd;
 	cli();
 	DstProc = pmt[ProcID];
-	if (DstProc == NULL || DstProc == CurProc || (DstProc->attr & PROC_ATTR_DEL))
+	if (DstProc == NULL || (DstProc->attr & PROC_ATTR_DEL))
 	{
 		sti();
 		return KERR_PROC_NOT_EXIST;
+	}
+	if (DstProc == CurProc)
+	{
+		sti();
+		return KERR_PROC_KILL_SELF;
 	}
 	if (!(DstProc->attr & PROC_ATTR_APPS) && (CurProc->attr & PROC_ATTR_APPS))	/*应用进程无权杀死驱动进程*/
 	{
