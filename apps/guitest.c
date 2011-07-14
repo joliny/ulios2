@@ -86,29 +86,31 @@ char *Itoa(char *buf, DWORD n, DWORD r)
 
 int main()
 {
-	DWORD vbuf[300000];
-	THREAD_ID GuiPtid;
-	long width, height, gid;
+	DWORD vbuf[0x20000];
+	char buf[12];
+	THREAD_ID GuiPtid, CuiPtid, ptid;
+	long width, height, gid, res;
 
-	width = 200;
-	height = 150;
-	LoadBmp("laopo.bmp", vbuf, 30000, &width, &height);
+	width = 256;
+	height = 128;
+	LoadBmp("laopo.bmp", vbuf, 0x20000, &width, &height);
 	KGetKptThed(SRV_GUI_PORT, &GuiPtid);
 	gid = GUIcreate(GuiPtid, 0, 0, vbuf, 0, 0, width, height);
 	for (;;)
 	{
 		DWORD data[MSG_DATA_LEN];
-		THREAD_ID ptid;
 
-		if (KRecvMsg(&ptid, data, INVALID))	/*等待消息*/
+		if ((res = KRecvMsg(&ptid, data, INVALID)) != NO_ERROR)	/*等待消息*/
 			break;
 		if ((data[MSG_API_ID] & MSG_API_MASK) == GM_MOUSEMOVE)
 		{
 			if (data[1] & MUS_STATE_LBUTTON)
-				GUImove(GuiPtid, gid, data[2] - 100, data[3] - 75);
-			else if (data[1] & MUS_STATE_RBUTTON)
-				GUIsize(GuiPtid, gid, vbuf, 0, 0, data[2] + 1, data[3] + 1);
+				GUImove(GuiPtid, gid, data[2] - 128, data[3] - 64);
 		}
+		else if ((data[MSG_API_ID] & MSG_API_MASK) == GM_MOUSEWHEEL)
+			GUIsize(GuiPtid, gid, vbuf, 0, 0, width, ++height);
 	}
+	Itoa(buf, -res, 10);
+	CUIPutS(CuiPtid, buf);
 	return NO_ERROR;
 }

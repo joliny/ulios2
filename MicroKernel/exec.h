@@ -21,7 +21,8 @@
 
 typedef struct _EXEC_DESC
 {
-	DWORD cou;		/*使用计数*/
+	WORD cou;		/*使用计数*/
+	volatile WORD Page_l;	/*分页管理锁*/
 	void *CodeOff;	/*代码段开始地址*/
 	void *CodeEnd;	/*代码段结束地址*/
 	DWORD CodeSeek;	/*代码段文件偏移*/
@@ -29,7 +30,6 @@ typedef struct _EXEC_DESC
 	void *DataEnd;	/*数据段结束地址*/
 	DWORD DataSeek;	/*数据段文件偏移*/
 	void *entry;	/*入口点*/
-	volatile DWORD Page_l;	/*分页管理锁*/
 }EXEC_DESC;	/*可执行体结构*/
 
 /*线程起点*/

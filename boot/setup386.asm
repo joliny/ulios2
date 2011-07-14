@@ -13,7 +13,7 @@ GDToff		equ	0	;GDT偏移
 IDTsize		equ	0x0800	;IDT字节数
 IDTseg		equ	0	;IDT段
 IDToff		equ	0x0800	;IDT偏移
-KPDTsize	equ	0x3000	;页目录表字节数(包括一个PDDT和一个PDDT0)
+KPDTsize	equ	0x2000	;页目录表字节数(包括一个PDDT)
 KPDTseg		equ	0	;页目录表段
 KPDToff		equ	0x1000	;页目录表偏移
 KNLoff		equ	0x10000	;内核起始地址偏移
@@ -142,25 +142,23 @@ A20LineOk:
 	cld			;清除方向
 ;----------------------------------------
 ;设置GDT
-	mov	ax,	GDTseg	;复制GDT
-	mov	es,	ax
-	mov	ax,	cs
+	mov	ax,	cs	;复制GDT
 	mov	ds,	ax
 	mov	si,	GDT
+	mov	ax,	GDTseg
+	mov	es,	ax
 	mov	di,	GDToff
 	mov	cx,	GDTN / 4
 	rep	movsd
-	mov	ax,	es	;其他表项清0
-	mov	ds,	ax
-	xor	eax,	eax
+	xor	eax,	eax	;其他表项清0
 	mov	cx,	(GDTsize - GDTN) / 4
 	rep	stosd
 ;----------------------------------------
 ;设置IDT
 	mov	ax,	IDTseg	;所有表项清0
-	mov	ds,	ax
-	xor	eax,	eax
+	mov	es,	ax
 	mov	di,	IDToff
+	xor	eax,	eax
 	mov	cx,	IDTsize / 4
 	rep	stosd
 ;----------------------------------------
@@ -174,10 +172,8 @@ A20LineOk:
 	stosd
 	mov	eax,	KPDTseg * 0x10 + KPDToff + 0x1063	;PDDT(内核访问的4K局部页面)
 	stosd
-	mov	eax,	KPDTseg * 0x10 + KPDToff + 0x2063	;PDDT0(内核访问的4K局部页面)
-	stosd
 	xor	eax,	eax	;其他表项清0
-	mov	cx,	KPDTsize / 4 - 4
+	mov	cx,	KPDTsize / 4 - 3
 	rep	stosd
 ;----------------------------------------
 ;设置页表

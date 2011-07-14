@@ -12,7 +12,7 @@
 typedef struct _BLK_DESC
 {
 	void *addr;					/*起始地址*/
-	DWORD siz;					/*字节数,0表示空项*/
+	DWORD siz;					/*字节数*/
 }BLK_DESC;	/*线性地址块描述符*/
 
 #define THED_ATTR_SLEEP		0x0001	/*0:就绪状态1:阻塞状态*/
@@ -21,7 +21,7 @@ typedef struct _BLK_DESC
 #define THED_ATTR_APPS		0x0008	/*0:系统调用态1:应用程序态*/
 #define THED_ATTR_DEL		0x0010	/*0:正常状态1:正在被删除*/
 #define THED_ATTR_KILLED	0x0020	/*0:正常状态1:被杀死标志*/
-#define KSTK_LEN			512		/*内核堆栈双字数*/
+#define KSTK_LEN			0x400		/*内核堆栈双字数*/
 #define THEDSTK_SIZ			0x00100000	/*线程默认堆栈大小*/
 typedef struct _THREAD_DESC
 {
@@ -43,7 +43,7 @@ typedef struct _THREAD_DESC
 
 #define PROC_ATTR_APPS		0x0001	/*0:驱动进程1:应用进程*/
 #define PROC_ATTR_DEL		0x0002	/*0:正常状态1:正在被删除*/
-#define TMT_LEN				0x100	/*进程中线程表长度*/
+#define TMT_LEN				0x400	/*进程中线程表长度*/
 #define UBLKT_LEN			0x400	/*地址块管理表长度*/
 #define UFDMT_LEN			64		/*用户自由数据区管理表长度*/
 typedef struct _PROCESS_DESC
@@ -51,25 +51,24 @@ typedef struct _PROCESS_DESC
 	struct _PROCESS_DESC *pre, *nxt;	/*前后指针*/
 	WORD par, attr;				/*父进程ID,属性*/
 
-	EXEC_DESC *exec;			/*可执行体指针*/
-	MAPBLK_DESC *map;			/*映射结构链表*/
-	MAPBLK_DESC *map2;			/*被映射结构链表*/
-	DWORD MapCou;				/*已用映射结构数*/
-	volatile DWORD Map_l;		/*映射过程锁*/
-
-	THREAD_DESC *tmt[TMT_LEN];	/*线程管理表*/
 	THREAD_DESC **FstTmd;		/*首个空线程项指针*/
 	THREAD_DESC **EndTmd;		/*末个非空线程项指针*/
 	THREAD_DESC *CurTmd;		/*当前线程指针*/
 	DWORD TmdCou;				/*已有线程数量*/
-
-	BLK_DESC ublkt[UBLKT_LEN];	/*地址块管理表*/
 	BLK_DESC *FstUBlk;			/*首个空地址块管理表项指针*/
 	BLK_DESC *EndUBlk;			/*末个非空地址块管理表项指针*/
-	FREE_BLK_DESC ufdmt[UFDMT_LEN];	/*用户自由数据区管理表*/
+
+	EXEC_DESC *exec;			/*可执行体指针*/
+	MAPBLK_DESC *map;			/*映射结构链表*/
+	MAPBLK_DESC *map2;			/*被映射结构链表*/
+	volatile DWORD MapCou;		/*映射过程锁,记录当前有多少个映射正在进行*/
 	volatile DWORD Ufdmt_l;		/*用户自由数据区锁*/
 	volatile DWORD Page_l;		/*分页管理锁*/
 	void *PageReadAddr;			/*缺页读取地址*/
+
+	THREAD_DESC *tmt[TMT_LEN];	/*线程管理表*/
+	BLK_DESC ublkt[UBLKT_LEN];	/*地址块管理表*/
+	FREE_BLK_DESC ufdmt[UFDMT_LEN];	/*用户自由数据区管理表*/
 }PROCESS_DESC;	/*进程结构*/
 
 /*唤醒线程*/

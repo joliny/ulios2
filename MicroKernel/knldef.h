@@ -33,8 +33,8 @@
 #define SHRDLIB_OFF	((void*)0xC0000000)	/*共享库区偏移*/
 #define SHRDLIB_SIZ			0x40000000	/*共享库区大小*/
 
-#define BOOTDAT_ADDR	0x00090000	/*启动数据物理地址*/
-#define UPHYMEM_ADDR	0x00800000	/*用户内存起始物理地址*/
+#define BOOTDAT_ADDR		0x00090000	/*启动数据物理地址*/
+#define UPHYMEM_ADDR		0x00800000	/*用户内存起始物理地址*/
 
 /**********内核数据表**********/
 
@@ -46,7 +46,6 @@ extern SEG_GATE_DESC idt[];	/*中断描述符表2KB*/
 #define PDT_LEN		0x0400	/*1024项*/
 extern PAGE_DESC kpdt[];	/*内核页目录表4KB*/
 extern PAGE_DESC pddt[];	/*页目录表的目录表4KB*/
-extern PAGE_DESC pddt0[];	/*页目录表副本的目录表4KB*/
 /*内核管理表*/
 #define FMT_LEN		0x0400	/*1024项*/
 extern FREE_BLK_DESC kmmt[];/*内核自由数据管理表*/
@@ -80,6 +79,7 @@ extern BYTE KnlValue[];		/*内核零散变量区4KB*/
 /*锁变量*/
 #define Kmalloc_l	(*((volatile DWORD*)(KnlValue + 0x0034)))	/*kmalloc锁*/
 #define AllocPage_l	(*((volatile DWORD*)(KnlValue + 0x0038)))	/*AllocPage锁*/
+#define MapMgr_l	(*((volatile DWORD*)(KnlValue + 0x003C)))	/*映射管理锁*/
 /*表结构*/
 #define IRQ_LEN		0x10	/*IRQ信号数量16项*/
 #define IrqPort		((THREAD_ID*)		(KnlValue + 0x0F58))	/*Irq端口注册表*/
@@ -87,24 +87,20 @@ extern BYTE KnlValue[];		/*内核零散变量区4KB*/
 
 /**********内核大块数据区**********/
 
-extern BYTE gramem[];	/*图形显存128K*/
-extern BYTE txtmem[];	/*文本显存32K*/
 #define KDAT_SIZ	0x00700000	/*大小7M*/
 extern BYTE kdat[];		/*内核自由数据*/
 
 /**********分页机制相关表**********/
 
 #define PDT_ID	2
-#define PD0T_ID	3
-#define PT_ID	4
-#define PT0_ID	5
-#define PT2_ID	6
-#define PG0_ID	7
+#define PT_ID	3
+#define PT0_ID	4
+#define PT2_ID	5
+#define PG0_ID	6
 
 #define PT_LEN	0x00100000	/*1048576项*/
 #define PG_LEN	0x00400000	/*4194304项*/
 extern PAGE_DESC pdt[];		/*所有进程页目录表4MB*/
-extern PAGE_DESC pdt0[];	/*所有进程副本页目录表4MB*/
 extern PAGE_DESC pt[];		/*当前进程页表4MB*/
 extern PAGE_DESC pt0[];		/*当前进程副本页表4MB*/
 extern PAGE_DESC pt2[];		/*关系进程页表4MB*/

@@ -157,7 +157,6 @@ typedef struct _I387SSE
 #define PAGE_ATTR_PS	0x00000080	/*0:页面大小为4KB，页目录项指向一个页表1:页面大小为4MB或2MB(由CR4的PAE位决定)，页目录项直接指向一个页*/
 #define PAGE_ATTR_G		0x00000100	/*0:普通页1:全局页(当PGE为1时，若发生CR3载入新值或任务切换，指向全局页的表项在TLB中仍然有效。这个标志只在直接指向一个页的表项中有效，否则会被忽略。)*/
 #define PAGE_ATTR_AVL	0x00000E00	/*软件自定*/
-#define PAGE_ATTR_ROMAP	0x00000200	/*0:可写页1:映射只读页*/
 
 typedef DWORD PAGE_DESC;	/*页目录表页表项*/
 

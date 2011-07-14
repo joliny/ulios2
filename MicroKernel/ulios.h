@@ -122,7 +122,7 @@ static inline void InitKnlProc()
 }
 
 /*异常IDT表副本(函数地址无法进行位运算,只好用加减了)*/
-const SEG_GATE_DESC IsrIdtTable[] = {
+SEG_GATE_DESC IsrIdtTable[] = {
 	{(DWORD)AsmIsr00 - 0x00010000 + (KCODE_SEL << 16), 0x00010000 | DESC_ATTR_P | DESC_ATTR_DPL0 | GATE_ATTR_T_TRAP},
 	{(DWORD)AsmIsr01 - 0x00010000 + (KCODE_SEL << 16), 0x00010000 | DESC_ATTR_P | DESC_ATTR_DPL0 | GATE_ATTR_T_TRAP},
 	{(DWORD)AsmIsr02 - 0x00010000 + (KCODE_SEL << 16), 0x00010000 | DESC_ATTR_P | DESC_ATTR_DPL0 | GATE_ATTR_T_TRAP},

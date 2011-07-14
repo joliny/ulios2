@@ -6,6 +6,109 @@
 
 #include "knldef.h"
 
+/*分配地址映射结构*/
+MAPBLK_DESC *AllocMap()
+{
+	MAPBLK_DESC *map;
+
+	cli();
+	if (FstMap == NULL)
+	{
+		sti();
+		return NULL;
+	}
+	FstMap = (map = FstMap)->nxt;
+	sti();
+	return map;
+}
+
+/*释放地址映射结构*/
+void FreeMap(MAPBLK_DESC *map)
+{
+	cli();
+	map->nxt = FstMap;
+	FstMap = map;
+	sti();
+}
+
+/*映射进程取得地址映射结构,并锁定目标进程*/
+static MAPBLK_DESC *GetMap(PROCESS_DESC *proc, void *addr)
+{
+	PROCESS_DESC *DstProc;
+	MAPBLK_DESC *PreMap, *CurMap, *map;
+
+	for (PreMap = NULL, CurMap = proc->map; CurMap; CurMap = (PreMap = CurMap)->nxt)
+		if (CurMap->addr == addr)
+		{
+			map = CurMap;
+			if (PreMap)	/*从映射进程的映射结构链表中删除*/
+				PreMap->nxt = map->nxt;
+			else
+				proc->map = map->nxt;
+			DstProc = pmt[map->ptid2.ProcID];
+			for (PreMap = NULL, CurMap = DstProc->map2; CurMap; CurMap = (PreMap = CurMap)->nxt2)
+				if (CurMap == map)
+					break;
+			if (PreMap)	/*从被映射进程的映射结构链表中删除*/
+				PreMap->nxt2 = map->nxt2;
+			else
+				DstProc->map2 = map->nxt2;
+			return map;
+		}
+	return NULL;
+}
+
+/*被映射进程取得地址映射结构,并锁定目标进程*/
+static MAPBLK_DESC *GetMap2(PROCESS_DESC *proc, void *addr)
+{
+	PROCESS_DESC *DstProc;
+	MAPBLK_DESC *PreMap, *CurMap, *map;
+
+	for (PreMap = NULL, CurMap = proc->map2; CurMap; CurMap = (PreMap = CurMap)->nxt2)
+		if (CurMap->addr2 == addr)
+		{
+			map = CurMap;
+			if (PreMap)	/*从被映射进程的映射结构链表中删除*/
+				PreMap->nxt2 = map->nxt2;
+			else
+				proc->map2 = map->nxt2;
+			DstProc = pmt[map->ptid.ProcID];
+			for (PreMap = NULL, CurMap = DstProc->map; CurMap; CurMap = (PreMap = CurMap)->nxt)
+				if (CurMap == map)
+					break;
+			if (PreMap)	/*从映射进程的映射结构链表中删除*/
+				PreMap->nxt = map->nxt;
+			else
+				DstProc->map = map->nxt;
+			return map;
+		}
+	return NULL;
+}
+
+/*检查地址块是否是映射区*/
+static MAPBLK_DESC *CheckInMap(MAPBLK_DESC *map, void *fst, void *end)
+{
+	while (map)
+	{
+		if ((DWORD)end > ((DWORD)map->addr & 0xFFFFF000) && (DWORD)fst < ((DWORD)map->addr & 0xFFFFF000) + (map->siz & 0xFFFFF000))
+			return map;
+		map = map->nxt;
+	}
+	return NULL;
+}
+
+/*检查地址块是否已被映射*/
+static MAPBLK_DESC *CheckInMap2(MAPBLK_DESC *map2, void *fst, void *end)
+{
+	while (map2)
+	{
+		if ((DWORD)end > ((DWORD)map2->addr2 & 0xFFFFF000) && (DWORD)fst < ((DWORD)map2->addr2 & 0xFFFFF000) + (map2->siz & 0xFFFFF000))
+			return map2;
+		map2 = map2->nxt2;
+	}
+	return NULL;
+}
+
 /*分配物理页*/
 DWORD AllocPage()
 {
@@ -45,48 +148,40 @@ void FreePage(DWORD pgaddr)
 		PmpID = pgid;
 }
 
-/*分配地址映射结构*/
-MAPBLK_DESC *AllocMap()
+/*填充连续的页地址*/
+long FillConAddr(PAGE_DESC *FstPg, PAGE_DESC *EndPg, DWORD PhyAddr, DWORD attr)
 {
-	MAPBLK_DESC *map;
+	PAGE_DESC *TstPg;
+	BOOL isRefreshTlb;
 
-	cli();
-	if (FstMap == NULL)
+	for (TstPg = (PAGE_DESC*)(*((DWORD*)&FstPg) & 0xFFFFF000); TstPg < EndPg; TstPg += 0x400)	/*调整地址到页表边界*/
 	{
-		sti();
-		return NULL;
-	}
-	FstMap = (map = FstMap)->nxt;
-	sti();
-	return map;
-}
-
-/*释放地址映射结构*/
-void FreeMap(MAPBLK_DESC *map)
-{
-	cli();
-	map->nxt = FstMap;
-	FstMap = map;
-	sti();
-}
-
-/*填充空页表*/
-long FillPt(PAGE_DESC *FstPg, PAGE_DESC *EndPg, DWORD attr)
-{
-	*((DWORD*)&FstPg) &= 0xFFFFF000;	/*调整地址到页表边界*/
-	while (FstPg < EndPg)
-	{
-		if (!(pt[(DWORD)FstPg >> 12] & PAGE_ATTR_P))	/*页表不存在*/
+		if (!(pt[(DWORD)TstPg >> 12] & PAGE_ATTR_P))	/*页表不存在*/
 		{
 			DWORD PtAddr;	/*页表的物理地址*/
 
 			if ((PtAddr = LockAllocPage()) == 0)
 				return KERR_OUT_OF_PHYMEM;
-			pt[(DWORD)FstPg >> 12] = attr | PtAddr;
-			memset32(FstPg, 0, 0x400);	/*清空页表*/
+			pt[(DWORD)TstPg >> 12] = attr | PtAddr;
+			memset32(TstPg, 0, 0x400);	/*清空页表*/
 		}
-		FstPg += 0x400;
 	}
+	isRefreshTlb = FALSE;
+	PhyAddr |= attr;
+	for (; FstPg < EndPg; FstPg++)	/*修改页表,映射地址*/
+	{
+		DWORD PgAddr;	/*页的物理地址*/
+
+		if ((PgAddr = *FstPg) & PAGE_ATTR_P)	/*物理页存在*/
+		{
+			LockFreePage(PgAddr);	/*释放物理页*/
+			isRefreshTlb = TRUE;
+		}
+		*FstPg = PhyAddr;
+		PhyAddr += PAGE_SIZE;
+	}
+	if (isRefreshTlb)
+		RefreshTlb();
 	return NO_ERROR;
 }
 
@@ -95,12 +190,20 @@ long FillPage(EXEC_DESC *exec, void *addr, DWORD ErrCode)
 {
 	PAGE_DESC *CurPt, *CurPt0, *CurPg, *CurPg0;
 
+	if (ErrCode & PAGE_ATTR_W)	/*检查是否要写只读的映射区*/
+	{
+		MAPBLK_DESC *TmpMap;
+
+		cli();
+		TmpMap = CheckInMap(CurPmd->map, (void*)((DWORD)addr & 0xFFFFF000), (void*)(((DWORD)addr + PAGE_SIZE) & 0xFFFFF000));
+		sti();
+		if (TmpMap && !(TmpMap->siz & PAGE_ATTR_W))
+			return KERR_WRITE_RDONLY_ADDR;
+	}
 	CurPg = &pt[(DWORD)addr >> 12];
 	CurPg0 = &pt0[(DWORD)addr >> 12];
 	CurPt = &pt[(DWORD)CurPg >> 12];
 	CurPt0 = &pt[(DWORD)CurPg0 >> 12];
-	if ((ErrCode & PAGE_ATTR_W) && (*CurPt & PAGE_ATTR_ROMAP))	/*页表为映射只读*/
-		return KERR_WRITE_RDONLY_ADDR;
 	if (!(ErrCode & PAGE_ATTR_P) && !(*CurPt & PAGE_ATTR_P))	/*页表不存在*/
 	{
 		if (*CurPt0 & PAGE_ATTR_P)	/*副本中存在*/
@@ -140,8 +243,6 @@ long FillPage(EXEC_DESC *exec, void *addr, DWORD ErrCode)
 			RefreshTlb();
 		}
 	}
-	if ((ErrCode & PAGE_ATTR_W) && (*CurPg & PAGE_ATTR_ROMAP))	/*页为映射只读*/
-		return KERR_WRITE_RDONLY_ADDR;
 	if (!(ErrCode & PAGE_ATTR_P) && !(*CurPg & PAGE_ATTR_P))	/*页不存在*/
 	{
 		if ((*CurPt0 & PAGE_ATTR_P) && (*CurPg0 & PAGE_ATTR_P))	/*副本页表和副本页存在*/
@@ -201,16 +302,14 @@ long FillPage(EXEC_DESC *exec, void *addr, DWORD ErrCode)
 		if ((*CurPt0 & PAGE_ATTR_P) && (*CurPg0 & PAGE_ATTR_P))	/*副本页存在*/
 		{
 			DWORD PgAddr;	/*页的物理地址*/
-			PAGE_DESC *Pg0Pt;
 
 			if ((PgAddr = LockAllocPage()) == 0)	/*申请新页*/
 				return KERR_OUT_OF_PHYMEM;
 			*CurPg = PAGE_ATTR_P | PAGE_ATTR_W | PAGE_ATTR_U | PgAddr;	/*修改页表,开启写权限*/
 			RefreshTlb();
-			Pg0Pt = (PAGE_DESC*)(((DWORD)CurPt & 0xFFFFF000) | (PG0_ID * sizeof(PAGE_DESC)));
-			*Pg0Pt = *CurPt0;	/*设置临时映射*/
+			pt[(PT_ID << 10) | PG0_ID] = *CurPt0;	/*设置临时映射*/
 			memcpy32((void*)((DWORD)addr & 0xFFFFF000), &pg0[(DWORD)addr & 0x003FF000], 0x400);	/*页写时复制*/
-			*Pg0Pt = 0;	/*解除临时映射*/
+			pt[(PT_ID << 10) | PG0_ID] = 0;	/*解除临时映射*/
 		}
 		else	/*副本页表或副本页不存在*/
 		{
@@ -233,9 +332,9 @@ void ClearPage(PAGE_DESC *FstPg, PAGE_DESC *EndPg, BOOL isFree)
 
 		if ((PtAddr = pt[(DWORD)FstPg >> 12]) & PAGE_ATTR_P)	/*页表存在*/
 		{
-			PAGE_DESC *TFstPg;
+			PAGE_DESC *TstPg;
 
-			TFstPg = FstPg;	/*记录开始释放的位置*/
+			TstPg = FstPg;	/*记录开始释放的位置*/
 			do	/*删除对应的全部非空页*/
 			{
 				DWORD PgAddr;	/*页的物理地址*/
@@ -249,17 +348,17 @@ void ClearPage(PAGE_DESC *FstPg, PAGE_DESC *EndPg, BOOL isFree)
 				}
 			}
 			while (((DWORD)(++FstPg) & 0xFFF) && FstPg < EndPg);
-			for (; (DWORD)TFstPg & 0xFFF; TFstPg--)	/*检查页表是否需要释放*/
-				if (*(TFstPg - 1) & PAGE_ATTR_P)
+			while ((DWORD)TstPg & 0xFFF)	/*检查页表是否需要释放*/
+				if (*(--TstPg) & PAGE_ATTR_P)
 					goto skip;
-			for (; (DWORD)FstPg & 0xFFF; FstPg++)
-				if (*FstPg & PAGE_ATTR_P)
+			while ((DWORD)FstPg & 0xFFF)
+				if (*(FstPg++) & PAGE_ATTR_P)
 					goto skip;
 			LockFreePage(PtAddr);	/*释放页表*/
-			pt[(DWORD)TFstPg >> 12] = 0;
+			pt[(DWORD)TstPg >> 12] = 0;
 skip:		continue;
 		}
-		else	/*整个页目录表项空*/
+		else	/*整个页表空*/
 			FstPg = (PAGE_DESC*)(((DWORD)FstPg + 0x1000) & 0xFFFFF000);
 	}
 	if (isRefreshTlb)
@@ -281,9 +380,9 @@ void ClearPageNoPt0(PAGE_DESC *FstPg, PAGE_DESC *EndPg)
 
 		if ((PtAddr = pt[(DWORD)FstPg >> 12]) & PAGE_ATTR_P && (PtAddr >> 12) != ((Pt0Addr = pt[(DWORD)FstPg0 >> 12]) >> 12))	/*页表存在,与副本不重合*/
 		{
-			PAGE_DESC *TFstPg;
+			PAGE_DESC *TstPg;
 
-			TFstPg = FstPg;	/*记录开始释放的位置*/
+			TstPg = FstPg;	/*记录开始释放的位置*/
 			do	/*删除对应的全部非空页*/
 			{
 				DWORD PgAddr;	/*页的物理地址*/
@@ -297,17 +396,17 @@ void ClearPageNoPt0(PAGE_DESC *FstPg, PAGE_DESC *EndPg)
 				}
 			}
 			while (((DWORD)(++FstPg0, ++FstPg) & 0xFFF) && FstPg < EndPg);
-			for (; (DWORD)TFstPg & 0xFFF; TFstPg--)	/*检查页表是否需要释放*/
-				if (*(TFstPg - 1) & PAGE_ATTR_P)
+			while ((DWORD)TstPg & 0xFFF)	/*检查页表是否需要释放*/
+				if (*(--TstPg) & PAGE_ATTR_P)
 					goto skip;
-			for (; (DWORD)FstPg & 0xFFF; FstPg0++, FstPg++)
-				if (*FstPg & PAGE_ATTR_P)
+			while ((DWORD)FstPg & 0xFFF)
+				if ((FstPg0++, *(FstPg++)) & PAGE_ATTR_P)
 					goto skip;
 			LockFreePage(PtAddr);	/*释放页表*/
-			pt[(DWORD)TFstPg >> 12] = 0;
+			pt[(DWORD)TstPg >> 12] = 0;
 skip:		continue;
 		}
-		else	/*整个页目录表项空*/
+		else	/*整个页表空*/
 		{
 			FstPg = (PAGE_DESC*)(((DWORD)FstPg + 0x1000) & 0xFFFFF000);
 			FstPg0 = (PAGE_DESC*)(((DWORD)FstPg0 + 0x1000) & 0xFFFFF000);
@@ -315,70 +414,6 @@ skip:		continue;
 	}
 	if (isRefreshTlb)
 		RefreshTlb();
-}
-
-/*映射进程取得地址映射结构,并锁定目标进程*/
-static MAPBLK_DESC *GetMap(PROCESS_DESC *proc, void *addr)
-{
-	PROCESS_DESC *DstProc;
-	MAPBLK_DESC *PreMap, *CurMap, *map;
-
-	cli();
-	for (PreMap = NULL, CurMap = proc->map; CurMap; CurMap = (PreMap = CurMap)->nxt)
-		if (CurMap->addr == addr)
-		{
-			map = CurMap;
-			if (PreMap)	/*从映射进程的映射结构链表中删除*/
-				PreMap->nxt = map->nxt;
-			else
-				proc->map = map->nxt;
-			DstProc = pmt[map->ptid2.ProcID];
-			for (PreMap = NULL, CurMap = DstProc->map2; CurMap; CurMap = (PreMap = CurMap)->nxt2)
-				if (CurMap == map)
-					break;
-			if (PreMap)	/*从被映射进程的映射结构链表中删除*/
-				PreMap->nxt2 = map->nxt2;
-			else
-				DstProc->map2 = map->nxt2;
-			proc->MapCou--;
-			DstProc->Map_l++;
-			sti();
-			return map;
-		}
-	sti();
-	return NULL;
-}
-
-/*被映射进程取得地址映射结构,并锁定目标进程*/
-static MAPBLK_DESC *GetMap2(PROCESS_DESC *proc, void *addr)
-{
-	PROCESS_DESC *DstProc;
-	MAPBLK_DESC *PreMap, *CurMap, *map;
-
-	cli();
-	for (PreMap = NULL, CurMap = proc->map2; CurMap; CurMap = (PreMap = CurMap)->nxt2)
-		if (CurMap->addr2 == addr)
-		{
-			map = CurMap;
-			if (PreMap)	/*从映射进程的映射结构链表中删除*/
-				PreMap->nxt2 = map->nxt2;
-			else
-				proc->map2 = map->nxt2;
-			DstProc = pmt[map->ptid.ProcID];
-			for (PreMap = NULL, CurMap = DstProc->map; CurMap; CurMap = (PreMap = CurMap)->nxt)
-				if (CurMap == map)
-					break;
-			if (PreMap)	/*从被映射进程的映射结构链表中删除*/
-				PreMap->nxt = map->nxt;
-			else
-				DstProc->map = map->nxt;
-			DstProc->MapCou--;
-			DstProc->Map_l++;
-			sti();
-			return map;
-		}
-	sti();
-	return NULL;
 }
 
 /*映射物理地址*/
@@ -405,22 +440,22 @@ long MapPhyAddr(void **addr, DWORD PhyAddr, DWORD siz)
 	if ((CurBlk = LockAllocUBlk(CurProc, siz)) == NULL)
 		return KERR_OUT_OF_LINEADDR;
 	MapAddr = CurBlk->addr;
+	cli();
+	if (CheckInMap2(CurProc->map2, MapAddr, MapAddr + siz))	/*检查区域是否已被映射*/
+	{
+		sti();
+		LockFreeUBlk(CurProc, CurBlk);
+		return KERR_PAGE_ALREADY_MAPED;
+	}
+	lock(&CurProc->Page_l);
 	FstPg = &pt[(DWORD)MapAddr >> 12];
 	EndPg = &pt[((DWORD)MapAddr + siz) >> 12];
-	lock(&CurProc->Page_l);
-	ClearPage(FstPg, EndPg, TRUE);
-	if (FillPt(FstPg, EndPg, PAGE_ATTR_P | PAGE_ATTR_W | PAGE_ATTR_U) != NO_ERROR)
+	if (FillConAddr(FstPg, EndPg, PhyAddr, PAGE_ATTR_P | PAGE_ATTR_W | PAGE_ATTR_U) != NO_ERROR)
 	{
 		ClearPage(FstPg, EndPg, TRUE);
 		ulock(&CurProc->Page_l);
 		LockFreeUBlk(CurProc, CurBlk);
 		return KERR_OUT_OF_PHYMEM;
-	}
-	PhyAddr |= PAGE_ATTR_P | PAGE_ATTR_W | PAGE_ATTR_U;
-	for (; FstPg < EndPg; FstPg++)	/*修改页表,映射地址*/
-	{
-		*FstPg = PhyAddr;
-		PhyAddr += PAGE_SIZE;
 	}
 	ulock(&CurProc->Page_l);
 	*((DWORD*)addr) |= *((DWORD*)&MapAddr);
@@ -464,21 +499,19 @@ long MapProcAddr(void *addr, DWORD siz, THREAD_ID *ptid, BOOL isWrite, BOOL isCh
 	PROCESS_DESC *CurProc, *DstProc;
 	THREAD_DESC *CurThed, *DstThed;
 	MAPBLK_DESC *map;
-	void *MapAddr, *daddr;
-	PAGE_DESC *FstPg, *EndPg, *FstPg2;
-	DWORD dsiz;
+	void *MapAddr, *AlgAddr;
+	PAGE_DESC *FstPg, *FstPg2, *EndPg;
+	DWORD AlgSize;
 	MESSAGE_DESC *msg;
 	long res;
 
 	if (siz == 0)
 		return KERR_MAPSIZE_IS_ZERO;
-	dsiz = siz;
-	siz = ((DWORD)addr + siz + 0x00000FFF) & 0xFFFFF000;	/*调整ProcAddr,siz到页边界,siz临时用做结束地址*/
-	*((DWORD*)&daddr) = (DWORD)addr & 0x00000FFF;	/*记录地址参数的零头*/
-	*((DWORD*)&addr) &= 0xFFFFF000;
-	if (siz <= (DWORD)addr)	/*长度越界*/
+	AlgAddr = (void*)((DWORD)addr & 0xFFFFF000);
+	AlgSize = ((DWORD)addr + siz + 0x00000FFF) & 0xFFFFF000;	/*调整ProcAddr,siz到页边界,AlgSiz临时用做结束地址*/
+	if (AlgSize <= (DWORD)AlgAddr)	/*长度越界*/
 		return KERR_MAPSIZE_TOO_LONG;
-	if (addr < UADDR_OFF)	/*与不允许被映射的区域有重合*/
+	if (AlgAddr < UADDR_OFF)	/*与不允许被映射的区域有重合*/
 		return KERR_ACCESS_ILLEGAL_ADDR;
 	if (ptid->ProcID >= PMT_LEN)
 		return KERR_INVALID_PROCID;
@@ -494,42 +527,42 @@ long MapProcAddr(void *addr, DWORD siz, THREAD_ID *ptid, BOOL isWrite, BOOL isCh
 
 		CurExec = CurProc->exec;	/*检查映射区域与代码段和数据段的重合*/
 		lock(&CurProc->Page_l);
-		lock(&CurExec->Page_l);
-		if (CurExec->CodeOff < CurExec->CodeEnd && CurExec->CodeOff < (void*)siz && CurExec->CodeEnd > addr)	/*代码段与映射区有重合*/
+		lockw(&CurExec->Page_l);
+		if (CurExec->CodeOff < CurExec->CodeEnd && CurExec->CodeOff < (void*)AlgSize && CurExec->CodeEnd > AlgAddr)	/*代码段与映射区有重合*/
 		{
 			void *fst, *end;
 
-			fst = (void*)((DWORD)(addr < CurExec->CodeOff ? CurExec->CodeOff : addr) & 0xFFFFF000);
-			end = ((void*)siz > CurExec->CodeEnd ? CurExec->CodeEnd : (void*)siz);
+			fst = (void*)((DWORD)(AlgAddr < CurExec->CodeOff ? CurExec->CodeOff : AlgAddr) & 0xFFFFF000);
+			end = ((void*)AlgSize > CurExec->CodeEnd ? CurExec->CodeEnd : (void*)AlgSize);
 			while (fst < end)	/*填充被映射的代码段*/
 			{
 				if ((res = FillPage(CurExec, fst, isWrite ? PAGE_ATTR_W : 0)) != NO_ERROR)
 				{
-					ulock(&CurExec->Page_l);
+					ulockw(&CurExec->Page_l);
 					ulock(&CurProc->Page_l);
 					return res;
 				}
 				fst += PAGE_SIZE;
 			}
 		}
-		if (CurExec->DataOff < CurExec->DataEnd && CurExec->DataOff < (void*)siz && CurExec->DataEnd > addr)	/*数据段与映射区有重合*/
+		if (CurExec->DataOff < CurExec->DataEnd && CurExec->DataOff < (void*)AlgSize && CurExec->DataEnd > AlgAddr)	/*数据段与映射区有重合*/
 		{
 			void *fst, *end;
 
-			fst = (void*)((DWORD)(addr < CurExec->DataOff ? CurExec->DataOff : addr) & 0xFFFFF000);
-			end = ((void*)siz > CurExec->DataEnd ? CurExec->DataEnd : (void*)siz);
+			fst = (void*)((DWORD)(AlgAddr < CurExec->DataOff ? CurExec->DataOff : AlgAddr) & 0xFFFFF000);
+			end = ((void*)AlgSize > CurExec->DataEnd ? CurExec->DataEnd : (void*)AlgSize);
 			while (fst < end)	/*填充被映射的数据段*/
 			{
 				if ((res = FillPage(CurExec, fst, isWrite ? PAGE_ATTR_W : 0)) != NO_ERROR)
 				{
-					ulock(&CurExec->Page_l);
+					ulockw(&CurExec->Page_l);
 					ulock(&CurProc->Page_l);
 					return res;
 				}
 				fst += PAGE_SIZE;
 			}
 		}
-		ulock(&CurExec->Page_l);
+		ulockw(&CurExec->Page_l);
 		ulock(&CurProc->Page_l);
 	}
 	cli();	/*要访问其他进程的信息,所以防止任务切换*/
@@ -545,99 +578,135 @@ long MapProcAddr(void *addr, DWORD siz, THREAD_ID *ptid, BOOL isWrite, BOOL isCh
 		sti();
 		return KERR_THED_NOT_EXIST;
 	}
-	if (DstProc->MapCou >= PROC_MAP_LEN)
-	{
-		sti();
-		return KERR_OUT_OF_LINEADDR;
-	}
-	DstProc->Map_l++;
+	DstProc->MapCou++;
 	sti();
-	siz -= (DWORD)addr;	/*siz恢复为映射字节数*/
-	if ((MapAddr = LockAllocUFData(DstProc, siz)) == NULL)	/*申请用户空间*/
+	AlgSize -= (DWORD)AlgAddr;	/*AlgSize恢复为映射字节数*/
+	if ((MapAddr = LockAllocUFData(DstProc, AlgSize)) == NULL)	/*申请用户空间*/
 	{
-		clisub(&DstProc->Map_l);
+		clisub(&DstProc->MapCou);
 		return KERR_OUT_OF_LINEADDR;
 	}
-	if ((map = AllocMap(DstProc, siz)) == NULL)	/*申请映射管理结构*/
+	if ((map = AllocMap()) == NULL)	/*申请映射管理结构*/
 	{
-		LockFreeUFData(DstProc, MapAddr, siz);
-		clisub(&DstProc->Map_l);
+		LockFreeUFData(DstProc, MapAddr, AlgSize);
+		clisub(&DstProc->MapCou);
 		return KERR_OUT_OF_LINEADDR;
 	}
-	FstPg = &pt[(DWORD)addr >> 12];
-	EndPg = &pt[((DWORD)addr + siz) >> 12];
-	FstPg2 = &pt2[(DWORD)MapAddr >> 12];
-	lock(&DstProc->Page_l);
-	lockset(&pt[(PT_ID << 10) | PT2_ID], pddt[ptid->ProcID]);	/*映射关系进程的页表*/
-	ClearPage(FstPg2, &pt2[((DWORD)MapAddr + siz) >> 12], TRUE);
-	while (FstPg < EndPg)	/*修改页表,映射地址*/
+	map->addr = (void*)((DWORD)MapAddr | ((DWORD)addr & 0x00000FFF));	/*设置映射结构*/
+	map->addr2 = addr;
+	map->siz = AlgSize | (isWrite ? PAGE_ATTR_W : 0);
+	map->ptid = *ptid;
+	map->ptid2 = CurThed->id;
+	cli();
+	if (isWrite && CurProc->map)	/*检查是否要写只读的映射区*/
 	{
-		DWORD PtAddr;	/*页表的物理地址*/
+		MAPBLK_DESC *TmpMap;
 
-		if (((PtAddr = pt[(DWORD)FstPg >> 12]) & PAGE_ATTR_ROMAP) && isWrite)	/*源页表映射为只读*/
+		TmpMap = CurProc->map;
+		for (;;)
 		{
-			ClearPage(&pt2[(DWORD)MapAddr >> 12], FstPg2, FALSE);
-			ulock(&pt[(PT_ID << 10) | PT2_ID]);	/*解除关系进程页表的映射*/
-			ulock(&DstProc->Page_l);
-			FreeMap(map);
-			LockFreeUFData(DstProc, MapAddr, siz);
-			clisub(&DstProc->Map_l);
-			return KERR_WRITE_RDONLY_ADDR;
+			if ((TmpMap = CheckInMap(TmpMap, AlgAddr, AlgAddr + AlgSize)) == NULL)
+				break;
+			if (!(TmpMap->siz & PAGE_ATTR_W))
+			{
+				FreeMap(map);
+				LockFreeUFData(DstProc, MapAddr, AlgSize);
+				clisub(&DstProc->MapCou);
+				return KERR_WRITE_RDONLY_ADDR;
+			}
+			TmpMap = TmpMap->nxt;
 		}
-		if (PtAddr & PAGE_ATTR_P)	/*源页表存在*/
+	}
+	map->nxt = DstProc->map;
+	map->nxt2 = CurProc->map2;
+	CurProc->map2 = DstProc->map = map;
+	if (isChkExec)
+	{
+		clilock(CurProc->Page_l || DstProc->Page_l);
+		CurProc->Page_l = TRUE;
+		DstProc->Page_l = TRUE;
+		sti();
+	}
+	else
+		lock(&DstProc->Page_l);
+	lockset(&pt[(PT_ID << 10) | PT2_ID], pddt[ptid->ProcID]);	/*映射关系进程的页表*/
+	FstPg = &pt[(DWORD)AlgAddr >> 12];
+	EndPg = &pt[((DWORD)AlgAddr + AlgSize) >> 12];
+	FstPg2 = &pt2[(DWORD)MapAddr >> 12];
+	while (FstPg < EndPg)	/*源地址循环*/
+	{
+		if (pt[(DWORD)FstPg >> 12] & PAGE_ATTR_P)	/*源页表存在*/
 		{
 			do
 			{
-				DWORD PgAddr;	/*页的物理地址*/
+				DWORD PgAddr;	/*源页的物理地址*/
 
-				if (((PgAddr = *FstPg) & PAGE_ATTR_ROMAP) && isWrite)	/*源页映射为只读*/
-				{
-					ClearPage(&pt2[(DWORD)MapAddr >> 12], FstPg2, FALSE);
-					ulock(&pt[(PT_ID << 10) | PT2_ID]);	/*解除关系进程页表的映射*/
-					ulock(&DstProc->Page_l);
-					FreeMap(map);
-					LockFreeUFData(DstProc, MapAddr, siz);
-					clisub(&DstProc->Map_l);
-					return KERR_WRITE_RDONLY_ADDR;
-				}
-				if (PgAddr & PAGE_ATTR_P)	/*源页存在*/
+				if ((PgAddr = *FstPg) & PAGE_ATTR_P)	/*源页存在*/
 				{
 					PAGE_DESC *CurPt2;
+					DWORD PgAddr2;	/*目的页的物理地址*/
 
 					CurPt2 = &pt[(DWORD)FstPg2 >> 12];
 					if (!(*CurPt2 & PAGE_ATTR_P))	/*目的页表不存在*/
 					{
-						DWORD PtAddr;	/*页表的物理地址*/
+						DWORD PtAddr2;	/*目的页表的物理地址*/
 
-						if ((PtAddr = LockAllocPage()) == 0)	/*申请目的页表*/
+						if ((PtAddr2 = LockAllocPage()) == 0)	/*申请目的页表*/
 						{
 							ClearPage(&pt2[(DWORD)MapAddr >> 12], FstPg2, FALSE);
 							ulock(&pt[(PT_ID << 10) | PT2_ID]);	/*解除关系进程页表的映射*/
 							ulock(&DstProc->Page_l);
+							if (isChkExec)
+								ulock(&CurProc->Page_l);
+							cli();
+							GetMap2(CurProc, addr);
+							cli();
 							FreeMap(map);
-							LockFreeUFData(DstProc, MapAddr, siz);
-							clisub(&DstProc->Map_l);
+							LockFreeUFData(DstProc, MapAddr, AlgSize);
+							clisub(&DstProc->MapCou);
 							return KERR_OUT_OF_PHYMEM;
 						}
-						*CurPt2 = PAGE_ATTR_P | PAGE_ATTR_U | PtAddr;	/*开启用户权限*/
+						*CurPt2 = PAGE_ATTR_P | PAGE_ATTR_U | PtAddr2;	/*开启用户权限*/
 						memset32((void*)((DWORD)FstPg2 & 0xFFFFF000), 0, 0x400);	/*清空页表*/
+					}
+					else if ((PgAddr2 = *FstPg2) & PAGE_ATTR_P)	/*目的页存在*/
+					{
+						cli();
+						if (CheckInMap2(DstProc->map2, (void*)((DWORD)FstPg2 << 10), (void*)((DWORD)(FstPg2 + 1) << 10)))	/*已被映射*/
+						{
+							sti();
+							ClearPage(&pt2[(DWORD)MapAddr >> 12], FstPg2, FALSE);
+							ulock(&pt[(PT_ID << 10) | PT2_ID]);	/*解除关系进程页表的映射*/
+							ulock(&DstProc->Page_l);
+							if (isChkExec)
+								ulock(&CurProc->Page_l);
+							cli();
+							GetMap2(CurProc, addr);
+							sti();
+							FreeMap(map);
+							LockFreeUFData(DstProc, MapAddr, AlgSize);
+							clisub(&DstProc->MapCou);
+							return KERR_PAGE_ALREADY_MAPED;
+						}
+						else
+							LockFreePage(PgAddr2);	/*释放目的页*/
 					}
 					if (isWrite)
 					{
-						*CurPt2 |= PAGE_ATTR_W;	/*开启写权限*/
-						*FstPg2 = PgAddr | PAGE_ATTR_W;
+						*CurPt2 |= PAGE_ATTR_W;	/*开启页表写权限*/
+						*FstPg2 = PAGE_ATTR_W | PgAddr;	/*开启页写权限*/
 					}
 					else
 					{
-						if (((DWORD)CurPt2 << 20) >= (DWORD)MapAddr && ((DWORD)(CurPt2 + 1) << 20) <= (DWORD)MapAddr + siz)	/*页表覆盖区全部位于映射空间内*/
-							*CurPt2 |= PAGE_ATTR_ROMAP;	/*页表设置为映射只读*/
-						*FstPg2 = (PgAddr & (~PAGE_ATTR_W)) | PAGE_ATTR_ROMAP;	/*关闭写权限,设置为映射只读*/
+						if (((DWORD)CurPt2 << 20) >= (DWORD)MapAddr && ((DWORD)(CurPt2 + 1) << 20) <= (DWORD)MapAddr + AlgSize)	/*页表覆盖区全部位于映射空间内*/
+							*CurPt2 &= (~PAGE_ATTR_W);	/*关闭页表写权限*/
+						*FstPg2 = (~PAGE_ATTR_W) & PgAddr;	/*关闭页写权限*/
 					}
 				}
 			}
 			while (((DWORD)(++FstPg2, ++FstPg) & 0xFFF) && FstPg < EndPg);
 		}
-		else	/*源页目录表项空*/
+		else	/*源页表不存在*/
 		{
 			DWORD step;
 
@@ -648,40 +717,26 @@ long MapProcAddr(void *addr, DWORD siz, THREAD_ID *ptid, BOOL isWrite, BOOL isCh
 	}
 	ulock(&pt[(PT_ID << 10) | PT2_ID]);	/*解除关系进程页表的映射*/
 	ulock(&DstProc->Page_l);
-	map->addr = (void*)(*((DWORD*)&MapAddr) | *((DWORD*)&daddr));	/*设置映射结构*/
-	map->addr2 = (void*)(*((DWORD*)&addr) | *((DWORD*)&daddr));
-	map->siz = siz;
-	map->ptid = *ptid;
-	map->ptid2 = CurThed->id;
-	cli();
-	map->nxt = DstProc->map;
-	map->nxt2 = CurProc->map2;
-	CurProc->map2 = DstProc->map = map;
-	DstProc->MapCou++;
-	DstProc->Map_l--;
-	sti();	/*到此映射完成*/
+	if (isChkExec)
+		ulock(&CurProc->Page_l);
+	clisub(&DstProc->MapCou);	/*到此映射完成*/
+	if (!isChkExec)
+		lockset((volatile DWORD*)(&CurProc->PageReadAddr), (DWORD)map->addr2);
 	if ((msg = AllocMsg()) == NULL)	/*申请消息结构*/
 		return KERR_MSG_NOT_ENOUGH;
 	msg->ptid = *ptid;	/*设置消息*/
 	memcpy32(msg->data, argv, MSG_DATA_LEN);
 	msg->data[MSG_ATTR_ID] = (argv[MSG_API_ID] & MSG_API_MASK) | (isWrite ? MSG_ATTR_RWMAP : MSG_ATTR_ROMAP);
-	msg->data[MSG_ADDR_ID] = *((DWORD*)&MapAddr) | *((DWORD*)&daddr);
-	msg->data[MSG_SIZE_ID] = dsiz;
-	if (!isChkExec)
-		CurProc->PageReadAddr = map->addr2;
+	msg->data[MSG_ADDR_ID] = (DWORD)map->addr;
+	msg->data[MSG_SIZE_ID] = siz;
 	if ((res = SendMsg(msg)) != NO_ERROR)	/*发送映射消息*/
 	{
-		if (!isChkExec)
-			CurProc->PageReadAddr = NULL;
 		FreeMsg(msg);
 		return res;
 	}
 	if (cs)	/*等待返回消息*/
 	{
-		res = RecvProcMsg(&msg, *ptid, cs);
-		if (!isChkExec)
-			CurProc->PageReadAddr = NULL;
-		if (res != NO_ERROR)
+		if ((res = RecvProcMsg(&msg, *ptid, cs)) != NO_ERROR)
 			return res;
 		*ptid = msg->ptid;
 		memcpy32(argv, msg->data, MSG_DATA_LEN);
@@ -698,127 +753,129 @@ long UnmapProcAddr(void *addr, const DWORD *argv)
 	PAGE_DESC *FstPg, *EndPg, *FstPg2;
 	THREAD_ID ptid;
 	void *addr2;
+	BOOL isRefreshTlb;
 	MESSAGE_DESC *msg;
 	long res;
 
 	CurProc = CurPmd;
-	if ((map = GetMap(CurProc, addr)) == NULL)
+	cli();
+	map = GetMap(CurProc, addr);
+	if (map == NULL)
+	{
+		sti();
 		return KERR_ADDRARGS_NOT_FOUND;
+	}
 	ptid = map->ptid2;
 	addr2 = map->addr2;
 	DstProc = pmt[ptid.ProcID];
-	res = NO_ERROR;
-	FstPg = &pt[(DWORD)addr >> 12];
-	EndPg = &pt[((DWORD)addr + map->siz) >> 12];
-	FstPg2 = &pt2[(DWORD)addr2 >> 12];
-	if (DstProc->PageReadAddr == NULL || DstProc->PageReadAddr != addr2)
-		lock(&DstProc->Page_l);
-	lockset(&pt[(PT_ID << 10) | PT2_ID], pddt[ptid.ProcID]);	/*映射关系进程的页表*/
-	while (FstPg < EndPg)	/*目录项对应的页表对应的每页分别回收*/
+	DstProc->MapCou++;
+	if (DstProc->PageReadAddr != addr2)
 	{
-		DWORD PtAddr;	/*页表的物理地址*/
-
-		if ((PtAddr = pt[(DWORD)FstPg2 >> 12]) & PAGE_ATTR_P)	/*页表存在*/
-		{
-			PAGE_DESC *TFstPg;
-			BOOL isSkip;
-
-			TFstPg = FstPg2;	/*记录开始释放的位置*/
-			isSkip = FALSE;
-			do	/*删除对应的全部非空页*/
-			{
-				DWORD PgAddr;	/*页的物理地址*/
-
-				if ((PgAddr = *FstPg2) & PAGE_ATTR_P)	/*物理页存在*/
-				{
-					if ((pt[(DWORD)FstPg >> 12] & PAGE_ATTR_P) && (PgAddr >> 12) == (*FstPg >> 12))	/*重合页不被释放*/
-						isSkip = TRUE;
-					else
-					{
-						LockFreePage(PgAddr);	/*释放物理页*/
-						*FstPg2 &= PAGE_ATTR_AVL;
-					}
-				}
-			}
-			while (((DWORD)(++FstPg, ++FstPg2) & 0xFFF) && FstPg < EndPg);
-			if (isSkip)
-				goto skip;
-			for (; (DWORD)TFstPg & 0xFFF; TFstPg--)	/*检查页表是否需要释放*/
-				if (*(TFstPg - 1) & PAGE_ATTR_P)
-					goto skip;
-			for (; (DWORD)FstPg2 & 0xFFF; FstPg++, FstPg2++)
-				if (*FstPg2 & PAGE_ATTR_P)
-					goto skip;
-			LockFreePage(PtAddr);	/*释放页表*/
-			pt[(DWORD)TFstPg >> 12] &= PAGE_ATTR_AVL;
-skip:		continue;
-		}
-		else	/*整个页目录表项空*/
-		{
-			DWORD step;
-
-			step = 0x1000 - ((DWORD)FstPg2 & 0xFFF);
-			*((DWORD*)&FstPg) += step;
-			*((DWORD*)&FstPg2) += step;
-		}
+		clilock(DstProc->Page_l || CurProc->Page_l);
+		DstProc->Page_l = TRUE;
+		CurProc->Page_l = TRUE;
+		sti();
 	}
+	else
+		lock(&CurProc->Page_l);
+	lockset(&pt[(PT_ID << 10) | PT2_ID], pddt[ptid.ProcID]);	/*映射关系进程的页表*/
+	res = NO_ERROR;
+	isRefreshTlb = FALSE;
 	FstPg = &pt[(DWORD)addr >> 12];
+	EndPg = &pt[((DWORD)addr + (map->siz & 0xFFFFF000)) >> 12];
 	FstPg2 = &pt2[(DWORD)addr2 >> 12];
-	while (FstPg < EndPg)	/*修改页表,映射地址*/
+	while (FstPg < EndPg)	/*源地址循环*/
 	{
-		if (pt[(DWORD)FstPg >> 12] & PAGE_ATTR_P)	/*源页表存在*/
+		DWORD PtAddr;	/*源页表的物理地址*/
+
+		if ((PtAddr = pt[(DWORD)FstPg >> 12]) & PAGE_ATTR_P)	/*源页表存在*/
 		{
+			PAGE_DESC *TstPg;
+
+			TstPg = FstPg;	/*记录开始释放的位置*/
 			do
 			{
-				DWORD PgAddr;	/*页的物理地址*/
+				DWORD PgAddr;	/*源页的物理地址*/
 
 				if ((PgAddr = *FstPg) & PAGE_ATTR_P)	/*源页存在*/
 				{
+					DWORD PgAddr2;	/*目的页的物理地址*/
+
 					if (!(pt[(DWORD)FstPg2 >> 12] & PAGE_ATTR_P))	/*目的页表不存在*/
 					{
-						DWORD PtAddr;	/*页表的物理地址*/
+						DWORD PtAddr2;	/*目的页表的物理地址*/
 
-						if ((PtAddr = LockAllocPage()) == 0)	/*申请目的页表*/
+						if ((PtAddr2 = LockAllocPage()) == 0)	/*申请目的页表*/
 						{
 							res = KERR_OUT_OF_PHYMEM;
 							goto skip2;
 						}
-						pt[(DWORD)FstPg2 >> 12] |= PAGE_ATTR_P | PAGE_ATTR_W | PAGE_ATTR_U | PtAddr;	/*开启用户写权限*/
+						pt[(DWORD)FstPg2 >> 12] |= PAGE_ATTR_P | PAGE_ATTR_W | PAGE_ATTR_U | PtAddr2;	/*开启用户写权限*/
 						memset32((void*)((DWORD)FstPg2 & 0xFFFFF000), 0, 0x400);	/*清空页表*/
 					}
-					if (!(*FstPg2 & PAGE_ATTR_P))	/*目的页不存在*/
-						*FstPg2 |= PAGE_ATTR_P | PAGE_ATTR_W | PAGE_ATTR_U | (PgAddr & 0xFFFFF000);	/*开启用户写权限*/
+					else if ((PgAddr2 = *FstPg2) & PAGE_ATTR_P && (PgAddr2 >> 12) != (PgAddr >> 12))	/*目的页存在,且与源页不重合*/
+					{
+						cli();
+						if (CheckInMap(DstProc->map, (void*)((DWORD)FstPg2 << 10), (void*)((DWORD)(FstPg2 + 1) << 10)) ||
+							CheckInMap2(DstProc->map2, (void*)((DWORD)FstPg2 << 10), (void*)((DWORD)(FstPg2 + 1) << 10)))	/*是映射区*/
+						{
+							sti();
+							pt[(PT_ID << 10) | PG0_ID] = pt[(DWORD)FstPg2 >> 12];	/*设置临时映射*/
+							memcpy32(&pg0[((DWORD)FstPg2 << 10) & 0x003FF000], (void*)((DWORD)FstPg << 10), 0x400);	/*复制页内容*/
+							pt[(PT_ID << 10) | PG0_ID] = 0;	/*解除临时映射*/
+							LockFreePage(PgAddr);	/*释放源页*/
+							PgAddr = PgAddr2;
+						}
+						else
+							LockFreePage(PgAddr2);	/*释放目的页*/
+					}
+					*FstPg2 |= PAGE_ATTR_P | PAGE_ATTR_W | PAGE_ATTR_U | (PgAddr & 0xFFFFF000);	/*开启用户写权限*/
+					*FstPg = 0;
+					isRefreshTlb = TRUE;
 				}
+				else
+					*FstPg = 0;
 			}
 			while (((DWORD)(++FstPg2, ++FstPg) & 0xFFF) && FstPg < EndPg);
+			while ((DWORD)TstPg & 0xFFF)	/*检查页表是否需要释放*/
+				if (*(--TstPg) & PAGE_ATTR_P)
+					goto skip;
+			while ((DWORD)FstPg & 0xFFF)
+				if (*(FstPg++) & PAGE_ATTR_P)
+					goto skip;
+			LockFreePage(PtAddr);	/*释放页表*/
+			pt[(DWORD)TstPg >> 12] = 0;
+skip:		continue;
 		}
-		else	/*源页目录表项空*/
+		else	/*源页表不存在*/
 		{
 			DWORD step;
 
+			pt[(DWORD)FstPg >> 12] = 0;
 			step = 0x1000 - ((DWORD)FstPg & 0xFFF);
 			*((DWORD*)&FstPg) += step;
 			*((DWORD*)&FstPg2) += step;
 		}
 	}
 skip2:
+	if (isRefreshTlb)
+		RefreshTlb();
 	ulock(&pt[(PT_ID << 10) | PT2_ID]);	/*解除关系进程页表的映射*/
-	if (DstProc->PageReadAddr == NULL || DstProc->PageReadAddr != addr2)
-		ulock(&DstProc->Page_l);
-	clisub(&DstProc->Map_l);	/*到此映射完成*/
-	lock(&CurProc->Page_l);
-	ClearPage(&pt[(DWORD)addr >> 12], EndPg, FALSE);	/*清除当前进程的映射*/
 	ulock(&CurProc->Page_l);
-	LockFreeUFData(CurProc, (void*)((DWORD)addr & 0xFFFFF000), map->siz);
+	if (DstProc->PageReadAddr != addr2)
+		ulock(&DstProc->Page_l);
+	clisub(&DstProc->MapCou);	/*到此映射完成*/
+	if (DstProc->PageReadAddr == addr2)
+		DstProc->PageReadAddr = NULL;
 	FreeMap(map);
+	LockFreeUFData(CurProc, (void*)((DWORD)addr & 0xFFFFF000), map->siz & 0xFFFFF000);
 	if ((msg = AllocMsg()) == NULL)	/*申请消息结构*/
 		return KERR_MSG_NOT_ENOUGH;
 	msg->ptid = ptid;	/*设置消息*/
 	memcpy32(msg->data, argv, MSG_DATA_LEN);
 	msg->data[MSG_ATTR_ID] = (argv[MSG_API_ID] & MSG_API_MASK) | MSG_ATTR_UNMAP;
 	msg->data[MSG_ADDR_ID] = (DWORD)addr2;
-	if (res != NO_ERROR)
-		msg->data[MSG_RES_ID] = res;
+	msg->data[MSG_RES_ID] = res;
 	if ((res = SendMsg(msg)) != NO_ERROR)	/*发送撤销映射消息*/
 	{
 		FreeMsg(msg);
@@ -839,45 +896,57 @@ long CnlmapProcAddr(void *addr, const DWORD *argv)
 	long res;
 
 	CurProc = CurPmd;
-	if ((map = GetMap2(CurProc, addr)) == NULL)
+	cli();
+	map = GetMap2(CurProc, addr);
+	if (map == NULL)
+	{
+		sti();
 		return KERR_ADDRARGS_NOT_FOUND;
+	}
 	ptid = map->ptid;
 	addr2 = map->addr;
 	DstProc = pmt[ptid.ProcID];
-	FstPg = &pt[(DWORD)addr >> 12];
-	EndPg = &pt[((DWORD)addr + map->siz) >> 12];
-	FstPg2 = &pt2[(DWORD)addr2 >> 12];
-	lock(&DstProc->Page_l);
+	DstProc->MapCou++;
+	clilock(CurProc->Page_l || DstProc->Page_l);
+	CurProc->Page_l = TRUE;
+	DstProc->Page_l = TRUE;
+	sti();
 	lockset(&pt[(PT_ID << 10) | PT2_ID], pddt[ptid.ProcID]);	/*映射关系进程的页表*/
-	while (FstPg < EndPg)	/*目录项对应的页表对应的每页分别回收*/
+	FstPg = &pt[(DWORD)addr >> 12];
+	EndPg = &pt[((DWORD)addr + (map->siz & 0xFFFFF000)) >> 12];
+	FstPg2 = &pt2[(DWORD)addr2 >> 12];
+	while (FstPg < EndPg)	/*源地址循环*/
 	{
-		DWORD PtAddr;	/*页表的物理地址*/
+		DWORD PtAddr2;	/*目的页表的物理地址*/
 
-		if ((PtAddr = pt[(DWORD)FstPg2 >> 12]) & PAGE_ATTR_P)	/*页表存在*/
+		if ((PtAddr2 = pt[(DWORD)FstPg2 >> 12]) & PAGE_ATTR_P)	/*页表存在*/
 		{
-			PAGE_DESC *TFstPg;
+			PAGE_DESC *TstPg2;
 
-			TFstPg = FstPg2;	/*记录开始释放的位置*/
-			do	/*删除对应的全部非空页*/
+			TstPg2 = FstPg2;	/*记录开始释放的位置*/
+			do
 			{
-				DWORD PgAddr;	/*页的物理地址*/
+				DWORD PgAddr2;	/*目的页的物理地址*/
 
-				if ((PgAddr = *FstPg2) & PAGE_ATTR_P)	/*物理页存在*/
+				if ((PgAddr2 = *FstPg2) & PAGE_ATTR_P)	/*物理页存在*/
 				{
-					if (!(pt[(DWORD)FstPg >> 12] & PAGE_ATTR_P) || (PgAddr >> 12) != (*FstPg >> 12))	/*释放非重合页*/
-						LockFreePage(PgAddr);	/*释放物理页*/
+					cli();
+					if ((!(pt[(DWORD)FstPg >> 12] & PAGE_ATTR_P) || (PgAddr2 >> 12) != (*FstPg >> 12)) &&
+						!CheckInMap2(DstProc->map2, (void*)((DWORD)FstPg2 << 10), (void*)((DWORD)(FstPg2 + 1) << 10)))	/*(源页不存在或与源页不重合)且没被映射*/
+						LockFreePage(PgAddr2);	/*释放物理页*/
+					sti();
 					*FstPg2 = 0;
 				}
 			}
 			while (((DWORD)(++FstPg, ++FstPg2) & 0xFFF) && FstPg < EndPg);
-			for (; (DWORD)TFstPg & 0xFFF; TFstPg--)	/*检查页表是否需要释放*/
-				if (*(TFstPg - 1) & PAGE_ATTR_P)
+			while ((DWORD)TstPg2 & 0xFFF)	/*检查页表是否需要释放*/
+				if (*(--TstPg2) & PAGE_ATTR_P)
 					goto skip;
-			for (; (DWORD)FstPg2 & 0xFFF; FstPg++, FstPg2++)
-				if (*FstPg2 & PAGE_ATTR_P)
+			while ((DWORD)FstPg2 & 0xFFF)
+				if ((FstPg++, *(FstPg2++)) & PAGE_ATTR_P)
 					goto skip;
-			LockFreePage(PtAddr);	/*释放页表*/
-			pt[(DWORD)TFstPg >> 12] = 0;
+			LockFreePage(PtAddr2);	/*释放页表*/
+			pt[(DWORD)TstPg2 >> 12] = 0;
 skip:		continue;
 		}
 		else	/*整个页目录表项空*/
@@ -891,9 +960,10 @@ skip:		continue;
 	}
 	ulock(&pt[(PT_ID << 10) | PT2_ID]);	/*解除关系进程页表的映射*/
 	ulock(&DstProc->Page_l);
-	clisub(&DstProc->Map_l);	/*到此解除映射完成*/
-	LockFreeUFData(DstProc, (void*)((DWORD)addr2 & 0xFFFFF000), map->siz);
+	ulock(&CurProc->Page_l);
+	clisub(&DstProc->MapCou);	/*到此解除映射完成*/
 	FreeMap(map);
+	LockFreeUFData(DstProc, (void*)((DWORD)addr2 & 0xFFFFF000), map->siz & 0xFFFFF000);
 	if ((msg = AllocMsg()) == NULL)	/*申请消息结构*/
 		return KERR_MSG_NOT_ENOUGH;
 	msg->ptid = ptid;	/*设置消息*/
@@ -917,7 +987,7 @@ void FreeAllMap()
 
 	data[MSG_API_ID] = (MSG_ATTR_PROCEXIT >> 16);
 	CurProc = CurPmd;
-	while (CurProc->Map_l)	/*等待其它进程映射完成*/
+	while (CurProc->MapCou)	/*等待其它进程映射完成*/
 		schedul();
 	CurMap = CurProc->map;
 	while (CurMap)
@@ -968,9 +1038,9 @@ void PageFaultProc(DWORD edi, DWORD esi, DWORD ebp, DWORD esp, DWORD ebx, DWORD 
 	}
 	CurExec = CurProc->exec;
 	lock(&CurProc->Page_l);
-	lock(&CurExec->Page_l);
+	lockw(&CurExec->Page_l);
 	res = FillPage(CurExec, addr, ErrCode);
-	ulock(&CurExec->Page_l);
+	ulockw(&CurExec->Page_l);
 	ulock(&CurProc->Page_l);
 	if (res != NO_ERROR)
 	{

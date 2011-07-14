@@ -102,6 +102,22 @@ static inline void ulock(volatile DWORD *l)
 	*l = FALSE;
 }
 
+/*WORD锁变量锁定*/
+static inline void lockw(volatile WORD *l)
+{
+	cli();
+	while (*l)
+		schedul();
+	*l = TRUE;
+	sti();
+}
+
+/*WORD锁变量解锁*/
+static inline void ulockw(volatile WORD *l)
+{
+	*l = FALSE;
+}
+
 /*锁定并赋值*/
 static inline void lockset(volatile DWORD *l, DWORD val)
 {
