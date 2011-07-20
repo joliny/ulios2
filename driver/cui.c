@@ -173,7 +173,7 @@ int main()
 	res = GDIinit();
 	if (res != NO_ERROR)
 	{
-		if (res == VESA_ERR_TEXTMODE)
+		if (res == GDI_ERR_TEXTMODE)
 		{
 			GDICharHeight = GDICharWidth = 1;
 			isTextMode = TRUE;

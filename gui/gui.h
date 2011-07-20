@@ -64,9 +64,6 @@ void DrawGobj(GOBJ_DESC *gobj, long xpos, long ypos, long xend, long yend, long 
 /*根据绝对坐标查找窗体*/
 GOBJ_DESC *FindGobj(long *AbsXpos, long *AbsYpos);
 
-/*创建主桌面*/
-long CreateDesktop(THREAD_ID ptid, DWORD attr, long width, long height, DWORD *vbuf);
-
 /*创建窗体*/
 long CreateGobj(THREAD_ID ptid, DWORD pid, DWORD attr, long xpos, long ypos, long width, long height, DWORD *vbuf, DWORD len, DWORD *gid);
 
@@ -79,11 +76,14 @@ long MoveGobj(THREAD_ID ptid, DWORD gid, long xpos, long ypos);
 /*设置窗体的大小*/
 long SizeGobj(THREAD_ID ptid, DWORD gid, long xpos, long ypos, long width, long height, DWORD *vbuf, DWORD len);
 
-/*设置窗体为活动*/
-long ActiveGobj(GOBJ_DESC *gobj);
+/*绘制窗体*/
+long PaintGobj(THREAD_ID ptid, DWORD gid, long xpos, long ypos, long width, long height);
 
-/*设置窗体显示缓冲*/
-long SetGobjVbuf(GOBJ_DESC *gobj, DWORD *vbuf);
+/*设置窗体为活动窗体(焦点)*/
+long ActiveGobj(THREAD_ID ptid, DWORD gid);
+
+/*创建主桌面*/
+long CreateDesktop(THREAD_ID ptid, DWORD attr, long width, long height, DWORD *vbuf);
 
 /**********功能库相关**********/
 
@@ -96,9 +96,12 @@ long LoadBmp(char *path, DWORD *buf, DWORD len, long *width, long *height);
 /**********桌面线程相关**********/
 
 /*桌面消息处理线程*/
-void DesktopThread(GOBJ_DESC *gobj);
+void DesktopThread(void *args);
 
-/**********鼠标功能相关**********/
+/**********键盘鼠标功能相关**********/
+
+/*键盘消息处理*/
+void KeyboardProc(DWORD key);
 
 /*鼠标初始化*/
 long InitMouse();

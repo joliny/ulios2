@@ -177,14 +177,12 @@ static inline long KMSetRecv(THREAD_ID ptid)
 #define MSG_ATTR_VESA	0x01050000	/*VESA显卡消息*/
 
 #define VESA_API_GETVMEM	0	/*取得显存映射功能号*/
-#define VESA_API_GETFONT	1	/*取得字体映射功能号*/
-#define VESA_API_GETMODE	2	/*取得模式列表功能号*/
+#define VESA_API_GETMODE	1	/*取得模式列表功能号*/
 
 #define VESA_ERR_ARGS		-1280	/*参数错误*/
-#define VESA_ERR_TEXTMODE	-1281	/*文本模式*/
 
 /*取得显存映射*/
-static inline long VSGetVmem(THREAD_ID ptid, void **vm, DWORD *width, DWORD *height, DWORD *PixBits)
+static inline long VSGetVmem(THREAD_ID ptid, void **vm, DWORD *width, DWORD *height, DWORD *PixBits, DWORD *CurMode)
 {
 	DWORD data[MSG_DATA_LEN];
 	data[MSG_API_ID] = MSG_ATTR_VESA | VESA_API_GETVMEM;
@@ -196,21 +194,7 @@ static inline long VSGetVmem(THREAD_ID ptid, void **vm, DWORD *width, DWORD *hei
 	*width = data[3];
 	*height = data[4];
 	*PixBits = data[5];
-	return NO_ERROR;
-}
-
-/*取得字体映射*/
-static inline long VSGetFont(THREAD_ID ptid, const BYTE **font, DWORD *CharWidth, DWORD *CharHeight)
-{
-	DWORD data[MSG_DATA_LEN];
-	data[MSG_API_ID] = MSG_ATTR_VESA | VESA_API_GETFONT;
-	if ((data[0] = KSendMsg(&ptid, data, SRV_OUT_TIME)) != NO_ERROR)
-		return data[0];
-	if (data[MSG_RES_ID] != NO_ERROR)
-		return data[MSG_RES_ID];
-	*font = (const BYTE*)data[MSG_ADDR_ID];
-	*CharWidth = data[3];
-	*CharHeight = data[4];
+	*CurMode = data[6];
 	return NO_ERROR;
 }
 
@@ -228,10 +212,34 @@ static inline long VSGetMode(THREAD_ID ptid, WORD mode[VESA_MAX_MODE], DWORD *Mo
 	return NO_ERROR;
 }
 
-/**********CUI字符界面服务相关**********/
-#define SRV_CUI_PORT	6	/*CUI字符界面服务端口*/
+/**********点阵字体服务相关**********/
+#define SRV_FONT_PORT	6	/*点阵字体服务端口*/
 
-#define MSG_ATTR_CUI	0x01060000	/*CUI字符界面消息*/
+#define MSG_ATTR_FONT	0x01060000	/*点阵字体服务消息*/
+
+#define FONT_API_GETFONT	0	/*取得字体映射功能号*/
+
+#define FONT_ERR_ARGS		-1536	/*参数错误*/
+
+/*取得字体映射*/
+static inline long FNTGetFont(THREAD_ID ptid, const BYTE **font, DWORD *CharWidth, DWORD *CharHeight)
+{
+	DWORD data[MSG_DATA_LEN];
+	data[MSG_API_ID] = MSG_ATTR_FONT | FONT_API_GETFONT;
+	if ((data[0] = KSendMsg(&ptid, data, SRV_OUT_TIME)) != NO_ERROR)
+		return data[0];
+	if (data[MSG_RES_ID] != NO_ERROR)
+		return data[MSG_RES_ID];
+	*font = (const BYTE*)data[MSG_ADDR_ID];
+	*CharWidth = data[3];
+	*CharHeight = data[4];
+	return NO_ERROR;
+}
+
+/**********CUI字符界面服务相关**********/
+#define SRV_CUI_PORT	7	/*CUI字符界面服务端口*/
+
+#define MSG_ATTR_CUI	0x01070000	/*CUI字符界面消息*/
 
 #define CUI_API_GETCOL	0	/*取得字符界面颜色功能号*/
 #define CUI_API_SETCOL	1	/*设置字符界面颜色功能号*/
@@ -241,7 +249,7 @@ static inline long VSGetMode(THREAD_ID ptid, WORD mode[VESA_MAX_MODE], DWORD *Mo
 #define CUI_API_PUTC	5	/*输出字符功能号*/
 #define CUI_API_PUTS	6	/*输出字符串功能号*/
 
-#define CUI_ERR_ARGS	-1536	/*参数错误*/
+#define CUI_ERR_ARGS	-1792	/*参数错误*/
 
 /*取得字符界面颜色*/
 static inline long CUIGetCol(THREAD_ID ptid, DWORD *CharColor, DWORD *BgColor)
@@ -315,9 +323,9 @@ static inline long CUIPutS(THREAD_ID ptid, const char *str)
 }
 
 /**********系统喇叭服务相关**********/
-#define SRV_SPK_PORT	7	/*系统喇叭服务端口*/
+#define SRV_SPK_PORT	8	/*系统喇叭服务端口*/
 
-#define MSG_ATTR_SPK	0x01070000	/*系统喇叭消息*/
+#define MSG_ATTR_SPK	0x01080000	/*系统喇叭消息*/
 
 #define SPK_API_SOUND	0	/*发声功能号*/
 #define SPK_API_NOSOUND	1	/*停止发声功能号*/
@@ -340,9 +348,9 @@ static inline long SPKNosound(THREAD_ID ptid)
 }
 
 /**********COM串口服务相关**********/
-#define SRV_UART_PORT	8	/*COM串口服务端口*/
+#define SRV_UART_PORT	9	/*COM串口服务端口*/
 
-#define MSG_ATTR_UART	0x01080000	/*COM串口消息*/
+#define MSG_ATTR_UART	0x01090000	/*COM串口消息*/
 
 #define UART_API_OPENCOM	0	/*打开串口功能号*/
 #define UART_API_CLOSECOM	1	/*关闭串口功能号*/
@@ -360,10 +368,10 @@ static inline long SPKNosound(THREAD_ID ptid)
 #define UART_ARGS_PARITY_ODD	0x08	/*奇位校验*/
 #define UART_ARGS_PARITY_EVEN	0x18	/*偶位校验*/
 
-#define UART_ERR_NOPORT	-2048	/*COM端口不存在*/
-#define UART_ERR_BAUD	-2049	/*波特率错误*/
-#define UART_ERR_NOTIME	-2050	/*超时错误*/
-#define UART_ERR_BUSY	-2051	/*端口驱动正忙*/
+#define UART_ERR_NOPORT	-2304	/*COM端口不存在*/
+#define UART_ERR_BAUD	-2305	/*波特率错误*/
+#define UART_ERR_NOTIME	-2306	/*超时错误*/
+#define UART_ERR_BUSY	-2307	/*端口驱动正忙*/
 
 /*打开串口*/
 static inline long UARTOpenCom(THREAD_ID ptid, DWORD com, DWORD baud, DWORD args)

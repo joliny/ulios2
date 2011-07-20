@@ -5,22 +5,27 @@
 */
 
 #include "gui.h"
+#include "../lib/gdi.h"
 
-#define DESKTOP_MAXLEN	0x140000	/*桌面背景数组大小1280*1024*/
+#define DESKTOP_MAXLEN	0x1A0000	/*桌面背景数组大小*/
 
 /*桌面消息处理线程*/
-void DesktopThread(GOBJ_DESC *gobj)
+void DesktopThread(void *args)
 {
+	DWORD data[MSG_DATA_LEN];
+	THREAD_ID ptid;
+	DWORD tid, pid;
 	DWORD DesktopPic[DESKTOP_MAXLEN];
 
-	if (LoadBmp("desktop.bmp", DesktopPic, DESKTOP_MAXLEN, NULL, NULL) == NO_ERROR)
-		SetGobjVbuf(gobj, DesktopPic);
+	LoadBmp("desktop.bmp", DesktopPic, DESKTOP_MAXLEN, NULL, NULL);
+	KGetPtid(&ptid, &tid, &pid);
+	CreateDesktop(ptid, 0, GDIwidth, GDIheight, DesktopPic);
+	ptid.ThedID = tid;	/*通知主线程初始化完成*/
+	data[MSG_ATTR_ID] = MSG_ATTR_USER;
+	KSendMsg(&ptid, data, 0);
 
 	for (;;)
 	{
-		DWORD data[MSG_DATA_LEN];
-		THREAD_ID ptid;
-
 		if (KRecvMsg(&ptid, data, INVALID) != NO_ERROR)	/*等待消息*/
 			break;
 	}

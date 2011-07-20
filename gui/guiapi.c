@@ -65,11 +65,29 @@ void ApiSize(DWORD *argv)
 
 void ApiPaint(DWORD *argv)
 {
+	if ((argv[MSG_ATTR_ID] & MSG_MAP_MASK) == MSG_ATTR_ROMAP)
+	{
+		argv[MSG_RES_ID] = GUI_ERR_WRONG_ARGS;
+		KUnmapProcAddr((void*)argv[MSG_ADDR_ID], argv);
+		return;
+	}
+	PaintGobj(*(THREAD_ID*)&argv[PTID_ID], argv[GUIMSG_GOBJ_ID], (short)argv[1], (short)(argv[1] >> 16), (short)argv[2], (short)(argv[2] >> 16));
+}
+
+void ApiActive(DWORD *argv)
+{
+	if ((argv[MSG_ATTR_ID] & MSG_MAP_MASK) == MSG_ATTR_ROMAP)
+	{
+		argv[MSG_RES_ID] = GUI_ERR_WRONG_ARGS;
+		KUnmapProcAddr((void*)argv[MSG_ADDR_ID], argv);
+		return;
+	}
+	ActiveGobj(*(THREAD_ID*)&argv[PTID_ID], argv[GUIMSG_GOBJ_ID]);
 }
 
 /*系统调用表*/
 void (*ApiTable[])(DWORD *argv) = {
-	ApiCreate, ApiDestroy, ApiMove, ApiSize
+	ApiCreate, ApiDestroy, ApiMove, ApiSize, ApiPaint, ApiActive
 };
 
 /*初始化GUI,如果不成功必须退出*/
@@ -79,6 +97,7 @@ long InitGUI()
 	GOBJ_DESC *gobj;
 	CLIPRECT *clip;
 	THREAD_ID ptid;
+	DWORD data[MSG_DATA_LEN];
 
 	if ((res = KRegKnlPort(SRV_GUI_PORT)) != NO_ERROR)	/*注册服务端口*/
 		return res;
@@ -101,12 +120,8 @@ long InitGUI()
 	clip->nxt = NULL;
 
 	InitMouse();
-	*((DWORD*)&ptid) = INVALID;
-	CreateDesktop(ptid, 0, GDIwidth, GDIheight, GDIvm);
-	KCreateThread((void(*)(void*))DesktopThread, 0x700000, gobjt, &ptid);
-	gobjt[0].ptid = ptid;
-
-	return NO_ERROR;
+	KCreateThread(DesktopThread, 0x700000, NULL, &ptid);	/*创建桌面线程*/
+	return KRecvProcMsg(&ptid, data, SRV_OUT_TIME);	/*等待桌面线程初始化完成*/
 }
 
 int main()
@@ -133,10 +148,10 @@ int main()
 					break;
 				}
 		}
-		if (data[MSG_ATTR_ID] == MSG_ATTR_MUS)	/*鼠标驱动消息*/
+		if (data[MSG_ATTR_ID] == MSG_ATTR_KBD)	/*键盘驱动消息*/
+			KeyboardProc(data[1]);
+		else if (data[MSG_ATTR_ID] == MSG_ATTR_MUS)	/*鼠标驱动消息*/
 			MouseProc(data[1], (long)data[2], (long)data[3], (long)data[4]);
-		else if (data[MSG_ATTR_ID] == MSG_ATTR_KBD)	/*键盘驱动消息*/
-			;//KeyBoardProc(data[1], (long)data[2], (long)data[3], (long)data[4]);
 		else if ((data[MSG_ATTR_ID] & MSG_MAP_MASK) == MSG_ATTR_ROMAP || (data[MSG_ATTR_ID] & MSG_ATTR_MASK) == MSG_ATTR_GUI)
 		{
 			if ((data[MSG_API_ID] & MSG_API_MASK) >= sizeof(ApiTable) / sizeof(void*))

@@ -15,7 +15,7 @@ long LoadBmp(char *path, DWORD *buf, DWORD len, long *width, long *height)
 	THREAD_ID FsPtid;
 	long bmpw, bmph, file, res;
 	
-	if ((res = KGetKptThed(SRV_FS_PORT, &FsPtid)) != NO_ERROR)	/*取得键盘鼠标服务线程*/
+	if ((res = KGetKptThed(SRV_FS_PORT, &FsPtid)) != NO_ERROR)	/*取得文件系统服务线程*/
 		return res;
 	if ((file = FSopen(FsPtid, path, FS_OPEN_READ)) < 0)	/*读取BMP文件*/
 		return file;
@@ -89,28 +89,45 @@ int main()
 	DWORD vbuf[0x20000];
 	char buf[12];
 	THREAD_ID GuiPtid, CuiPtid, ptid;
-	long width, height, gid, res;
+	long width, height, gid[2], res;
 
 	width = 256;
 	height = 128;
 	LoadBmp("laopo.bmp", vbuf, 0x20000, &width, &height);
 	KGetKptThed(SRV_GUI_PORT, &GuiPtid);
-	gid = GUIcreate(GuiPtid, 0, 0, vbuf, 0, 0, width, height);
+
+	gid[0] = GUIcreate(GuiPtid, 0, 0, vbuf, 0, 0, width, height);
+	gid[1] = GUIcreate(GuiPtid, 0, 0, vbuf, width, 0, width, height);
 	for (;;)
 	{
 		DWORD data[MSG_DATA_LEN];
 
 		if ((res = KRecvMsg(&ptid, data, INVALID)) != NO_ERROR)	/*等待消息*/
 			break;
-		if ((data[MSG_API_ID] & MSG_API_MASK) == GM_MOUSEMOVE)
+		switch (data[MSG_API_ID] & MSG_API_MASK)
 		{
+		case GM_MOUSEMOVE:
 			if (data[1] & MUS_STATE_LBUTTON)
-				GUImove(GuiPtid, gid, data[2] - 128, data[3] - 64);
+				GUImove(GuiPtid, data[GUIMSG_GOBJ_ID], data[2] - 128, data[3] - 64);
+			break;
+		case GM_LBUTTONDOWN:
+			GUISetFocus(GuiPtid, data[GUIMSG_GOBJ_ID]);
+			break;
+		case GM_MOUSEWHEEL:
+			{
+				DWORD clk;
+				KGetClock(&clk);
+				memset32(vbuf, clk, width * height);
+				GUIpaint(GuiPtid, data[GUIMSG_GOBJ_ID], 10, 10, width - 20, height - 20);
+			}
+			break;
+		case GM_LBUTTONDBCLK:
+			return NO_ERROR;
 		}
-		else if ((data[MSG_API_ID] & MSG_API_MASK) == GM_MOUSEWHEEL)
-			GUIsize(GuiPtid, gid, vbuf, 0, 0, width, ++height);
 	}
-	Itoa(buf, -res, 10);
-	CUIPutS(CuiPtid, buf);
-	return NO_ERROR;
+/*		KGetKptThed(SRV_CUI_PORT, &CuiPtid);
+		Itoa(buf, data[MSG_API_ID] & MSG_API_MASK, 16);
+		CUIPutS(CuiPtid, buf);
+		CUIPutC(CuiPtid, ' ');
+*/	return NO_ERROR;
 }
