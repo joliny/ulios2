@@ -82,26 +82,6 @@ GOBJ_DESC *FindGobj(long *AbsXpos, long *AbsYpos)
 	return gobj;
 }
 
-/*创建主桌面*/
-long CreateDesktop(THREAD_ID ptid, DWORD attr, long width, long height, DWORD *vbuf)
-{
-	GOBJ_DESC *gobj;
-
-	if ((gobj = AllocGobj()) == NULL)
-		return GUI_ERR_HAVENO_MEMORY;
-	memset32(gobj, 0, sizeof(GOBJ_DESC) / sizeof(DWORD));
-	gobj->ptid = ptid;
-	gobj->attr = attr;
-	gobj->rect.xpos = 0;
-	gobj->rect.ypos = 0;
-	gobj->rect.xend = width;
-	gobj->rect.yend = height;
-	gobj->vbuf = vbuf;
-	DiscoverRectInter(gobj, 0, 0, width, height);	/*为桌面创建最初的剪切矩形*/
-
-	return NO_ERROR;
-}
-
 /*创建窗体*/
 long CreateGobj(THREAD_ID ptid, DWORD pid, DWORD attr, long xpos, long ypos, long width, long height, DWORD *vbuf, DWORD len, DWORD *gid)
 {
@@ -303,14 +283,43 @@ long SizeGobj(THREAD_ID ptid, DWORD gid, long xpos, long ypos, long width, long 
 	return NO_ERROR;
 }
 
-/*设置窗体为活动*/
-long ActiveGobj(GOBJ_DESC *gobj)
+/*绘制窗体*/
+long PaintGobj(THREAD_ID ptid, DWORD gid, long xpos, long ypos, long width, long height)
 {
-	GOBJ_DESC *ParGobj;	/*父节点*/
+	GOBJ_DESC *gobj;
+	long TmpXpos, TmpYpos;
+
+	if (gid >= GOBJT_LEN)	/*检查窗体ID*/
+		return GUI_ERR_INVALID_GOBJID;
+	gobj = &gobjt[gid];
+	if (gobj->attr == INVALID)	/*无效窗口*/
+		return GUI_ERR_INVALID_GOBJID;
+	if (ptid.ProcID != gobj->ptid.ProcID)	/*不允许重绘其他进程的窗体*/
+		return GUI_ERR_INVALID_GOBJID;
+	if (width <= 0 || height <= 0)	/*尺寸错误*/
+		return GUI_ERR_WRONG_GOBJSIZE;
+
+	GetGobjPos(gobj, &TmpXpos, &TmpYpos);
+	DrawGobj(gobj, xpos, ypos, xpos + width, ypos + height, TmpXpos, TmpYpos, NULL);
+
+	return NO_ERROR;
+}
+
+/*设置窗体为活动窗体(焦点)*/
+long ActiveGobj(THREAD_ID ptid, DWORD gid)
+{
+	GOBJ_DESC *gobj, *ParGobj;	/*父节点*/
 	long xpos, ypos;
 
+	if (gid >= GOBJT_LEN)	/*检查窗体ID*/
+		return GUI_ERR_INVALID_GOBJID;
+	gobj = &gobjt[gid];
+	if (gobj->attr == INVALID)	/*无效窗口*/
+		return GUI_ERR_INVALID_GOBJID;
+	if (ptid.ProcID != gobj->ptid.ProcID)	/*不允许重绘其他进程的窗体*/
+		return GUI_ERR_INVALID_GOBJID;
 	if (gobj->pre == NULL)
-		return GUI_ERR_NOCHG_CLIPRECT;
+		return NO_ERROR;
 
 	for (ParGobj = gobj->pre; ParGobj; ParGobj = ParGobj->pre)
 		CoverRectInter(ParGobj, gobj->rect.xpos - ParGobj->rect.xpos, gobj->rect.ypos - ParGobj->rect.ypos, gobj->rect.xend - ParGobj->rect.xpos, gobj->rect.yend - ParGobj->rect.ypos);
@@ -332,14 +341,23 @@ long ActiveGobj(GOBJ_DESC *gobj)
 	return NO_ERROR;
 }
 
-/*设置窗体显示缓冲*/
-long SetGobjVbuf(GOBJ_DESC *gobj, DWORD *vbuf)
+/*创建主桌面*/
+long CreateDesktop(THREAD_ID ptid, DWORD attr, long width, long height, DWORD *vbuf)
 {
-	long xpos, ypos;
+	GOBJ_DESC *gobj;
 
+	if ((gobj = AllocGobj()) == NULL)
+		return GUI_ERR_HAVENO_MEMORY;
+	memset32(gobj, 0, sizeof(GOBJ_DESC) / sizeof(DWORD));
+	gobj->ptid = ptid;
+	gobj->attr = attr;
+	gobj->rect.xpos = 0;
+	gobj->rect.ypos = 0;
+	gobj->rect.xend = width;
+	gobj->rect.yend = height;
 	gobj->vbuf = vbuf;
-	GetGobjPos(gobj, &xpos, &ypos);
-	DrawGobj(gobj, 0, 0, gobj->rect.xend - gobj->rect.xpos, gobj->rect.yend - gobj->rect.ypos, xpos, ypos, NULL);
+	DiscoverRectInter(gobj, 0, 0, width, height);	/*为桌面创建最初的剪切矩形*/
+	DrawGobj(gobj, 0, 0, width, height, 0, 0, NULL);
 
 	return NO_ERROR;
 }

@@ -22,8 +22,8 @@ DASMFLAGS	= -u -o $(ENTRYPOINT) -e $(ENTRYOFFSET)
 # This Program
 HEADS		= ../MkApi/ulimkapi.h basesrv.h
 HEADOBJ		= ../objs/apphead.o
-OBJS		= ../objs/athd.o ../objs/time.o ../objs/kbdmus.o ../objs/vesa.o ../objs/cui.o ../objs/rep.o ../objs/speaker.o ../objs/uart.o
-BINS		= ../out/ulios/athd.bin ../out/ulios/time.bin ../out/ulios/kbdmus.bin ../out/ulios/vesa.bin ../out/ulios/cui.bin ../out/ulios/rep.bin ../out/ulios/speaker.bin ../out/ulios/uart.bin
+OBJS		= ../objs/athd.o ../objs/time.o ../objs/kbdmus.o ../objs/vesa.o ../objs/font.o ../objs/cui.o ../objs/rep.o ../objs/speaker.o ../objs/uart.o
+BINS		= ../out/ulios/athd.bin ../out/ulios/time.bin ../out/ulios/kbdmus.bin ../out/ulios/vesa.bin ../out/ulios/font.bin ../out/ulios/cui.bin ../out/ulios/rep.bin ../out/ulios/speaker.bin ../out/ulios/uart.bin
 
 # All Phony Targets
 .PHONY : all redo clean
@@ -49,6 +49,9 @@ clean :
 ../out/ulios/vesa.bin : ../objs/vesa.o $(HEADOBJ) $(LDFILE)
 	$(LD) $(LDFLAGS) -o $@ $(HEADOBJ) ../objs/vesa.o
 
+../out/ulios/font.bin : ../objs/font.o $(HEADOBJ) $(LDFILE)
+	$(LD) $(LDFLAGS) -o $@ $(HEADOBJ) ../objs/font.o
+
 ../out/ulios/cui.bin : ../objs/cui.o $(HEADOBJ) $(LDFILE)
 	$(LD) $(LDFLAGS) -o $@ $(HEADOBJ) ../objs/cui.o ../objs/gdi.o
 
@@ -73,7 +76,10 @@ clean :
 ../objs/kbdmus.o : kbdmus.c $(HEADS)
 	$(CC) $(CFLAGS) -o $@ $<
 
-../objs/vesa.o : vesa.c $(HEADS) ../fs/fsapi.h
+../objs/vesa.o : vesa.c $(HEADS)
+	$(CC) $(CFLAGS) -o $@ $<
+
+../objs/font.o : font.c $(HEADS) ../fs/fsapi.h
 	$(CC) $(CFLAGS) -o $@ $<
 
 ../objs/cui.o : cui.c $(HEADS) ../lib/gdi.h

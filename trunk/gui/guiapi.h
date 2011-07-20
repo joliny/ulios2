@@ -39,6 +39,7 @@
 #define GM_MOVE			0x02	/*移动窗体*/
 #define GM_SIZE			0x03	/*改变大小*/
 #define GM_PAINT		0x04	/*绘制窗体*/
+#define GM_SETFOCUS		0x05	/*获得焦点*/
 
 #define GM_MOUSEENTER	0x10	/*鼠标移入*/
 #define GM_MOUSELEAVE	0x11	/*鼠标移出*/
@@ -111,6 +112,26 @@ static inline long GUIsize(THREAD_ID ptid, DWORD gid, DWORD *vbuf, short x, shor
 		return KWriteProcAddr(vbuf, (DWORD)width * height * sizeof(DWORD), &ptid, data, 0);
 	else
 		return KSendMsg(&ptid, data, 0);
+}
+
+/*重绘窗体区域*/
+static inline long GUIpaint(THREAD_ID ptid, DWORD gid, short x, short y, WORD width, WORD height)
+{
+	DWORD data[MSG_DATA_LEN];
+	data[MSG_API_ID] = MSG_ATTR_GUI | GM_PAINT;
+	data[1] = (WORD)x | ((DWORD)(WORD)y << 16);
+	data[2] = width | ((DWORD)height << 16);
+	data[GUIMSG_GOBJ_ID] = gid;
+	return KSendMsg(&ptid, data, 0);
+}
+
+/*设置窗体焦点*/
+static inline long GUISetFocus(THREAD_ID ptid, DWORD gid)
+{
+	DWORD data[MSG_DATA_LEN];
+	data[MSG_API_ID] = MSG_ATTR_GUI | GM_SETFOCUS;
+	data[GUIMSG_GOBJ_ID] = gid;
+	return KSendMsg(&ptid, data, 0);
 }
 
 #endif

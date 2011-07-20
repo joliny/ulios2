@@ -116,6 +116,12 @@ DEP_CPP_CUI_C=\
 # End Source File
 # Begin Source File
 
+SOURCE=.\driver\font.c
+DEP_CPP_FONT_=\
+	".\driver\basesrv.h"\
+	".\fs\fsapi.h"\
+	".\MkApi\ulimkapi.h"\
+	
 SOURCE=.\driver\kbdmus.c
 DEP_CPP_KBDMU=\
 	".\driver\basesrv.h"\
@@ -163,7 +169,6 @@ DEP_CPP_UART_=\
 SOURCE=.\driver\vesa.c
 DEP_CPP_VESA_=\
 	".\driver\basesrv.h"\
-	".\fs\fsapi.h"\
 	".\MkApi\ulimkapi.h"\
 	
 # End Source File
@@ -272,6 +277,10 @@ SOURCE=.\gui\guiapi.h
 # End Source File
 # Begin Source File
 
+SOURCE=.\gui\guikbdmus.c
+# End Source File
+# Begin Source File
+
 SOURCE=.\gui\guilib.c
 # End Source File
 # Begin Source File
@@ -298,10 +307,6 @@ DEP_CPP_GUIRE=\
 # Begin Source File
 
 SOURCE=.\gui\Makefile
-# End Source File
-# Begin Source File
-
-SOURCE=.\gui\mouse.c
 # End Source File
 # End Group
 # Begin Group "MicroKernel"
@@ -640,6 +645,20 @@ DEP_CPP_GDI_C=\
 # Begin Source File
 
 SOURCE=.\lib\gdi.h
+# End Source File
+# Begin Source File
+
+SOURCE=.\lib\guigdi.c
+DEP_CPP_GDI_C=\
+	".\driver\basesrv.h"\
+	".\gui\guiapi.h"\
+	".\lib\guigdi.h"\
+	".\MkApi\ulimkapi.h"\
+	
+# End Source File
+# Begin Source File
+
+SOURCE=.\lib\guigdi.h
 # End Source File
 # Begin Source File
 

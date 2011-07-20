@@ -6,6 +6,7 @@ Fulios/time.bin
 Fulios/fs.bin
 Fulios/kbdmus.bin
 Fulios/vesa.bin
+Fulios/font.bin
 Fulios/cui.bin
 Fulios/speaker.bin
 Fulios/uart.bin

@@ -1,30 +1,24 @@
-/*	gdi.c for ulios
+/*	guigdi.c for ulios graphical user interface
 	作者：孙亮
-	功能：图形设备接口库实现
-	最后修改日期：2010-06-10
+	功能：图形用户界面绘图库实现
+	最后修改日期：2011-07-20
 */
 
-#include "gdi.h"
+#include "../gui/guiapi.h"
 
-void *GDIvm;
 const BYTE *GDIfont;
-DWORD GDIwidth, GDIheight, GDIPixBits, GDImode;
 DWORD GDICharWidth, GDICharHeight;
-THREAD_ID GDIVesaPtid, GDIFontPtid;
+THREAD_ID UDIGuiPtid, GDIFontPtid;
 
 /*初始化GDI库*/
 long GDIinit()
 {
 	long res;
 
-	if ((res = KGetKptThed(SRV_VESA_PORT, &GDIVesaPtid)) != NO_ERROR)
+	if ((res = KGetKptThed(SRV_GUI_PORT, &UDIGuiPtid)) != NO_ERROR)
 		return res;
 	if ((res = KGetKptThed(SRV_FONT_PORT, &GDIFontPtid)) != NO_ERROR)
 		return res;
-	if (GDIvm == NULL && (res = VSGetVmem(GDIVesaPtid, &GDIvm, &GDIwidth, &GDIheight, &GDIPixBits, &GDImode)) != NO_ERROR)
-		return res;
-	if (!GDImode)
-		return GDI_ERR_TEXTMODE;
 	if (GDIfont == NULL && (res = FNTGetFont(GDIFontPtid, &GDIfont, &GDICharWidth, &GDICharHeight)) != NO_ERROR)
 		return res;
 	return NO_ERROR;

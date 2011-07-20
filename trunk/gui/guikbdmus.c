@@ -1,6 +1,6 @@
-/*	mouse.c for ulios graphical user interface
+/*	guikbdmus.c for ulios graphical user interface
 	作者：孙亮
-	功能：图形用户界面鼠标功能实现
+	功能：图形用户界面键盘鼠标功能实现
 	最后修改日期：2011-05-22
 */
 
@@ -18,6 +18,12 @@ DWORD ClickClock[3];	/*单击时的时钟*/
 DWORD MusKey, MusState;	/*鼠标键,状态*/
 long MusX, MusY, MusPicWidth, MusPicHeight;	/*鼠标位置,背景图像备份*/
 GOBJ_DESC *MusInGobj;	/*鼠标移入的窗体*/
+
+/*键盘消息处理*/
+void KeyboardProc(DWORD key)
+{
+
+}
 
 /*鼠标初始化*/
 long InitMouse()

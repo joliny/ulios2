@@ -9,14 +9,15 @@
 
 #include "../driver/basesrv.h"
 
-#define GDI_ERR_LOCATION	-1408	/*坐标错误*/
-#define GDI_ERR_SIZE		-1409	/*尺寸错误*/
+#define GDI_ERR_TEXTMODE	-1408	/*文本模式*/
+#define GDI_ERR_LOCATION	-1409	/*坐标错误*/
+#define GDI_ERR_SIZE		-1410	/*尺寸错误*/
 
 extern void *GDIvm;
 extern const BYTE *GDIfont;
-extern DWORD GDIwidth, GDIheight, GDIPixBits;
+extern DWORD GDIwidth, GDIheight, GDIPixBits, GDImode;
 extern DWORD GDICharWidth, GDICharHeight;
-extern THREAD_ID GDIVesaPtid;
+extern THREAD_ID GDIVesaPtid, GDIFontPtid;
 
 /*初始化GDI库*/
 long GDIinit();

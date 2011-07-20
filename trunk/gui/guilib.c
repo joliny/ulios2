@@ -84,7 +84,7 @@ long LoadBmp(char *path, DWORD *buf, DWORD len, long *width, long *height)
 	THREAD_ID FsPtid;
 	long bmpw, bmph, file, res;
 
-	if ((res = KGetKptThed(SRV_FS_PORT, &FsPtid)) != NO_ERROR)	/*取得键盘鼠标服务线程*/
+	if ((res = KGetKptThed(SRV_FS_PORT, &FsPtid)) != NO_ERROR)	/*取得文件系统服务线程*/
 		return res;
 	if ((file = FSopen(FsPtid, path, FS_OPEN_READ)) < 0)	/*读取BMP文件*/
 		return file;
