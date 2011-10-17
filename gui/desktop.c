@@ -19,7 +19,7 @@ void DesktopThread(void *args)
 
 	LoadBmp("desktop.bmp", DesktopPic, DESKTOP_MAXLEN, NULL, NULL);
 	KGetPtid(&ptid, &tid, &pid);
-	CreateDesktop(ptid, 0, GDIwidth, GDIheight, DesktopPic);
+	CreateDesktop(ptid, GDIwidth, GDIheight, DesktopPic);
 	ptid.ThedID = tid;	/*通知主线程初始化完成*/
 	data[MSG_ATTR_ID] = MSG_ATTR_USER;
 	KSendMsg(&ptid, data, 0);

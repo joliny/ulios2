@@ -19,12 +19,12 @@ long GDIinit()
 
 	if ((res = KGetKptThed(SRV_VESA_PORT, &GDIVesaPtid)) != NO_ERROR)
 		return res;
-	if ((res = KGetKptThed(SRV_FONT_PORT, &GDIFontPtid)) != NO_ERROR)
-		return res;
 	if (GDIvm == NULL && (res = VSGetVmem(GDIVesaPtid, &GDIvm, &GDIwidth, &GDIheight, &GDIPixBits, &GDImode)) != NO_ERROR)
 		return res;
 	if (!GDImode)
 		return GDI_ERR_TEXTMODE;
+	if ((res = KGetKptThed(SRV_FONT_PORT, &GDIFontPtid)) != NO_ERROR)
+		return res;
 	if (GDIfont == NULL && (res = FNTGetFont(GDIFontPtid, &GDIfont, &GDICharWidth, &GDICharHeight)) != NO_ERROR)
 		return res;
 	return NO_ERROR;
@@ -168,28 +168,28 @@ long GDIPutImage(long x, long y, DWORD *img, long w, long h)
 	case 15:
 		{
 			WORD *tmpvm;
-			for (tmpvm = (WORD*)GDIvm + x + GDIwidth * y; h > 0; tmpvm += GDIwidth, img += memw, h--)
+			for (tmpvm = (WORD*)GDIvm + x + y * GDIwidth; h > 0; tmpvm += GDIwidth, img += memw, h--)
 				Dw2Rgb15(tmpvm, img, w);
 		}
 		break;
 	case 16:
 		{
 			WORD *tmpvm;
-			for (tmpvm = (WORD*)GDIvm + x + GDIwidth * y; h > 0; tmpvm += GDIwidth, img += memw, h--)
+			for (tmpvm = (WORD*)GDIvm + x + y * GDIwidth; h > 0; tmpvm += GDIwidth, img += memw, h--)
 				Dw2Rgb16(tmpvm, img, w);
 		}
 		break;
 	case 24:
 		{
 			RGB24 *tmpvm;
-			for (tmpvm = (RGB24*)GDIvm + x + GDIwidth * y; h > 0; tmpvm += GDIwidth, img += memw, h--)
+			for (tmpvm = (RGB24*)GDIvm + x + y * GDIwidth; h > 0; tmpvm += GDIwidth, img += memw, h--)
 				Dw2Rgb24(tmpvm, img, w);
 		}
 		break;
 	case 32:
 		{
 			DWORD *tmpvm;
-			for (tmpvm = (DWORD*)GDIvm + x + GDIwidth * y; h > 0; tmpvm += GDIwidth, img += memw, h--)
+			for (tmpvm = (DWORD*)GDIvm + x + y * GDIwidth; h > 0; tmpvm += GDIwidth, img += memw, h--)
 				memcpy32(tmpvm, img, w);
 		}
 		break;
@@ -273,28 +273,28 @@ long GDIPutBCImage(long x, long y, DWORD *img, long w, long h, DWORD bc)
 	case 15:
 		{
 			WORD *tmpvm;
-			for (tmpvm = (WORD*)GDIvm + x + GDIwidth * y; h > 0; tmpvm += GDIwidth, img += memw, h--)
+			for (tmpvm = (WORD*)GDIvm + x + y * GDIwidth; h > 0; tmpvm += GDIwidth, img += memw, h--)
 				BCDw2Rgb15(tmpvm, img, w, bc);
 		}
 		break;
 	case 16:
 		{
 			WORD *tmpvm;
-			for (tmpvm = (WORD*)GDIvm + x + GDIwidth * y; h > 0; tmpvm += GDIwidth, img += memw, h--)
+			for (tmpvm = (WORD*)GDIvm + x + y * GDIwidth; h > 0; tmpvm += GDIwidth, img += memw, h--)
 				BCDw2Rgb16(tmpvm, img, w, bc);
 		}
 		break;
 	case 24:
 		{
 			RGB24 *tmpvm;
-			for (tmpvm = (RGB24*)GDIvm + x + GDIwidth * y; h > 0; tmpvm += GDIwidth, img += memw, h--)
+			for (tmpvm = (RGB24*)GDIvm + x + y * GDIwidth; h > 0; tmpvm += GDIwidth, img += memw, h--)
 				BCDw2Rgb24(tmpvm, img, w, bc);
 		}
 		break;
 	case 32:
 		{
 			DWORD *tmpvm;
-			for (tmpvm = (DWORD*)GDIvm + x + GDIwidth * y; h > 0; tmpvm += GDIwidth, img += memw, h--)
+			for (tmpvm = (DWORD*)GDIvm + x + y * GDIwidth; h > 0; tmpvm += GDIwidth, img += memw, h--)
 				BCDw2Rgb32(tmpvm, img, w, bc);
 		}
 		break;
@@ -352,28 +352,28 @@ long GDIGetImage(long x, long y, DWORD *img, long w, long h)
 	case 15:
 		{
 			WORD *tmpvm;
-			for (tmpvm = (WORD*)GDIvm + x + GDIwidth * y; h > 0; tmpvm += GDIwidth, img += memw, h--)
+			for (tmpvm = (WORD*)GDIvm + x + y * GDIwidth; h > 0; tmpvm += GDIwidth, img += memw, h--)
 				Rgb152Dw(img, tmpvm, w);
 		}
 		break;
 	case 16:
 		{
 			WORD *tmpvm;
-			for (tmpvm = (WORD*)GDIvm + x + GDIwidth * y; h > 0; tmpvm += GDIwidth, img += memw, h--)
+			for (tmpvm = (WORD*)GDIvm + x + y * GDIwidth; h > 0; tmpvm += GDIwidth, img += memw, h--)
 				Rgb162Dw(img, tmpvm, w);
 		}
 		break;
 	case 24:
 		{
 			RGB24 *tmpvm;
-			for (tmpvm = (RGB24*)GDIvm + x + GDIwidth * y; h > 0; tmpvm += GDIwidth, img += memw, h--)
+			for (tmpvm = (RGB24*)GDIvm + x + y * GDIwidth; h > 0; tmpvm += GDIwidth, img += memw, h--)
 				Rgb242Dw(img, tmpvm, w);
 		}
 		break;
 	case 32:
 		{
 			DWORD *tmpvm;
-			for (tmpvm = (DWORD*)GDIvm + x + GDIwidth * y; h > 0; tmpvm += GDIwidth, img += memw, h--)
+			for (tmpvm = (DWORD*)GDIvm + x + y * GDIwidth; h > 0; tmpvm += GDIwidth, img += memw, h--)
 				memcpy32(img, tmpvm, w);
 		}
 		break;
@@ -431,21 +431,21 @@ long GDIFillRect(long x, long y, long w, long h, DWORD c)
 	case 16:
 		{
 			WORD *tmpvm;
-			for (tmpvm = (WORD*)GDIvm + x + GDIwidth * y; h > 0; tmpvm += GDIwidth, h--)
+			for (tmpvm = (WORD*)GDIvm + x + y * GDIwidth; h > 0; tmpvm += GDIwidth, h--)
 				SetRgb1516(tmpvm, c, w);
 		}
 		break;
 	case 24:
 		{
 			RGB24 *tmpvm;
-			for (tmpvm = (RGB24*)GDIvm + x + GDIwidth * y; h > 0; tmpvm += GDIwidth, h--)
+			for (tmpvm = (RGB24*)GDIvm + x + y * GDIwidth; h > 0; tmpvm += GDIwidth, h--)
 				SetRgb24(tmpvm, c, w);
 		}
 		break;
 	case 32:
 		{
 			DWORD *tmpvm;
-			for (tmpvm = (DWORD*)GDIvm + x + GDIwidth * y; h > 0; tmpvm += GDIwidth, h--)
+			for (tmpvm = (DWORD*)GDIvm + x + y * GDIwidth; h > 0; tmpvm += GDIwidth, h--)
 				memset32(tmpvm, c, w);
 		}
 		break;
@@ -488,7 +488,7 @@ static inline void NCPutPixel(DWORD x, DWORD y, DWORD c)
 #define CS_BOTTOM	8
 
 /*Cohen-Sutherland裁剪算法编码*/
-static inline DWORD CsEncode(long x, long y)
+static DWORD CsEncode(long x, long y)
 {
 	DWORD mask;
 
@@ -504,6 +504,8 @@ static inline DWORD CsEncode(long x, long y)
 	return mask;
 }
 
+#define F2L_SCALE	0x10000
+
 /*Cohen-Sutherland算法裁剪Bresenham改进算法画线*/
 long GDIDrawLine(long x1, long y1, long x2, long y2, DWORD c)
 {
@@ -516,13 +518,13 @@ long GDIDrawLine(long x1, long y1, long x2, long y2, DWORD c)
 	mask2 = CsEncode(x2, y2);
 	if (mask1 || mask2)
 	{
-		float ydivx, xdivy;
+		long ydivx, xdivy;
 
-		xdivy = ydivx = 0.f;
+		xdivy = ydivx = 0;
 		if (x1 != x2)
-			ydivx = (float)(y2 - y1) / (float)(x2 - x1);
+			ydivx = ((y2 - y1) * F2L_SCALE) / (x2 - x1);
 		if (y1 != y2)
-			xdivy = (float)(x2 - x1) / (float)(y2 - y1);
+			xdivy = ((x2 - x1) * F2L_SCALE) / (y2 - y1);
 		do
 		{
 			if (mask1 & mask2)	/*在裁剪区一侧,完全裁剪掉*/
@@ -533,22 +535,22 @@ long GDIDrawLine(long x1, long y1, long x2, long y2, DWORD c)
 			if (mask & CS_LEFT)
 			{
 				dx = 0;
-				dy = y1 - x1 * ydivx;
+				dy = y1 - (x1 * ydivx / F2L_SCALE);
 			}
 			else if (mask & CS_RIGHT)
 			{
 				dx = (long)GDIwidth - 1;
-				dy = y1 - (x1 + 1 - (long)GDIwidth) * ydivx;
+				dy = y1 - ((x1 + 1 - (long)GDIwidth) * ydivx / F2L_SCALE);
 			}
 			if (mask & CS_TOP)
 			{
 				dy = 0;
-				dx = x1 - y1 * xdivy;
+				dx = x1 - (y1 * xdivy / F2L_SCALE);
 			}
 			else if (mask & CS_BOTTOM)
 			{
 				dy = (long)GDIheight - 1;
-				dx = x1 - (y1 + 1 - (long)GDIheight) * xdivy;
+				dx = x1 - ((y1 + 1 - (long)GDIheight) * xdivy / F2L_SCALE);
 			}
 			if (mask == mask1)
 			{
@@ -656,7 +658,7 @@ long GDIcircle(long cx, long cy, long r, DWORD c)
 
 #define HZ_COUNT	8178
 
-/*显示汉字*/
+/*绘制汉字*/
 long GDIDrawHz(long x, long y, DWORD hz, DWORD c)
 {
 	void *tmpvm;
@@ -683,7 +685,7 @@ long GDIDrawHz(long x, long y, DWORD hz, DWORD c)
 	{
 	case 15:
 	case 16:
-		for (j = GDICharHeight - 1; j >= 0; j--, p++, y++, x -= HzWidth)
+		for (j = GDICharHeight - 1; j >= 0; j--, p++, y++)
 		{
 			if ((DWORD)y >= GDIheight)
 				continue;
@@ -691,10 +693,11 @@ long GDIDrawHz(long x, long y, DWORD hz, DWORD c)
 			for (i = HzWidth - 1; i >= 0; i--, x++, tmpvm += sizeof(WORD))
 				if ((DWORD)x < GDIwidth && ((*p >> i) & 1u))
 					*((WORD*)tmpvm) = c;
+			x -= HzWidth;
 		}
 		break;
 	case 24:
-		for (j = GDICharHeight - 1; j >= 0; j--, p++, y++, x -= HzWidth)
+		for (j = GDICharHeight - 1; j >= 0; j--, p++, y++)
 		{
 			if ((DWORD)y >= GDIheight)
 				continue;
@@ -702,10 +705,11 @@ long GDIDrawHz(long x, long y, DWORD hz, DWORD c)
 			for (i = HzWidth - 1; i >= 0; i--, x++, tmpvm += sizeof(RGB24))
 				if ((DWORD)x < GDIwidth && ((*p >> i) & 1u))
 					*((RGB24*)tmpvm) = *(RGB24*)&c;
+			x -= HzWidth;
 		}
 		break;
 	case 32:
-		for (j = GDICharHeight - 1; j >= 0; j--, p++, y++, x -= HzWidth)
+		for (j = GDICharHeight - 1; j >= 0; j--, p++, y++)
 		{
 			if ((DWORD)y >= GDIheight)
 				continue;
@@ -713,13 +717,14 @@ long GDIDrawHz(long x, long y, DWORD hz, DWORD c)
 			for (i = HzWidth - 1; i >= 0; i--, x++, tmpvm += sizeof(DWORD))
 				if ((DWORD)x < GDIwidth && ((*p >> i) & 1u))
 					*((DWORD*)tmpvm) = c;
+			x -= HzWidth;
 		}
 		break;
 	}
 	return NO_ERROR;
 }
 
-/*显示ASCII字符*/
+/*绘制ASCII字符*/
 long GDIDrawAscii(long x, long y, DWORD ch, DWORD c)
 {
 	void *tmpvm;
@@ -742,7 +747,7 @@ long GDIDrawAscii(long x, long y, DWORD ch, DWORD c)
 	{
 	case 15:
 	case 16:
-		for (j = GDICharHeight - 1; j >= 0; j--, p++, y++, x -= GDICharWidth)
+		for (j = GDICharHeight - 1; j >= 0; j--, p++, y++)
 		{
 			if ((DWORD)y >= GDIheight)
 				continue;
@@ -750,10 +755,11 @@ long GDIDrawAscii(long x, long y, DWORD ch, DWORD c)
 			for (i = GDICharWidth - 1; i >= 0; i--, x++, tmpvm += sizeof(WORD))
 				if ((DWORD)x < GDIwidth && ((*p >> i) & 1u))
 					*((WORD*)tmpvm) = c;
+			x -= GDICharWidth;
 		}
 		break;
 	case 24:
-		for (j = GDICharHeight - 1; j >= 0; j--, p++, y++, x -= GDICharWidth)
+		for (j = GDICharHeight - 1; j >= 0; j--, p++, y++)
 		{
 			if ((DWORD)y >= GDIheight)
 				continue;
@@ -761,10 +767,11 @@ long GDIDrawAscii(long x, long y, DWORD ch, DWORD c)
 			for (i = GDICharWidth - 1; i >= 0; i--, x++, tmpvm += sizeof(RGB24))
 				if ((DWORD)x < GDIwidth && ((*p >> i) & 1u))
 					*((RGB24*)tmpvm) = *(RGB24*)&c;
+			x -= GDICharWidth;
 		}
 		break;
 	case 32:
-		for (j = GDICharHeight - 1; j >= 0; j--, p++, y++, x -= GDICharWidth)
+		for (j = GDICharHeight - 1; j >= 0; j--, p++, y++)
 		{
 			if ((DWORD)y >= GDIheight)
 				continue;
@@ -772,13 +779,14 @@ long GDIDrawAscii(long x, long y, DWORD ch, DWORD c)
 			for (i = GDICharWidth - 1; i >= 0; i--, x++, tmpvm += sizeof(DWORD))
 				if ((DWORD)x < GDIwidth && ((*p >> i) & 1u))
 					*((DWORD*)tmpvm) = c;
+			x -= GDICharWidth;
 		}
 		break;
 	}
 	return NO_ERROR;
 }
 
-/*输出字符串*/
+/*绘制字符串*/
 long GDIDrawStr(long x, long y, const char *str, DWORD c)
 {
 	DWORD hzf;	/*汉字内码首字符标志*/

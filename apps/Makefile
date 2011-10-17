@@ -22,8 +22,8 @@ DASMFLAGS	= -u -o $(ENTRYPOINT) -e $(ENTRYOFFSET)
 # This Program
 HEADS		= ../MkApi/ulimkapi.h ../driver/basesrv.h
 HEADOBJ		= ../objs/apphead.o
-OBJS		= ../objs/loader.o ../objs/cmd.o ../objs/3demo.o ../objs/3dline.o ../objs/workout.o ../objs/jpg.o ../objs/clock.o ../objs/guitest.o
-BINS		= ../out/ulios/loader.bin ../out/ulios/cmd.bin ../out/ulios/3demo.bin ../out/ulios/3dline.bin ../out/ulios/workout.bin ../out/ulios/jpg.bin ../out/ulios/clock.bin ../out/ulios/guitest.bin
+OBJS		= ../objs/loader.o ../objs/cmd.o ../objs/3demo.o ../objs/3dline.o ../objs/workout.o ../objs/jpg.o ../objs/clock.o ../objs/desktop.o ../objs/guitest.o
+BINS		= ../out/ulios/loader.bin ../out/ulios/cmd.bin ../out/ulios/3demo.bin ../out/ulios/3dline.bin ../out/ulios/workout.bin ../out/ulios/jpg.bin ../out/ulios/clock.bin ../out/ulios/desktop.bin ../out/ulios/guitest.bin
 
 # All Phony Targets
 .PHONY : all redo clean
@@ -58,8 +58,11 @@ clean :
 ../out/ulios/clock.bin : ../objs/clock.o $(HEADOBJ) $(LDFILE)
 	$(LD) $(LDFLAGS) -o $@ $(HEADOBJ) ../objs/clock.o ../objs/gdi.o
 
+../out/ulios/desktop.bin : ../objs/desktop.o $(HEADOBJ) $(LDFILE)
+	$(LD) $(LDFLAGS) -o $@ $(HEADOBJ) ../objs/desktop.o ../objs/malloc.o ../objs/gclient.o
+
 ../out/ulios/guitest.bin : ../objs/guitest.o $(HEADOBJ) $(LDFILE)
-	$(LD) $(LDFLAGS) -o $@ $(HEADOBJ) ../objs/guitest.o
+	$(LD) $(LDFLAGS) -o $@ $(HEADOBJ) ../objs/guitest.o ../objs/malloc.o ../objs/gclient.o
 
 ../objs/apphead.o : ../MkApi/apphead.c
 	$(CC) $(CFLAGS) -o $@ $<
@@ -85,5 +88,8 @@ clean :
 ../objs/clock.o : clock.c $(HEADS) ../lib/gdi.h
 	$(CC) $(CFLAGS) -o $@ $<
 
-../objs/guitest.o : guitest.c $(HEADS) ../gui/guiapi.h
+../objs/desktop.o : desktop.c $(HEADS) ../fs/fsapi.h ../lib/malloc.h ../lib/gclient.h
+	$(CC) $(CFLAGS) -o $@ $<
+
+../objs/guitest.o : guitest.c $(HEADS) ../fs/fsapi.h ../lib/malloc.h ../lib/gclient.h
 	$(CC) $(CFLAGS) -o $@ $<

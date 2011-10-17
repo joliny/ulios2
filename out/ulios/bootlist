@@ -19,4 +19,4 @@ V276
 ;应用程序命令可使用带引号的参数,如:Aapps.bin a b "c d"
 Acmd.bin
 Agui.bin
-Aguitest.bin
+Adesktop.bin

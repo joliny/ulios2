@@ -21,7 +21,7 @@ DASMFLAGS	= -u -o $(ENTRYPOINT) -e $(ENTRYOFFSET)
 
 # This Program
 HEADS		= ../MkApi/ulimkapi.h ../driver/basesrv.h ../lib/gdi.h gui.h guiapi.h
-OBJS		= ../objs/apphead.o ../objs/guiapi.o ../objs/guiobj.o ../objs/guirect.o ../objs/desktop.o ../objs/guikbdmus.o ../objs/guilib.o
+OBJS		= ../objs/apphead.o ../objs/guiapi.o ../objs/guiobj.o ../objs/guirect.o ../objs/guikbdmus.o ../objs/guilib.o
 GUIBIN		= ../out/ulios/gui.bin
 
 # All Phony Targets
@@ -49,9 +49,6 @@ $(GUIBIN) : $(OBJS) $(LDFILE)
 	$(CC) $(CFLAGS) -o $@ $<
 
 ../objs/guirect.o : guirect.c $(HEADS)
-	$(CC) $(CFLAGS) -o $@ $<
-
-../objs/desktop.o : desktop.c $(HEADS)
 	$(CC) $(CFLAGS) -o $@ $<
 
 ../objs/guikbdmus.o : guikbdmus.c $(HEADS)

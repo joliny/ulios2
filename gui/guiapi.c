@@ -16,9 +16,42 @@ THREAD_ID KbdMusPtid;	/*键盘鼠标服务ID*/
 
 #define PTID_ID	MSG_DATA_LEN
 
+void ApiGetGinfo(DWORD *argv)
+{
+	if ((argv[MSG_ATTR_ID] & MSG_MAP_MASK) == MSG_ATTR_ROMAP)
+	{
+		argv[MSG_RES_ID] = GUI_ERR_WRONG_ARGS;
+		KUnmapProcAddr((void*)argv[MSG_ADDR_ID], argv);
+		return;
+	}
+	argv[1] = GDIwidth;
+	argv[2] = GDIheight;
+	argv[MSG_RES_ID] = NO_ERROR;
+	KSendMsg((THREAD_ID*)&argv[PTID_ID], argv, 0);
+}
+
 void ApiCreate(DWORD *argv)
 {
-	argv[MSG_RES_ID] = CreateGobj(*(THREAD_ID*)&argv[PTID_ID], argv[GUIMSG_GOBJ_ID], argv[3], (short)argv[4], (short)(argv[4] >> 16), (short)argv[5], (short)(argv[5] >> 16), (argv[MSG_ATTR_ID] & MSG_ATTR_MASK) == MSG_ATTR_GUI ? NULL : (DWORD*)argv[MSG_ADDR_ID], argv[MSG_SIZE_ID] / sizeof(DWORD), &argv[GUIMSG_GOBJ_ID]);
+	GOBJ_DESC *gobj;
+
+	if (argv[5] < GOBJT_LEN && *(DWORD*)(&(gobj = &gobjt[argv[5]])->ptid) != INVALID)	/*检查父窗体ID有效,窗体有效*/
+	{
+		if ((argv[MSG_RES_ID] = CreateGobj(gobj, *(THREAD_ID*)&argv[PTID_ID], argv[GUIMSG_GOBJ_ID], (short)argv[3], (short)(argv[3] >> 16), (short)argv[4], (short)(argv[4] >> 16), (argv[MSG_ATTR_ID] & MSG_ATTR_MASK) == MSG_ATTR_GUI ? NULL : (DWORD*)argv[MSG_ADDR_ID], argv[MSG_SIZE_ID] / sizeof(DWORD), &gobj)) == NO_ERROR)
+		{
+			argv[5] = gobj - gobjt;
+			argv[GUIMSG_GOBJ_ID] = gobj->ClientSign;
+		}
+	}
+	else if (*(DWORD*)(&gobjt[0].ptid) == INVALID)	/*gobjt的0项为空,创建主桌面*/
+	{
+		if ((argv[MSG_RES_ID] = CreateDesktop(*(THREAD_ID*)&argv[PTID_ID], argv[GUIMSG_GOBJ_ID], (argv[MSG_ATTR_ID] & MSG_ATTR_MASK) == MSG_ATTR_GUI ? NULL : (DWORD*)argv[MSG_ADDR_ID], argv[MSG_SIZE_ID] / sizeof(DWORD))) == NO_ERROR)
+		{
+			argv[5] = 0;
+			argv[GUIMSG_GOBJ_ID] = gobjt[0].ClientSign;
+		}
+	}
+	else
+		argv[MSG_RES_ID] = GUI_ERR_INVALID_GOBJID;
 	if (argv[MSG_RES_ID] != NO_ERROR && (argv[MSG_ATTR_ID] & MSG_MAP_MASK) == MSG_ATTR_ROMAP)
 		KUnmapProcAddr((void*)argv[MSG_ADDR_ID], argv);
 	else
@@ -30,64 +63,118 @@ void ApiCreate(DWORD *argv)
 
 void ApiDestroy(DWORD *argv)
 {
+	GOBJ_DESC *gobj;
+
 	if ((argv[MSG_ATTR_ID] & MSG_MAP_MASK) == MSG_ATTR_ROMAP)
 	{
 		argv[MSG_RES_ID] = GUI_ERR_WRONG_ARGS;
 		KUnmapProcAddr((void*)argv[MSG_ADDR_ID], argv);
 		return;
 	}
-	if ((argv[MSG_RES_ID] = DeleteGobj(*(THREAD_ID*)&argv[PTID_ID], argv[GUIMSG_GOBJ_ID])) != NO_ERROR)
-		KSendMsg((THREAD_ID*)&argv[PTID_ID], argv, 0);
+	if (argv[GUIMSG_GOBJ_ID] < GOBJT_LEN && ((THREAD_ID*)&argv[PTID_ID])->ProcID == (gobj = &gobjt[argv[GUIMSG_GOBJ_ID]])->ptid.ProcID)	/*检查窗体ID有效,窗体有效,进程访问自身的窗体*/
+	{
+		argv[GUIMSG_GOBJ_ID] = gobj->ClientSign;
+		if (argv[GUIMSG_GOBJ_ID])
+			argv[MSG_RES_ID] = DeleteGobj(gobj);
+		else	/*gobj的ID为0,删除主桌面*/
+			argv[MSG_RES_ID] = DeleteDesktop(gobj);
+	}
+	else
+		argv[MSG_RES_ID] = GUI_ERR_INVALID_GOBJID;
+	KSendMsg((THREAD_ID*)&argv[PTID_ID], argv, 0);
 }
 
 void ApiMove(DWORD *argv)
 {
+	GOBJ_DESC *gobj;
+
 	if ((argv[MSG_ATTR_ID] & MSG_MAP_MASK) == MSG_ATTR_ROMAP)
 	{
 		argv[MSG_RES_ID] = GUI_ERR_WRONG_ARGS;
 		KUnmapProcAddr((void*)argv[MSG_ADDR_ID], argv);
 		return;
 	}
-	if ((argv[MSG_RES_ID] = MoveGobj(*(THREAD_ID*)&argv[PTID_ID], argv[GUIMSG_GOBJ_ID], argv[1], argv[2])) != NO_ERROR)
-		KSendMsg((THREAD_ID*)&argv[PTID_ID], argv, 0);
+	if (argv[GUIMSG_GOBJ_ID] && argv[GUIMSG_GOBJ_ID] < GOBJT_LEN && ((THREAD_ID*)&argv[PTID_ID])->ProcID == (gobj = &gobjt[argv[GUIMSG_GOBJ_ID]])->ptid.ProcID)	/*检查窗体ID不为0且有效,窗体有效,进程访问自身的窗体*/
+	{
+		if ((argv[MSG_RES_ID] = MoveGobj(gobj, argv[1], argv[2])) == NO_ERROR)
+			argv[GUIMSG_GOBJ_ID] = gobj->ClientSign;
+	}
+	else
+		argv[MSG_RES_ID] = GUI_ERR_INVALID_GOBJID;
+	KSendMsg((THREAD_ID*)&argv[PTID_ID], argv, 0);
 }
 
 void ApiSize(DWORD *argv)
 {
-	if ((argv[MSG_RES_ID] = SizeGobj(*(THREAD_ID*)&argv[PTID_ID], argv[GUIMSG_GOBJ_ID], (short)argv[3], (short)(argv[3] >> 16), (short)argv[4], (short)(argv[4] >> 16), (argv[MSG_ATTR_ID] & MSG_ATTR_MASK) == MSG_ATTR_GUI ? NULL : (DWORD*)argv[MSG_ADDR_ID], argv[MSG_SIZE_ID] / sizeof(DWORD))) != NO_ERROR)
+	GOBJ_DESC *gobj;
+
+	if (argv[GUIMSG_GOBJ_ID] && argv[GUIMSG_GOBJ_ID] < GOBJT_LEN && ((THREAD_ID*)&argv[PTID_ID])->ProcID == (gobj = &gobjt[argv[GUIMSG_GOBJ_ID]])->ptid.ProcID)	/*检查窗体ID不为0且有效,窗体有效,进程访问自身的窗体*/
 	{
-		if ((argv[MSG_ATTR_ID] & MSG_MAP_MASK) == MSG_ATTR_ROMAP)
-			KUnmapProcAddr((void*)argv[MSG_ADDR_ID], argv);
-		else
-			KSendMsg((THREAD_ID*)&argv[PTID_ID], argv, 0);
+		if ((argv[MSG_RES_ID] = SizeGobj(gobj, (short)argv[3], (short)(argv[3] >> 16), (short)argv[4], (short)(argv[4] >> 16), (argv[MSG_ATTR_ID] & MSG_ATTR_MASK) == MSG_ATTR_GUI ? NULL : (DWORD*)argv[MSG_ADDR_ID], argv[MSG_SIZE_ID] / sizeof(DWORD))) == NO_ERROR)
+			argv[GUIMSG_GOBJ_ID] = gobj->ClientSign;
+	}
+	else
+		argv[MSG_RES_ID] = GUI_ERR_INVALID_GOBJID;
+	if (argv[MSG_RES_ID] != NO_ERROR && (argv[MSG_ATTR_ID] & MSG_MAP_MASK) == MSG_ATTR_ROMAP)
+		KUnmapProcAddr((void*)argv[MSG_ADDR_ID], argv);
+	else
+	{
+		argv[MSG_API_ID] = MSG_ATTR_GUI | GM_SIZE;
+		KSendMsg((THREAD_ID*)&argv[PTID_ID], argv, 0);
 	}
 }
 
 void ApiPaint(DWORD *argv)
 {
+	GOBJ_DESC *gobj;
+
 	if ((argv[MSG_ATTR_ID] & MSG_MAP_MASK) == MSG_ATTR_ROMAP)
 	{
 		argv[MSG_RES_ID] = GUI_ERR_WRONG_ARGS;
 		KUnmapProcAddr((void*)argv[MSG_ADDR_ID], argv);
 		return;
 	}
-	PaintGobj(*(THREAD_ID*)&argv[PTID_ID], argv[GUIMSG_GOBJ_ID], (short)argv[1], (short)(argv[1] >> 16), (short)argv[2], (short)(argv[2] >> 16));
+	if (argv[GUIMSG_GOBJ_ID] < GOBJT_LEN && ((THREAD_ID*)&argv[PTID_ID])->ProcID == (gobj = &gobjt[argv[GUIMSG_GOBJ_ID]])->ptid.ProcID)	/*检查窗体ID有效,窗体有效,进程访问自身的窗体*/
+		PaintGobj(gobj, (short)argv[1], (short)(argv[1] >> 16), (short)argv[2], (short)(argv[2] >> 16));	/*不反馈消息*/
 }
 
 void ApiActive(DWORD *argv)
 {
+	GOBJ_DESC *gobj;
+
 	if ((argv[MSG_ATTR_ID] & MSG_MAP_MASK) == MSG_ATTR_ROMAP)
 	{
 		argv[MSG_RES_ID] = GUI_ERR_WRONG_ARGS;
 		KUnmapProcAddr((void*)argv[MSG_ADDR_ID], argv);
 		return;
 	}
-	ActiveGobj(*(THREAD_ID*)&argv[PTID_ID], argv[GUIMSG_GOBJ_ID]);
+	if (argv[GUIMSG_GOBJ_ID] < GOBJT_LEN && ((THREAD_ID*)&argv[PTID_ID])->ProcID == (gobj = &gobjt[argv[GUIMSG_GOBJ_ID]])->ptid.ProcID)	/*检查窗体ID有效,窗体有效,进程访问自身的窗体*/
+	{
+		if ((argv[MSG_RES_ID] = ActiveGobj(gobj)) == NO_ERROR)
+			argv[GUIMSG_GOBJ_ID] = gobj->ClientSign;
+	}
+	else
+		argv[MSG_RES_ID] = GUI_ERR_INVALID_GOBJID;
+	KSendMsg((THREAD_ID*)&argv[PTID_ID], argv, 0);
+}
+
+void ApiDrag(DWORD *argv)
+{
+	GOBJ_DESC *gobj;
+
+	if ((argv[MSG_ATTR_ID] & MSG_MAP_MASK) == MSG_ATTR_ROMAP)
+	{
+		argv[MSG_RES_ID] = GUI_ERR_WRONG_ARGS;
+		KUnmapProcAddr((void*)argv[MSG_ADDR_ID], argv);
+		return;
+	}
+	if (argv[GUIMSG_GOBJ_ID] && argv[GUIMSG_GOBJ_ID] < GOBJT_LEN && ((THREAD_ID*)&argv[PTID_ID])->ProcID == (gobj = &gobjt[argv[GUIMSG_GOBJ_ID]])->ptid.ProcID)	/*检查窗体ID不为0且有效,窗体有效,进程访问自身的窗体*/
+		DragGobj(gobj, argv[1]);	/*不反馈消息*/
 }
 
 /*系统调用表*/
 void (*ApiTable[])(DWORD *argv) = {
-	ApiCreate, ApiDestroy, ApiMove, ApiSize, ApiPaint, ApiActive
+	ApiGetGinfo, ApiCreate, ApiDestroy, ApiMove, ApiSize, ApiPaint, ApiActive, ApiDrag
 };
 
 /*初始化GUI,如果不成功必须退出*/
@@ -96,8 +183,6 @@ long InitGUI()
 	long res;
 	GOBJ_DESC *gobj;
 	CLIPRECT *clip;
-	THREAD_ID ptid;
-	DWORD data[MSG_DATA_LEN];
 
 	if ((res = KRegKnlPort(SRV_GUI_PORT)) != NO_ERROR)	/*注册服务端口*/
 		return res;
@@ -110,18 +195,15 @@ long InitGUI()
 
 	for (gobj = FstGobj = gobjt; gobj < &gobjt[GOBJT_LEN - 1]; gobj++)
 	{
-		gobj->attr = INVALID;
+		*(DWORD*)(&gobj->ptid) = INVALID;
 		gobj->nxt = gobj + 1;
 	}
-	gobj->attr = INVALID;
+	*(DWORD*)(&gobj->ptid) = INVALID;
 	gobj->nxt = NULL;
 	for (clip = FstClipRect = ClipRectt; clip < &FstClipRect[CLIPRECTT_LEN - 1]; clip++)
 		clip->nxt = clip + 1;
 	clip->nxt = NULL;
-
-	InitMouse();
-	KCreateThread(DesktopThread, 0x700000, NULL, &ptid);	/*创建桌面线程*/
-	return KRecvProcMsg(&ptid, data, SRV_OUT_TIME);	/*等待桌面线程初始化完成*/
+	return InitMouse();
 }
 
 int main()
@@ -141,7 +223,7 @@ int main()
 			GOBJ_DESC *gobj;
 
 			for (gobj = gobjt; gobj < &gobjt[GOBJT_LEN]; gobj++)
-				if (gobj->attr != INVALID && (DWORD)gobj->vbuf == data[MSG_ADDR_ID])	/*查找所属窗体*/
+				if (*(DWORD*)(&gobj->ptid) != INVALID && (DWORD)gobj->vbuf == data[MSG_ADDR_ID])	/*查找所属窗体*/
 				{
 					data[MSG_API_ID] = MSG_ATTR_GUI | GM_DESTROY;
 					data[GUIMSG_GOBJ_ID] = gobj - gobjt;

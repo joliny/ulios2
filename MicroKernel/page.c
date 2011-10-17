@@ -875,7 +875,8 @@ skip2:
 	memcpy32(msg->data, argv, MSG_DATA_LEN);
 	msg->data[MSG_ATTR_ID] = (argv[MSG_API_ID] & MSG_API_MASK) | MSG_ATTR_UNMAP;
 	msg->data[MSG_ADDR_ID] = (DWORD)addr2;
-	msg->data[MSG_RES_ID] = res;
+	if (res != NO_ERROR)
+		msg->data[MSG_RES_ID] = res;
 	if ((res = SendMsg(msg)) != NO_ERROR)	/*发送撤销映射消息*/
 	{
 		FreeMsg(msg);

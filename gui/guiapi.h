@@ -7,11 +7,7 @@
 #ifndef	_GUIAPI_H_
 #define	_GUIAPI_H_
 
-#include "../MkApi/ulimkapi.h"
-
-#define GUI_TYPE_DESKTOP	0	/*桌面类型*/
-#define GUI_TYPE_WINDOW		1	/*窗口类型*/
-#define GUI_TYPE_BUTTON		2	/*按钮类型*/
+#include "../driver/basesrv.h"
 
 /*错误定义*/
 #define GUI_ERR_HAVENO_GOBJ		-2560	/*窗体描述符不足*/
@@ -27,6 +23,7 @@
 #define GUI_ERR_HAVENO_VBUF		-2570	/*显示缓冲不存在*/
 #define GUI_ERR_WRONG_VBUF		-2571	/*显示缓冲错误*/
 #define GUI_ERR_WRONG_ARGS		-2572	/*参数错误*/
+#define GUI_ERR_BEING_DRAGGED	-2573	/*有窗体正在被拖拽*/
 
 #define SRV_GUI_PORT		10	/*GUI服务端口*/
 
@@ -34,12 +31,18 @@
 
 #define GUIMSG_GOBJ_ID	6	/*GUI消息窗体对象索引*/
 
-#define GM_CREATE		0x00	/*创建窗体*/
-#define GM_DESTROY		0x01	/*销毁窗体*/
-#define GM_MOVE			0x02	/*移动窗体*/
-#define GM_SIZE			0x03	/*改变大小*/
-#define GM_PAINT		0x04	/*绘制窗体*/
-#define GM_SETFOCUS		0x05	/*获得焦点*/
+#define GM_GETGINFO		0x00	/*取得GUI信息*/
+#define GM_CREATE		0x01	/*创建窗体*/
+#define GM_DESTROY		0x02	/*销毁窗体*/
+#define GM_MOVE			0x03	/*移动窗体*/
+#define GM_SIZE			0x04	/*缩放窗体*/
+#define GM_PAINT		0x05	/*绘制窗体*/
+#define GM_SETFOCUS		0x06	/*焦点消息*/
+#define GM_DRAG			0x07	/*拖拽消息*/
+
+#define GM_DRAGMOD_NONE	0		/*取消拖拽模式*/
+#define GM_DRAGMOD_MOVE	1		/*拖拽移动模式*/
+#define GM_DRAGMOD_SIZE	2		/*拖拽缩放模式*/
 
 #define GM_MOUSEENTER	0x10	/*鼠标移入*/
 #define GM_MOUSELEAVE	0x11	/*鼠标移出*/
@@ -60,24 +63,31 @@
 
 #define GM_UNMAPVBUF	0x0100	/*撤销显示缓冲映射*/
 
+/*取得GUI信息*/
+static inline long GUIGetGinfo(THREAD_ID ptid, DWORD *GUIwidth, DWORD *GUIheight)
+{
+	DWORD data[MSG_DATA_LEN];
+	data[MSG_API_ID] = MSG_ATTR_GUI | GM_GETGINFO;
+	if ((data[0] = KSendMsg(&ptid, data, SRV_OUT_TIME)) != NO_ERROR)
+		return data[0];
+	*GUIwidth = data[1];
+	*GUIheight = data[2];
+	return data[MSG_RES_ID];
+}
+
 /*创建窗体*/
-static inline long GUIcreate(THREAD_ID ptid, DWORD pid, DWORD attr, DWORD *vbuf, short x, short y, WORD width, WORD height)
+static inline long GUIcreate(THREAD_ID ptid, DWORD pid, DWORD ClintSign, short x, short y, WORD width, WORD height, DWORD *vbuf)
 {
 	DWORD data[MSG_DATA_LEN];
 	data[MSG_API_ID] = MSG_ATTR_GUI | GM_CREATE;
-	data[3] = attr;
-	data[4] = (WORD)x | ((DWORD)(WORD)y << 16);
-	data[5] = width | ((DWORD)height << 16);
-	data[GUIMSG_GOBJ_ID] = pid;
+	data[3] = (WORD)x | ((DWORD)(WORD)y << 16);
+	data[4] = width | ((DWORD)height << 16);
+	data[5] = pid;
+	data[GUIMSG_GOBJ_ID] = ClintSign;
 	if (vbuf)
-		data[0] = KWriteProcAddr(vbuf, (DWORD)width * height * sizeof(DWORD), &ptid, data, SRV_OUT_TIME);
+		return KWriteProcAddr(vbuf, (DWORD)width * height * sizeof(DWORD), &ptid, data, 0);
 	else
-		data[0] = KSendMsg(&ptid, data, SRV_OUT_TIME);
-	if (data[0] != NO_ERROR)
-		return data[0];
-	if (data[MSG_RES_ID] != NO_ERROR)
-		return data[MSG_RES_ID];
-	return data[GUIMSG_GOBJ_ID];
+		return KSendMsg(&ptid, data, 0);
 }
 
 /*销毁窗体*/
@@ -126,10 +136,21 @@ static inline long GUIpaint(THREAD_ID ptid, DWORD gid, short x, short y, WORD wi
 }
 
 /*设置窗体焦点*/
-static inline long GUISetFocus(THREAD_ID ptid, DWORD gid)
+static inline long GUISetFocus(THREAD_ID ptid, DWORD gid, BOOL isFocus)
 {
 	DWORD data[MSG_DATA_LEN];
 	data[MSG_API_ID] = MSG_ATTR_GUI | GM_SETFOCUS;
+	data[1] = isFocus;
+	data[GUIMSG_GOBJ_ID] = gid;
+	return KSendMsg(&ptid, data, 0);
+}
+
+/*发送拖拽消息*/
+static inline long GUIdrag(THREAD_ID ptid, DWORD gid, DWORD mode)
+{
+	DWORD data[MSG_DATA_LEN];
+	data[MSG_API_ID] = MSG_ATTR_GUI | GM_DRAG;
+	data[1] = mode;
 	data[GUIMSG_GOBJ_ID] = gid;
 	return KSendMsg(&ptid, data, 0);
 }
