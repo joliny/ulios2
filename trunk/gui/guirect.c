@@ -289,7 +289,7 @@ void DrawGobj(GOBJ_DESC *gobj, long xpos, long ypos, long xend, long yend, long 
 				TmpYpos += ParGobj->rect.ypos;
 			}
 			if (isRefreshMouse)
-				HidMouse();
+				HideMouse();
 			GuiPutImage(ParXpos + TmpXpos, ParYpos + TmpYpos, ParGobj->vbuf + (TmpXpos + TmpYpos * (ParGobj->rect.xend - ParGobj->rect.xpos)), ParGobj->rect.xend - ParGobj->rect.xpos, TmpXend, TmpYend);
 			if (isRefreshMouse)
 				ShowMouse();

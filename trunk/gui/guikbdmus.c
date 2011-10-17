@@ -7,8 +7,6 @@
 #include "gui.h"
 #include "../lib/gdi.h"
 
-extern GOBJ_DESC gobjt[];	/*窗体描述符管理表*/
-
 #define MUSSTATE_MOVED	0x01	/*已移动*/
 
 #define DBCLK_CLOCK		40		/*双击延迟*/
@@ -18,6 +16,10 @@ DWORD ClickClock[3];	/*单击时的时钟*/
 DWORD MusKey, MusState;	/*鼠标键,状态*/
 long MusX, MusY, MusPicWidth, MusPicHeight;	/*鼠标位置,背景图像备份*/
 GOBJ_DESC *MusInGobj;	/*鼠标移入的窗体*/
+
+GOBJ_DESC *DraggedGobj;	/*被拖拽的窗体*/
+long DragX, DragY;		/*拖拽位置差*/
+DWORD DragMode;			/*拖拽模式*/
 
 /*键盘消息处理*/
 void KeyboardProc(DWORD key)
@@ -45,7 +47,7 @@ BOOL CheckMousePos(long xpos, long ypos, long xend, long yend)
 }
 
 /*隐藏鼠标指针*/
-void HidMouse()
+void HideMouse()
 {
 	GDIPutImage(MusX, MusY, MusBak, MusPicWidth, MusPicHeight);
 }
@@ -85,8 +87,69 @@ void MouseProc(DWORD key, long x, long y, long z)
 	data[3] = y;
 	data[4] = z;
 	data[5] = (data[5] & 0xFFFF) | (data[6] << 16);	/*坐标合成*/
-	data[GUIMSG_GOBJ_ID] = gobj - gobjt;
+	data[GUIMSG_GOBJ_ID] = gobj->ClientSign;
 
+	if (x != MusX || y != MusY)	/*鼠标位置移动*/
+	{
+		MusState |= MUSSTATE_MOVED;
+		GDIPutImage(MusX, MusY, MusBak, MusPicWidth, MusPicHeight);	/*绘制鼠标指针*/
+		MusX = x;
+		MusY = y;
+		GDIGetImage(MusX, MusY, MusBak, MusPicWidth, MusPicHeight);
+		GDIPutBCImage(MusX, MusY, MusPic, MusPicWidth, MusPicHeight, 0xFFFFFFFF);
+		if (DraggedGobj)
+		{
+			switch (DragMode)
+			{
+			case GM_DRAGMOD_MOVE:
+				if (MoveGobj(DraggedGobj, MusX - DragX, MusY - DragY) == NO_ERROR)
+				{
+					data[MSG_API_ID] = MSG_ATTR_GUI | GM_MOVE;	/*被移动消息*/
+					data[1] = DraggedGobj->rect.xpos;
+					data[2] = DraggedGobj->rect.ypos;
+					data[GUIMSG_GOBJ_ID] = DraggedGobj->ClientSign;
+					KSendMsg(&DraggedGobj->ptid, data, 0);
+					data[GUIMSG_GOBJ_ID] = gobj->ClientSign;
+				}
+				break;
+			case GM_DRAGMOD_SIZE:
+				data[MSG_API_ID] = MSG_ATTR_GUI | GM_DRAG;	/*拖拽缩放消息*/
+				data[1] = GM_DRAGMOD_SIZE;
+				data[2] = MusX - DragX;
+				data[3] = MusY - DragY;
+				data[GUIMSG_GOBJ_ID] = DraggedGobj->ClientSign;
+				KSendMsg(&DraggedGobj->ptid, data, 0);
+				data[GUIMSG_GOBJ_ID] = gobj->ClientSign;
+				break;
+			}
+		}
+		else
+		{
+			if (gobj != MusInGobj)	/*移到了其他窗体*/
+			{
+				if (MusInGobj && *(DWORD*)(&MusInGobj->ptid) != INVALID)	/*从此有效窗体移开*/
+				{
+					data[MSG_ATTR_ID] = MSG_ATTR_GUI | GM_MOUSELEAVE;	/*移出消息*/
+					data[GUIMSG_GOBJ_ID] = MusInGobj->ClientSign;
+					KSendMsg(&MusInGobj->ptid, data, 0);
+					data[GUIMSG_GOBJ_ID] = gobj->ClientSign;
+				}
+				MusInGobj = gobj;
+				data[MSG_ATTR_ID] = MSG_ATTR_GUI | GM_MOUSEENTER;	/*移入消息*/
+				KSendMsg(&gobj->ptid, data, 0);
+			}
+			else
+			{
+				data[MSG_ATTR_ID] = MSG_ATTR_GUI | GM_MOUSEMOVE;	/*移动消息*/
+				KSendMsg(&gobj->ptid, data, 0);
+			}
+		}
+	}
+	if (z)
+	{
+		data[MSG_ATTR_ID] = MSG_ATTR_GUI | GM_MOUSEWHEEL;	/*滚轮消息*/
+		KSendMsg(&gobj->ptid, data, 0);
+	}
 	for (i = 0; i < 3; i++)	/*检查鼠标按键*/
 	{
 		DWORD key0, key1;
@@ -123,41 +186,42 @@ void MouseProc(DWORD key, long x, long y, long z)
 						KSendMsg(&gobj->ptid, data, 0);
 					}
 				}
+				DraggedGobj = NULL;	/*鼠标键抬起,停止拖拽*/
 			}
 			break;
 		}
 	}
 	MusKey = key;
-	if (x != MusX || y != MusY)	/*鼠标位置移动*/
+}
+
+/*处理拖拽消息*/
+long DragGobj(GOBJ_DESC *gobj, DWORD mode)
+{
+	if (mode != GM_DRAGMOD_NONE)
 	{
-		MusState |= MUSSTATE_MOVED;
-		GDIPutImage(MusX, MusY, MusBak, MusPicWidth, MusPicHeight);	/*绘制鼠标指针*/
-		MusX = x;
-		MusY = y;
-		GDIGetImage(MusX, MusY, MusBak, MusPicWidth, MusPicHeight);
-		GDIPutBCImage(MusX, MusY, MusPic, MusPicWidth, MusPicHeight, 0xFFFFFFFF);
-		if (gobj != MusInGobj)	/*移到了其他窗体*/
+		if (DraggedGobj)	/*已有窗体被拖拽*/
+			return GUI_ERR_BEING_DRAGGED;
+		GetGobjPos(gobj, &DragX, &DragY);
+		if (MusX < DragX || MusX > gobj->rect.xend - gobj->rect.xpos + DragX ||	/*非法的拖拽位置*/
+			MusY < DragY || MusY > gobj->rect.yend - gobj->rect.ypos + DragY)
+			return GUI_ERR_WRONG_ARGS;
+
+		switch (mode)
 		{
-			if (MusInGobj && MusInGobj->attr != INVALID)	/*从此有效窗体移开*/
-			{
-				data[MSG_ATTR_ID] = MSG_ATTR_GUI | (GM_MOUSELEAVE);	/*移出消息*/
-				data[GUIMSG_GOBJ_ID] = MusInGobj - gobjt;
-				KSendMsg(&MusInGobj->ptid, data, 0);
-				data[GUIMSG_GOBJ_ID] = gobj - gobjt;
-			}
-			MusInGobj = gobj;
-			data[MSG_ATTR_ID] = MSG_ATTR_GUI | GM_MOUSEENTER;	/*移入消息*/
-			KSendMsg(&gobj->ptid, data, 0);
+		case GM_DRAGMOD_MOVE:
+			DragX = MusX - gobj->rect.xpos;	/*记录拖拽位置差*/
+			DragY = MusY - gobj->rect.ypos;
+			break;
+		case GM_DRAGMOD_SIZE:
+			DragX = MusX - (gobj->rect.xend - gobj->rect.xpos);	/*记录拖拽位置差*/
+			DragY = MusY - (gobj->rect.yend - gobj->rect.ypos);
+			break;
 		}
-		else
-		{
-			data[MSG_ATTR_ID] = MSG_ATTR_GUI | GM_MOUSEMOVE;	/*移动消息*/
-			KSendMsg(&gobj->ptid, data, 0);
-		}
+		DragMode = mode;
+		DraggedGobj = gobj;
 	}
-	if (z)
-	{
-		data[MSG_ATTR_ID] = MSG_ATTR_GUI | GM_MOUSEWHEEL;	/*滚轮消息*/
-		KSendMsg(&gobj->ptid, data, 0);
-	}
+	else
+		DraggedGobj = NULL;
+
+	return NO_ERROR;
 }

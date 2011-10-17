@@ -122,11 +122,6 @@ DEP_CPP_FONT_=\
 	".\fs\fsapi.h"\
 	".\MkApi\ulimkapi.h"\
 	
-SOURCE=.\driver\kbdmus.c
-DEP_CPP_KBDMU=\
-	".\driver\basesrv.h"\
-	".\MkApi\ulimkapi.h"\
-	
 # End Source File
 # Begin Source File
 
@@ -252,10 +247,6 @@ DEP_CPP_ULIFS=\
 # Begin Group "gui"
 
 # PROP Default_Filter ""
-# Begin Source File
-
-SOURCE=.\gui\desktop.c
-# End Source File
 # Begin Source File
 
 SOURCE=.\gui\gui.h
@@ -596,6 +587,10 @@ DEP_CPP_CMD_C=\
 # End Source File
 # Begin Source File
 
+SOURCE=.\apps\desktop.c
+# End Source File
+# Begin Source File
+
 SOURCE=.\apps\guitest.c
 # End Source File
 # Begin Source File
@@ -635,6 +630,14 @@ DEP_CPP_WORKO=\
 # PROP Default_Filter ""
 # Begin Source File
 
+SOURCE=.\lib\gclient.c
+# End Source File
+# Begin Source File
+
+SOURCE=.\lib\gclient.h
+# End Source File
+# Begin Source File
+
 SOURCE=.\lib\gdi.c
 DEP_CPP_GDI_C=\
 	".\driver\basesrv.h"\
@@ -648,21 +651,15 @@ SOURCE=.\lib\gdi.h
 # End Source File
 # Begin Source File
 
-SOURCE=.\lib\guigdi.c
-DEP_CPP_GDI_C=\
-	".\driver\basesrv.h"\
-	".\gui\guiapi.h"\
-	".\lib\guigdi.h"\
-	".\MkApi\ulimkapi.h"\
-	
-# End Source File
-# Begin Source File
-
-SOURCE=.\lib\guigdi.h
-# End Source File
-# Begin Source File
-
 SOURCE=.\lib\Makefile
+# End Source File
+# Begin Source File
+
+SOURCE=.\lib\malloc.c
+# End Source File
+# Begin Source File
+
+SOURCE=.\lib\malloc.h
 # End Source File
 # Begin Source File
 
