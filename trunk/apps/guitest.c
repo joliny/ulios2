@@ -8,6 +8,8 @@
 #include "../lib/malloc.h"
 #include "../lib/gclient.h"
 
+CTRL_TXT *txt;
+CTRL_SEDT *edt;
 long CliX, CliY, x0, y0;
 
 long MainMsgProc(THREAD_ID ptid, DWORD data[MSG_DATA_LEN])
@@ -17,6 +19,24 @@ long MainMsgProc(THREAD_ID ptid, DWORD data[MSG_DATA_LEN])
 	{
 	case GM_CREATE:
 		GCWndGetClientLoca(wnd, &CliX, &CliY);
+		{
+			CTRL_ARGS args;
+			args.width = 100;
+			args.height = 16;
+			args.x = 10;
+			args.y = 30;
+			args.style = 0;
+			args.MsgProc = NULL;
+			GCTxtCreate(&txt, &args, wnd->obj.gid, &wnd->obj, "hello ulios2 gui");
+			args.y = 50;
+			GCSedtCreate(&edt, &args, wnd->obj.gid, &wnd->obj, "hello");
+		}
+		break;
+	case GM_SIZE:
+		if (GCSetArea(&txt->obj.uda, 100, 16, &wnd->obj.uda, txt->obj.x, txt->obj.y) == NO_ERROR)
+			GCGobjDraw(&txt->obj);
+		if (GCSetArea(&edt->obj.uda, 100, 16, &wnd->obj.uda, edt->obj.x, edt->obj.y) == NO_ERROR)
+			GCGobjDraw(&edt->obj);
 		break;
 	case GM_LBUTTONDOWN:
 		x0 = (data[5] & 0xFFFF) - CliX;

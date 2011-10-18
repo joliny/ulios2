@@ -582,26 +582,6 @@ static void FillGradRect(UDI_AREA *uda, long x, long y, long w, long h, DWORD c1
 		GCFillRect(uda, x, y + i, w, 1, ((BaseR + StepR * i / h) & 0xFF0000) | ((BaseG + StepG * i / h) & 0xFF00) | ((BaseB + StepB * i / h) & 0xFF));
 }
 
-/*绘制圆角矩形*/
-static void DrawRoundRect(UDI_AREA *uda, long x, long y, long w, long h, DWORD c)
-{
-	GCFillRect(uda, x + 2, y, w - 4, 1, c);	/*上边框*/
-	GCFillRect(uda, x + 2, y + h - 1, w - 4, 1, c);	/*下边框*/
-	GCFillRect(uda, x, y + 2, 1, h - 4, c);	/*左边框*/
-	GCFillRect(uda, x + w - 1, y + 2, 1, h - 4, c);	/*右边框*/
-	GCPutPixel(uda, x + 1, y + 1, c);	/*左上角*/
-	GCPutPixel(uda, x + w - 2, y + 1, c);	/*右上角*/
-	GCPutPixel(uda, x + 1, y + h - 2, c);	/*左下角*/
-	GCPutPixel(uda, x + w - 2, y + h - 2, c);	/*右下角*/
-}
-
-/*绘制渐变圆角按钮*/
-static void DrawButton(UDI_AREA *uda, long x, long y, long w, long h, DWORD c1, DWORD c2, DWORD bc)
-{
-	FillGradRect(uda, x + 1, y + 1, w - 2, h - 2, c1, c2);
-	DrawRoundRect(uda, x, y, w, h, bc);
-}
-
 /**********控件基类**********/
 
 /*初始化CTRL_GOBJ结构*/
@@ -726,6 +706,7 @@ long GCDispatchMsg(THREAD_ID ptid, DWORD data[MSG_DATA_LEN])
 
 /**********桌面**********/
 
+/*创建桌面*/
 long GCDskCreate(CTRL_DSK **dsk, const CTRL_ARGS *args, DWORD pid, CTRL_GOBJ *ParGobj)
 {
 	CTRL_DSK *NewDsk;
@@ -744,11 +725,13 @@ long GCDskCreate(CTRL_DSK **dsk, const CTRL_ARGS *args, DWORD pid, CTRL_GOBJ *Pa
 	return NO_ERROR;
 }
 
+/*桌面消息处理*/
 long GCDskDefMsgProc(THREAD_ID ptid, DWORD data[MSG_DATA_LEN])
 {
 	return NO_ERROR;
 }
 
+/*桌面绘制处理*/
 void GCDskDefDrawProc(CTRL_DSK *dsk)
 {
 }
@@ -762,6 +745,7 @@ void GCDskDefDrawProc(CTRL_DSK *dsk)
 #define WND_MIN_WIDTH		128	/*窗口最小尺寸*/
 #define WND_MIN_HEIGHT		(WND_CAP_HEIGHT + WND_SIZEBTN_SIZE)
 
+/*创建窗口*/
 long GCWndCreate(CTRL_WND **wnd, const CTRL_ARGS *args, DWORD pid, CTRL_GOBJ *ParGobj, const char *caption)
 {
 	CTRL_WND *NewWnd;
@@ -783,7 +767,7 @@ long GCWndCreate(CTRL_WND **wnd, const CTRL_ARGS *args, DWORD pid, CTRL_GOBJ *Pa
 		else	/*无边框*/
 			GCSetArea(&NewWnd->client, NewWnd->obj.uda.width, NewWnd->obj.uda.height - WND_CAP_HEIGHT, &NewWnd->obj.uda, 0, WND_CAP_HEIGHT);	/*创建客户区*/
 	}
-	else
+	else	/*无标题栏*/
 	{
 		if (NewWnd->obj.style & WND_STYLE_BORDER)	/*有边框*/
 			GCSetArea(&NewWnd->client, NewWnd->obj.uda.width - WND_BORDER_WIDTH * 2, NewWnd->obj.uda.height - WND_BORDER_WIDTH * 2, &NewWnd->obj.uda, WND_BORDER_WIDTH, WND_BORDER_WIDTH);	/*创建客户区*/
@@ -806,6 +790,7 @@ long GCWndCreate(CTRL_WND **wnd, const CTRL_ARGS *args, DWORD pid, CTRL_GOBJ *Pa
 	return NO_ERROR;
 }
 
+/*窗口关闭按钮处理函数*/
 static void WndCloseBtnProc(CTRL_BTN *btn)
 {
 	THREAD_ID ptid;
@@ -818,6 +803,7 @@ static void WndCloseBtnProc(CTRL_BTN *btn)
 	btn->obj.par->MsgProc(ptid, data);
 }
 
+/*窗口缩放处理*/
 static void WndChangeSize(CTRL_WND *wnd, long x, long y, DWORD width, DWORD height)
 {
 	if ((long)width < WND_MIN_WIDTH && (long)height < WND_MIN_HEIGHT)
@@ -837,7 +823,7 @@ static void WndChangeSize(CTRL_WND *wnd, long x, long y, DWORD width, DWORD heig
 		else	/*无边框*/
 			GCSetArea(&wnd->client, wnd->obj.uda.width, wnd->obj.uda.height - WND_CAP_HEIGHT, &wnd->obj.uda, 0, WND_CAP_HEIGHT);
 	}
-	else
+	else	/*无标题栏*/
 	{
 		if (wnd->obj.style & WND_STYLE_BORDER)	/*有边框*/
 			GCSetArea(&wnd->client, wnd->obj.uda.width - WND_BORDER_WIDTH * 2, wnd->obj.uda.height - WND_BORDER_WIDTH * 2, &wnd->obj.uda, WND_BORDER_WIDTH, WND_BORDER_WIDTH);	/*创建客户区*/
@@ -872,6 +858,7 @@ static void WndChangeSize(CTRL_WND *wnd, long x, long y, DWORD width, DWORD heig
 		GUImove(GCGuiPtid, wnd->size->obj.gid, wnd->size->obj.x, wnd->size->obj.y);
 }
 
+/*窗口最大化正常化切换*/
 static void WndMaxOrNormal(CTRL_WND *wnd)
 {
 	if (wnd->obj.x != 0 || wnd->obj.y != 0 || wnd->obj.uda.width != GCwidth || wnd->obj.uda.height != GCheight)
@@ -880,16 +867,19 @@ static void WndMaxOrNormal(CTRL_WND *wnd)
 		WndChangeSize(wnd, wnd->x0, wnd->y0, wnd->width0, wnd->height0);	/*正常化*/
 }
 
+/*窗口最大化按钮处理函数*/
 static void WndMaxBtnProc(CTRL_BTN *btn)
 {
 	WndMaxOrNormal((CTRL_WND*)btn->obj.par);
 }
 
+/*窗口最小化按钮处理函数*/
 static void WndMinBtnProc(CTRL_BTN *btn)
 {
 	WndChangeSize((CTRL_WND*)btn->obj.par, 0, 0, WND_MIN_WIDTH, WND_MIN_HEIGHT);
 }
 
+/*窗口缩放按钮消息处理*/
 static long WndSizeBtnProc(THREAD_ID ptid, DWORD data[MSG_DATA_LEN])
 {
 	if ((data[MSG_API_ID] & MSG_API_MASK) == GM_LBUTTONDOWN)
@@ -897,6 +887,7 @@ static long WndSizeBtnProc(THREAD_ID ptid, DWORD data[MSG_DATA_LEN])
 	return GCBtnDefMsgProc(ptid, data);
 }
 
+/*窗口消息处理*/
 long GCWndDefMsgProc(THREAD_ID ptid, DWORD data[MSG_DATA_LEN])
 {
 	CTRL_WND *wnd = (CTRL_WND*)data[GUIMSG_GOBJ_ID];
@@ -966,6 +957,7 @@ long GCWndDefMsgProc(THREAD_ID ptid, DWORD data[MSG_DATA_LEN])
 	return NO_ERROR;
 }
 
+/*窗口绘制处理*/
 void GCWndDefDrawProc(CTRL_WND *wnd)
 {
 	if (wnd->obj.style & WND_STYLE_CAPTION)	/*有标题栏*/
@@ -1021,6 +1013,7 @@ void GCWndGetClientLoca(CTRL_WND *wnd, long *x, long *y)
 
 /**********按钮**********/
 
+/*创建按钮*/
 long GCBtnCreate(CTRL_BTN **btn, const CTRL_ARGS *args, DWORD pid, CTRL_GOBJ *ParGobj, const char *text, void (*PressProc)(CTRL_BTN *btn))
 {
 	CTRL_BTN *NewBtn;
@@ -1048,6 +1041,23 @@ long GCBtnCreate(CTRL_BTN **btn, const CTRL_ARGS *args, DWORD pid, CTRL_GOBJ *Pa
 	return NO_ERROR;
 }
 
+/*按钮绘制*/
+static void BtnDrawButton(UDI_AREA *uda, long x, long y, long w, long h, DWORD c1, DWORD c2, DWORD bc, const char *text, DWORD tc)
+{
+	FillGradRect(uda, x + 1, y + 1, w - 2, h - 2, c1, c2);
+	/*绘制圆角矩形*/
+	GCFillRect(uda, x + 2, y, w - 4, 1, bc);	/*上边框*/
+	GCFillRect(uda, x + 2, y + h - 1, w - 4, 1, bc);	/*下边框*/
+	GCFillRect(uda, x, y + 2, 1, h - 4, bc);	/*左边框*/
+	GCFillRect(uda, x + w - 1, y + 2, 1, h - 4, bc);	/*右边框*/
+	GCPutPixel(uda, x + 1, y + 1, bc);	/*左上角*/
+	GCPutPixel(uda, x + w - 2, y + 1, bc);	/*右上角*/
+	GCPutPixel(uda, x + 1, y + h - 2, bc);	/*左下角*/
+	GCPutPixel(uda, x + w - 2, y + h - 2, bc);	/*右下角*/
+	GCDrawStr(uda, x + (w - (long)strlen(text) * (long)GCCharWidth) / 2, y + (h - (long)GCCharHeight) / 2, text, tc);
+}
+
+/*按钮消息处理*/
 long GCBtnDefMsgProc(THREAD_ID ptid, DWORD data[MSG_DATA_LEN])
 {
 	CTRL_BTN *btn = (CTRL_BTN*)data[GUIMSG_GOBJ_ID];
@@ -1061,8 +1071,7 @@ long GCBtnDefMsgProc(THREAD_ID ptid, DWORD data[MSG_DATA_LEN])
 				btn->PressProc(btn);
 		}
 	case GM_MOUSEENTER:	/*鼠标进入状态*/
-		DrawButton(&btn->obj.uda, 0, 0, btn->obj.uda.width, btn->obj.uda.height, COL_ABTN_GRADLIGHT, COL_ABTN_GRADDARK, COL_BTN_BORDER);	/*绘制底座*/
-		GCDrawStr(&btn->obj.uda, ((long)btn->obj.uda.width - (long)strlen(btn->text) * (long)GCCharWidth) / 2, ((long)btn->obj.uda.height - (long)GCCharHeight) / 2, btn->text, COL_TEXT_DARK);
+		BtnDrawButton(&btn->obj.uda, 0, 0, btn->obj.uda.width, btn->obj.uda.height, COL_ABTN_GRADLIGHT, COL_ABTN_GRADDARK, COL_BTN_BORDER, btn->text, COL_TEXT_DARK);	/*绘制按钮*/
 		GUIpaint(GCGuiPtid, btn->obj.gid, 0, 0, btn->obj.uda.width, btn->obj.uda.height);
 		break;
 	case GM_MOUSELEAVE:	/*鼠标离开状态*/
@@ -1072,21 +1081,20 @@ long GCBtnDefMsgProc(THREAD_ID ptid, DWORD data[MSG_DATA_LEN])
 		break;
 	case GM_LBUTTONDOWN:	/*鼠标按下状态*/
 		btn->isPressDown = TRUE;
-		DrawButton(&btn->obj.uda, 0, 0, btn->obj.uda.width, btn->obj.uda.height, COL_ABTN_GRADDARK, COL_ABTN_GRADLIGHT, COL_BTN_BORDER);	/*绘制底座*/
-		GCDrawStr(&btn->obj.uda, ((long)btn->obj.uda.width - (long)strlen(btn->text) * (long)GCCharWidth) / 2, ((long)btn->obj.uda.height - (long)GCCharHeight) / 2, btn->text, COL_TEXT_LIGHT);
+		BtnDrawButton(&btn->obj.uda, 0, 0, btn->obj.uda.width, btn->obj.uda.height, COL_ABTN_GRADDARK, COL_ABTN_GRADLIGHT, COL_BTN_BORDER, btn->text, COL_TEXT_LIGHT);	/*绘制按钮*/
 		GUIpaint(GCGuiPtid, btn->obj.gid, 0, 0, btn->obj.uda.width, btn->obj.uda.height);
 		break;
 	}
 	return NO_ERROR;
 }
 
+/*按钮绘制处理*/
 void GCBtnDefDrawProc(CTRL_BTN *btn)
 {
-	DrawButton(&btn->obj.uda, 0, 0, btn->obj.uda.width, btn->obj.uda.height, COL_BTN_GRADLIGHT, COL_BTN_GRADDARK, COL_BTN_BORDER);	/*绘制底座*/
-	GCDrawStr(&btn->obj.uda, ((long)btn->obj.uda.width - (long)strlen(btn->text) * (long)GCCharWidth) / 2, ((long)btn->obj.uda.height - (long)GCCharHeight) / 2, btn->text, COL_TEXT_DARK);
+	BtnDrawButton(&btn->obj.uda, 0, 0, btn->obj.uda.width, btn->obj.uda.height, COL_BTN_GRADLIGHT, COL_BTN_GRADDARK, COL_BTN_BORDER, btn->text, COL_TEXT_DARK);	/*绘制按钮*/
 }
 
-/*设置窗口标题文本*/
+/*设置按钮文本*/
 void GCBtnSetText(CTRL_BTN *btn, const char *text)
 {
 	if (text)
@@ -1096,6 +1104,122 @@ void GCBtnSetText(CTRL_BTN *btn, const char *text)
 	}
 	else
 		btn->text[0] = 0;
-	GCBtnDefDrawProc(btn);
-	GUIpaint(GCGuiPtid, btn->obj.gid, 0, 0, btn->obj.uda.width, btn->obj.uda.height);
+	GCGobjDraw(&btn->obj);
+}
+
+/**********静态文本框**********/
+
+/*创建静态文本框*/
+long GCTxtCreate(CTRL_TXT **txt, const CTRL_ARGS *args, DWORD pid, CTRL_GOBJ *ParGobj, const char *text)
+{
+	CTRL_TXT *NewTxt;
+	long res;
+
+	if ((NewTxt = (CTRL_TXT*)malloc(sizeof(CTRL_TXT))) == NULL)
+		return GC_ERR_OUT_OF_MEM;
+	if ((res = GCGobjInit(&NewTxt->obj, args, GCTxtDefMsgProc, (DRAWPROC)GCTxtDefDrawProc, pid, ParGobj)) != NO_ERROR)
+	{
+		free(NewTxt);
+		return res;
+	}
+	NewTxt->obj.type = GC_CTRL_TYPE_TEXT;
+	if (text)
+	{
+		strncpy(NewTxt->text, text, TXT_TXT_LEN - 1);
+		NewTxt->text[TXT_TXT_LEN - 1] = 0;
+	}
+	else
+		NewTxt->text[0] = 0;
+	if (txt)
+		*txt = NewTxt;
+	return NO_ERROR;
+}
+
+/*静态文本框消息处理*/
+long GCTxtDefMsgProc(THREAD_ID ptid, DWORD data[MSG_DATA_LEN])
+{
+	return NO_ERROR;
+}
+
+/*静态文本框绘制处理*/
+void GCTxtDefDrawProc(CTRL_TXT *txt)
+{
+	GCDrawStr(&txt->obj.uda, ((long)txt->obj.uda.width - (long)strlen(txt->text) * (long)GCCharWidth) / 2, ((long)txt->obj.uda.height - (long)GCCharHeight) / 2, txt->text, COL_TEXT_DARK);
+}
+
+/*设置文本框文本*/
+void GCTxtSetText(CTRL_TXT *txt, const char *text)
+{
+	if (text)
+	{
+		strncpy(txt->text, text, TXT_TXT_LEN - 1);
+		txt->text[TXT_TXT_LEN - 1] = 0;
+	}
+	else
+		txt->text[0] = 0;
+	GCGobjDraw(&txt->obj);
+}
+
+/**********单行编辑框**********/
+
+/*创建单行编辑框*/
+long GCSedtCreate(CTRL_SEDT **edt, const CTRL_ARGS *args, DWORD pid, CTRL_GOBJ *ParGobj, const char *text)
+{
+	CTRL_SEDT *NewEdt;
+	long res;
+	
+	if ((NewEdt = (CTRL_SEDT*)malloc(sizeof(CTRL_SEDT))) == NULL)
+		return GC_ERR_OUT_OF_MEM;
+	if ((res = GCGobjInit(&NewEdt->obj, args, GCSedtDefMsgProc, (DRAWPROC)GCSedtDefDrawProc, pid, ParGobj)) != NO_ERROR)
+	{
+		free(NewEdt);
+		return res;
+	}
+	NewEdt->obj.type = GC_CTRL_TYPE_SLEDIT;
+	if (text)
+	{
+		strncpy(NewEdt->text, text, SEDT_TXT_LEN - 1);
+		NewEdt->text[SEDT_TXT_LEN - 1] = 0;
+	}
+	else
+		NewEdt->text[0] = 0;
+	if (edt)
+		*edt = NewEdt;
+	return NO_ERROR;
+}
+
+/*单行编辑框消息处理*/
+long GCSedtDefMsgProc(THREAD_ID ptid, DWORD data[MSG_DATA_LEN])
+{
+	return NO_ERROR;
+}
+
+/*按钮单行编辑框*/
+static void SedtDrawSLEdit(UDI_AREA *uda, long x, long y, long w, long h, DWORD c, DWORD bc, const char *text, DWORD tc)
+{
+	GCFillRect(uda, x, y, w, 1, bc);	/*上边框*/
+	GCFillRect(uda, x, y + h - 1, w, 1, bc);	/*下边框*/
+	GCFillRect(uda, x, y + 1, 1, h - 2, bc);	/*左边框*/
+	GCFillRect(uda, x + w - 1, y + 1, 1, h - 2, bc);	/*右边框*/
+	GCFillRect(uda, x + 1, y + 1, w - 2, h - 2, c);	/*底色*/
+	GCDrawStr(uda, x + (w - (long)strlen(text) * (long)GCCharWidth) / 2, y + (h - (long)GCCharHeight) / 2, text, tc);
+}
+
+/*单行编辑框绘制处理*/
+void GCSedtDefDrawProc(CTRL_SEDT *edt)
+{
+	SedtDrawSLEdit(&edt->obj.uda, 0, 0, edt->obj.uda.width, edt->obj.uda.height, COL_BTN_GRADLIGHT, COL_BTN_BORDER, edt->text, COL_TEXT_DARK);	/*绘制按钮*/
+}
+
+/*设置单行编辑框文本*/
+void GCSedtSetText(CTRL_SEDT *edt, const char *text)
+{
+	if (text)
+	{
+		strncpy(edt->text, text, SEDT_TXT_LEN - 1);
+		edt->text[SEDT_TXT_LEN - 1] = 0;
+	}
+	else
+		edt->text[0] = 0;
+	GCGobjDraw(&edt->obj);
 }

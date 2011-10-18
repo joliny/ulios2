@@ -365,6 +365,15 @@ void killproc(char *args)
 		CUIPutS(CuiPtid, "强行结束进程失败！\n");
 }
 
+/*启动GUI和桌面应用程序*/
+void startgui(char *args)
+{
+	THREAD_ID ptid;
+	KCreateProcess(0, "gui.bin", NULL, &ptid);
+	KCreateProcess(0, "desktop.bin", NULL, &ptid);
+	KExitProcess(NO_ERROR);
+}
+
 /*发声*/
 void sound(char *args)
 {
@@ -398,6 +407,7 @@ void help(char *args)
 		"time:显示当前时间\n"
 		"ps:进程列表\n"
 		"kill ProcID:强行结束进程\n"
+		"startgui:启动图形界面\n"
 		"sound freq:以一定频率发声一秒\n"
 		"help:帮助\n"
 		"输入可执行文件路径将运行该程序\n");
@@ -464,6 +474,7 @@ void CmdProc(char *str)
 		{"time", showtim},
 		{"ps", proclist},
 		{"kill", killproc},
+		{"startgui", startgui},
 		{"sound", sound},
 		{"help", help}
 	};
