@@ -86,7 +86,8 @@ long GCLoadBmp(char *path, DWORD *buf, DWORD len, long *width, long *height);
 #define GC_CTRL_TYPE_DESKTOP	0		/*桌面*/
 #define GC_CTRL_TYPE_WINDOW		1		/*窗口*/
 #define GC_CTRL_TYPE_BUTTON		2		/*按钮*/
-#define GC_CTRL_TYPE_TEXT		3		/*文本框*/
+#define GC_CTRL_TYPE_TEXT		3		/*静态文本框*/
+#define GC_CTRL_TYPE_SLEDIT		4		/*单行编辑框*/
 
 typedef long (*MSGPROC)(THREAD_ID ptid, DWORD data[MSG_DATA_LEN]);	/*窗体消息处理函数*/
 
@@ -139,7 +140,7 @@ void GCDskDefDrawProc(CTRL_DSK *dsk);
 
 /**********按钮**********/
 
-#define BTN_TXT_LEN			64
+#define BTN_TXT_LEN			32
 
 typedef struct _CTRL_BTN
 {
@@ -155,7 +156,7 @@ long GCBtnDefMsgProc(THREAD_ID ptid, DWORD data[MSG_DATA_LEN]);
 
 void GCBtnDefDrawProc(CTRL_BTN *btn);
 
-/*设置窗口标题文本*/
+/*设置按钮文本*/
 void GCBtnSetText(CTRL_BTN *btn, const char *text);
 
 /**********窗口**********/
@@ -194,8 +195,42 @@ void GCWndSetCaption(CTRL_WND *wnd, const char *caption);
 /*取得窗口客户区位置*/
 void GCWndGetClientLoca(CTRL_WND *wnd, long *x, long *y);
 
-/**********文本框**********/
+/**********静态文本框**********/
 
-#define TXT_TEXT_LEN		128
+#define TXT_TXT_LEN			128
+
+typedef struct _CTRL_TXT
+{
+	CTRL_GOBJ obj;
+	char text[TXT_TXT_LEN];			/*文本框文本*/
+}CTRL_TXT;	/*静态文本框类*/
+
+long GCTxtCreate(CTRL_TXT **txt, const CTRL_ARGS *args, DWORD pid, CTRL_GOBJ *ParGobj, const char *text);
+
+long GCTxtDefMsgProc(THREAD_ID ptid, DWORD data[MSG_DATA_LEN]);
+
+void GCTxtDefDrawProc(CTRL_TXT *txt);
+
+/*设置文本框文本*/
+void GCTxtSetText(CTRL_TXT *txt, const char *text);
+
+/**********单行编辑框**********/
+
+#define SEDT_TXT_LEN		128
+
+typedef struct _CTRL_SEDT
+{
+	CTRL_GOBJ obj;
+	char text[SEDT_TXT_LEN];		/*编辑框文本*/
+}CTRL_SEDT;	/*单行编辑框*/
+
+long GCSedtCreate(CTRL_SEDT **edt, const CTRL_ARGS *args, DWORD pid, CTRL_GOBJ *ParGobj, const char *text);
+
+long GCSedtDefMsgProc(THREAD_ID ptid, DWORD data[MSG_DATA_LEN]);
+
+void GCSedtDefDrawProc(CTRL_SEDT *edt);
+
+/*设置单行编辑框文本*/
+void GCSedtSetText(CTRL_SEDT *edt, const char *text);
 
 #endif
