@@ -556,6 +556,8 @@ long GCLoadBmp(char *path, DWORD *buf, DWORD len, long *width, long *height)
 #define COL_WND_BORDER		0x7B858E	// 窗口边框色
 #define COL_CAP_GRADDARK	0x589FCE	// 标题渐变色暗区
 #define COL_CAP_GRADLIGHT	0xE1EEF6	// 标题渐变色亮区
+#define COL_CAP_NOFCDARK	0x8F8F8F	// 无焦标题渐变色暗区
+#define COL_CAP_NOFCLIGHT	0xFBFBFB	// 无焦标题渐变色暗区
 #define COL_BTN_BORDER		0x7B858E	// 按钮边框色
 #define COL_BTN_GRADDARK	0x89B0CD	// 按钮渐变色暗区
 #define COL_BTN_GRADLIGHT	0xD7E9F5	// 按钮渐变色亮区
@@ -687,6 +689,8 @@ long GCDispatchMsg(THREAD_ID ptid, DWORD data[MSG_DATA_LEN])
 
 	if ((data[MSG_ATTR_ID] & MSG_ATTR_MASK) != MSG_ATTR_GUI)	/*抽取合法的GUI消息*/
 		return GC_ERR_INVALID_GUIMSG;
+	if (data[MSG_RES_ID] != NO_ERROR)	/*分离出错的GUI消息*/
+		return GC_ERR_WRONG_GUIMSG;
 	gobj = (CTRL_GOBJ*)data[GUIMSG_GOBJ_ID];
 	if ((data[MSG_ATTR_ID] & MSG_API_MASK) == GM_CREATE)	/*获取新窗体的GUI服务端对象ID*/
 		gobj->gid = data[5];
@@ -759,6 +763,7 @@ long GCWndCreate(CTRL_WND **wnd, const CTRL_ARGS *args, DWORD pid, CTRL_GOBJ *Pa
 		return res;
 	}
 	NewWnd->obj.type = GC_CTRL_TYPE_WINDOW;
+	NewWnd->obj.style |= WND_STYLE_FOCUS;
 	NewWnd->size = NewWnd->min = NewWnd->max = NewWnd->close = NULL;
 	if (NewWnd->obj.style & WND_STYLE_CAPTION)	/*有标题栏*/
 	{
@@ -925,15 +930,6 @@ long GCWndDefMsgProc(THREAD_ID ptid, DWORD data[MSG_DATA_LEN])
 			}
 		}
 		break;
-	case GM_LBUTTONDOWN:
-		if (wnd->obj.style & WND_STYLE_CAPTION && (data[5] >> 16) < WND_CAP_HEIGHT)	/*单击标题拖动窗口*/
-			GUIdrag(GCGuiPtid, wnd->obj.gid, GM_DRAGMOD_MOVE);
-		GUISetFocus(GCGuiPtid, wnd->obj.gid, TRUE);
-		break;
-	case GM_LBUTTONDBCLK:
-		if (wnd->obj.style & WND_STYLE_CAPTION && (data[5] >> 16) < WND_CAP_HEIGHT)	/*双击标题缩放窗口*/
-			WndMaxOrNormal(wnd);
-		break;
 	case GM_MOVE:
 		wnd->obj.x = data[1];
 		wnd->obj.y = data[2];
@@ -946,9 +942,42 @@ long GCWndDefMsgProc(THREAD_ID ptid, DWORD data[MSG_DATA_LEN])
 			wnd->height0 = wnd->obj.uda.height;
 		}
 		break;
+	case GM_SETFOCUS:
+		if (data[1])
+			wnd->obj.style |= WND_STYLE_FOCUS;
+		else
+			wnd->obj.style &= (~WND_STYLE_FOCUS);
+		if (wnd->obj.style & WND_STYLE_CAPTION)	/*有标题栏*/
+		{
+			if (wnd->obj.style & WND_STYLE_FOCUS)
+				FillGradRect(&wnd->obj.uda, WND_BORDER_WIDTH, 0, wnd->obj.uda.width - WND_BORDER_WIDTH * 2, WND_CAP_HEIGHT, COL_CAP_GRADLIGHT, COL_CAP_GRADDARK);	/*绘制标题栏*/
+			else
+				FillGradRect(&wnd->obj.uda, WND_BORDER_WIDTH, 0, wnd->obj.uda.width - WND_BORDER_WIDTH * 2, WND_CAP_HEIGHT, COL_CAP_NOFCLIGHT, COL_CAP_NOFCDARK);	/*绘制无焦标题栏*/
+			GCDrawStr(&wnd->obj.uda, ((long)wnd->obj.uda.width - (long)strlen(wnd->caption) * (long)GCCharWidth) / 2, (WND_CAP_HEIGHT - (long)GCCharHeight) / 2, wnd->caption, COL_TEXT_DARK);
+			if (wnd->obj.style & WND_STYLE_BORDER)	/*有边框*/
+				GCFillRect(&wnd->obj.uda, WND_BORDER_WIDTH, 0, wnd->obj.uda.width - WND_BORDER_WIDTH * 2, WND_BORDER_WIDTH, COL_WND_BORDER);	/*上边框*/
+			if (wnd->obj.style & WND_STYLE_CLOSEBTN)	/*有关闭按钮*/
+				GCBtnDefDrawProc(wnd->close);
+			if (wnd->obj.style & WND_STYLE_MAXBTN)	/*有最大化按钮*/
+				GCBtnDefDrawProc(wnd->max);
+			if (wnd->obj.style & WND_STYLE_MINBTN)	/*有最小化按钮*/
+				GCBtnDefDrawProc(wnd->min);
+			GUIpaint(GCGuiPtid, wnd->obj.gid, WND_BORDER_WIDTH, 0, wnd->obj.uda.width - WND_BORDER_WIDTH * 2, WND_CAP_HEIGHT);
+		}
+		break;
 	case GM_DRAG:
 		if (data[1] == GM_DRAGMOD_SIZE)
 			WndChangeSize(wnd, wnd->obj.x, wnd->obj.y, data[2], data[3]);
+		break;
+	case GM_LBUTTONDOWN:
+		if (wnd->obj.style & WND_STYLE_CAPTION && (data[5] >> 16) < WND_CAP_HEIGHT)	/*单击标题拖动窗口*/
+			GUIdrag(GCGuiPtid, wnd->obj.gid, GM_DRAGMOD_MOVE);
+		if (!(wnd->obj.style & WND_STYLE_FOCUS))
+			GUISetFocus(GCGuiPtid, wnd->obj.gid, TRUE);
+		break;
+	case GM_LBUTTONDBCLK:
+		if (wnd->obj.style & WND_STYLE_CAPTION && (data[5] >> 16) < WND_CAP_HEIGHT)	/*双击标题缩放窗口*/
+			WndMaxOrNormal(wnd);
 		break;
 	case GM_CLOSE:
 		GUIdestroy(GCGuiPtid, wnd->obj.gid);
@@ -962,7 +991,10 @@ void GCWndDefDrawProc(CTRL_WND *wnd)
 {
 	if (wnd->obj.style & WND_STYLE_CAPTION)	/*有标题栏*/
 	{
-		FillGradRect(&wnd->obj.uda, 0, 0, wnd->obj.uda.width, WND_CAP_HEIGHT, COL_CAP_GRADLIGHT, COL_CAP_GRADDARK);	/*绘制标题栏*/
+		if (wnd->obj.style & WND_STYLE_FOCUS)
+			FillGradRect(&wnd->obj.uda, 0, 0, wnd->obj.uda.width, WND_CAP_HEIGHT, COL_CAP_GRADLIGHT, COL_CAP_GRADDARK);	/*绘制标题栏*/
+		else
+			FillGradRect(&wnd->obj.uda, 0, 0, wnd->obj.uda.width, WND_CAP_HEIGHT, COL_CAP_NOFCLIGHT, COL_CAP_NOFCDARK);	/*绘制无焦标题栏*/
 		GCDrawStr(&wnd->obj.uda, ((long)wnd->obj.uda.width - (long)strlen(wnd->caption) * (long)GCCharWidth) / 2, (WND_CAP_HEIGHT - (long)GCCharHeight) / 2, wnd->caption, COL_TEXT_DARK);
 	}
 	if (wnd->obj.style & WND_STYLE_BORDER)	/*有边框*/
@@ -987,7 +1019,10 @@ void GCWndSetCaption(CTRL_WND *wnd, const char *caption)
 		wnd->caption[0] = 0;
 	if (wnd->obj.style & WND_STYLE_CAPTION)	/*有标题栏*/
 	{
-		FillGradRect(&wnd->obj.uda, WND_BORDER_WIDTH, 0, wnd->obj.uda.width - WND_BORDER_WIDTH * 2, WND_CAP_HEIGHT, COL_CAP_GRADLIGHT, COL_CAP_GRADDARK);	/*绘制标题栏*/
+		if (wnd->obj.style & WND_STYLE_FOCUS)
+			FillGradRect(&wnd->obj.uda, WND_BORDER_WIDTH, 0, wnd->obj.uda.width - WND_BORDER_WIDTH * 2, WND_CAP_HEIGHT, COL_CAP_GRADLIGHT, COL_CAP_GRADDARK);	/*绘制标题栏*/
+		else
+			FillGradRect(&wnd->obj.uda, WND_BORDER_WIDTH, 0, wnd->obj.uda.width - WND_BORDER_WIDTH * 2, WND_CAP_HEIGHT, COL_CAP_NOFCLIGHT, COL_CAP_NOFCDARK);	/*绘制无焦标题栏*/
 		GCDrawStr(&wnd->obj.uda, ((long)wnd->obj.uda.width - (long)strlen(wnd->caption) * (long)GCCharWidth) / 2, (WND_CAP_HEIGHT - (long)GCCharHeight) / 2, wnd->caption, COL_TEXT_DARK);
 		if (wnd->obj.style & WND_STYLE_BORDER)	/*有边框*/
 			GCFillRect(&wnd->obj.uda, WND_BORDER_WIDTH, 0, wnd->obj.uda.width - WND_BORDER_WIDTH * 2, WND_BORDER_WIDTH, COL_WND_BORDER);	/*上边框*/

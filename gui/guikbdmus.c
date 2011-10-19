@@ -88,6 +88,7 @@ void MouseProc(DWORD key, long x, long y, long z)
 	data[4] = z;
 	data[5] = (data[5] & 0xFFFF) | (data[6] << 16);	/*坐标合成*/
 	data[GUIMSG_GOBJ_ID] = gobj->ClientSign;
+	data[MSG_RES_ID] = NO_ERROR;
 
 	if (x != MusX || y != MusY)	/*鼠标位置移动*/
 	{

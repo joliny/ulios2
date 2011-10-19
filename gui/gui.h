@@ -57,7 +57,7 @@ void CoverRectByPar(GOBJ_DESC *gobj);
 long DeleteClipList(GOBJ_DESC *gobj);
 
 /*绘制窗体矩形内部*/
-void DrawGobj(GOBJ_DESC *gobj, long xpos, long ypos, long xend, long yend, long AbsXpos, long AbsYpos, GOBJ_DESC *ExcludeGobj);
+void DrawGobj(GOBJ_DESC *gobj, long xpos, long ypos, long xend, long yend, long AbsXpos, long AbsYpos, BOOL isDrawNoRoot);
 
 /**********窗体管理相关**********/
 
