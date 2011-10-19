@@ -32,7 +32,7 @@ void ApiGetGinfo(DWORD *argv)
 
 void ApiCreate(DWORD *argv)
 {
-	GOBJ_DESC *gobj;
+	GOBJ_DESC *gobj = NULL;
 
 	if (argv[5] < GOBJT_LEN && *(DWORD*)(&(gobj = &gobjt[argv[5]])->ptid) != INVALID)	/*检查父窗体ID有效,窗体有效*/
 	{
@@ -59,11 +59,22 @@ void ApiCreate(DWORD *argv)
 		argv[MSG_API_ID] = MSG_ATTR_GUI | GM_CREATE;
 		KSendMsg((THREAD_ID*)&argv[PTID_ID], argv, 0);
 	}
+	if (argv[MSG_RES_ID] == NO_ERROR)
+	{
+		gobj = gobj->nxt;	/*向失去焦点的窗体发消息*/
+		if (gobj)
+		{
+			argv[MSG_API_ID] = MSG_ATTR_GUI | GM_SETFOCUS;
+			argv[1] = FALSE;
+			argv[GUIMSG_GOBJ_ID] = gobj->ClientSign;
+			KSendMsg(&gobj->ptid, argv, 0);
+		}
+	}
 }
 
 void ApiDestroy(DWORD *argv)
 {
-	GOBJ_DESC *gobj;
+	GOBJ_DESC *gobj, *ParGobj = NULL;
 
 	if ((argv[MSG_ATTR_ID] & MSG_MAP_MASK) == MSG_ATTR_ROMAP)
 	{
@@ -73,8 +84,9 @@ void ApiDestroy(DWORD *argv)
 	}
 	if (argv[GUIMSG_GOBJ_ID] < GOBJT_LEN && ((THREAD_ID*)&argv[PTID_ID])->ProcID == (gobj = &gobjt[argv[GUIMSG_GOBJ_ID]])->ptid.ProcID)	/*检查窗体ID有效,窗体有效,进程访问自身的窗体*/
 	{
+		ParGobj = gobj->par;
 		argv[GUIMSG_GOBJ_ID] = gobj->ClientSign;
-		if (argv[GUIMSG_GOBJ_ID])
+		if (ParGobj)
 			argv[MSG_RES_ID] = DeleteGobj(gobj);
 		else	/*gobj的ID为0,删除主桌面*/
 			argv[MSG_RES_ID] = DeleteDesktop(gobj);
@@ -82,6 +94,17 @@ void ApiDestroy(DWORD *argv)
 	else
 		argv[MSG_RES_ID] = GUI_ERR_INVALID_GOBJID;
 	KSendMsg((THREAD_ID*)&argv[PTID_ID], argv, 0);
+	if (argv[MSG_RES_ID] == NO_ERROR && ParGobj)
+	{
+		gobj = ParGobj->chl;	/*向得到焦点的窗体发消息*/
+		if (gobj)
+		{
+			argv[MSG_API_ID] = MSG_ATTR_GUI | GM_SETFOCUS;
+			argv[1] = TRUE;
+			argv[GUIMSG_GOBJ_ID] = gobj->ClientSign;
+			KSendMsg(&gobj->ptid, argv, 0);
+		}
+	}
 }
 
 void ApiMove(DWORD *argv)
@@ -140,7 +163,7 @@ void ApiPaint(DWORD *argv)
 
 void ApiActive(DWORD *argv)
 {
-	GOBJ_DESC *gobj;
+	GOBJ_DESC *gobj = NULL;
 
 	if ((argv[MSG_ATTR_ID] & MSG_MAP_MASK) == MSG_ATTR_ROMAP)
 	{
@@ -156,6 +179,16 @@ void ApiActive(DWORD *argv)
 	else
 		argv[MSG_RES_ID] = GUI_ERR_INVALID_GOBJID;
 	KSendMsg((THREAD_ID*)&argv[PTID_ID], argv, 0);
+	if (argv[MSG_RES_ID] == NO_ERROR)
+	{
+		gobj = gobj->nxt;	/*向失去焦点的窗体发消息*/
+		if (gobj)
+		{
+			argv[1] = FALSE;
+			argv[GUIMSG_GOBJ_ID] = gobj->ClientSign;
+			KSendMsg(&gobj->ptid, argv, 0);
+		}
+	}
 }
 
 void ApiDrag(DWORD *argv)

@@ -15,6 +15,7 @@
 #define GC_ERR_AREASIZE			-2689	/*尺寸错误*/
 #define GC_ERR_OUT_OF_MEM		-2690	/*内存不足*/
 #define GC_ERR_INVALID_GUIMSG	-2691	/*非法GUI消息*/
+#define GC_ERR_WRONG_GUIMSG		-2692	/*出错的GUI消息*/
 
 typedef struct _UDI_AREA
 {
@@ -169,6 +170,7 @@ void GCBtnSetText(CTRL_BTN *btn, const char *text);
 #define WND_STYLE_MAXBTN	0x0008	/*最大化按钮*/
 #define WND_STYLE_MINBTN	0x0010	/*最小化按钮*/
 #define WND_STYLE_SIZEBTN	0x0020	/*拖动缩放按钮*/
+#define WND_STYLE_FOCUS		0x0040	/*焦点状态*/
 
 typedef struct _CTRL_WND
 {

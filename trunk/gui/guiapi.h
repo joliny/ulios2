@@ -23,7 +23,8 @@
 #define GUI_ERR_HAVENO_VBUF		-2570	/*显示缓冲不存在*/
 #define GUI_ERR_WRONG_VBUF		-2571	/*显示缓冲错误*/
 #define GUI_ERR_WRONG_ARGS		-2572	/*参数错误*/
-#define GUI_ERR_BEING_DRAGGED	-2573	/*有窗体正在被拖拽*/
+#define GUI_ERR_NOCHG_FOCUS		-2573	/*焦点无变化*/
+#define GUI_ERR_BEING_DRAGGED	-2574	/*有窗体正在被拖拽*/
 
 #define SRV_GUI_PORT		10	/*GUI服务端口*/
 

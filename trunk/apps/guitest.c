@@ -64,8 +64,10 @@ int main()
 	CTRL_ARGS args;
 	long res;
 
-	InitMallocTab(0x1000000);	/*设置16MB堆内存*/
-	GCinit();
+	if ((res = InitMallocTab(0x1000000)) != NO_ERROR)	/*设置16MB堆内存*/
+		return res;
+	if ((res = GCinit()) != NO_ERROR)
+		return res;
 	args.width = 256;
 	args.height = 128;
 	args.x = 100;
