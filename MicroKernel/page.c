@@ -216,7 +216,7 @@ long FillPage(EXEC_DESC *exec, void *addr, DWORD ErrCode)
 			if ((PtAddr = LockAllocPage()) == 0)	/*申请新页表*/
 				return KERR_OUT_OF_PHYMEM;
 			PtAddr |= PAGE_ATTR_P | PAGE_ATTR_U;	/*设为只读*/
-			*CurPt |= PtAddr;	/*修改页目录表*/
+			*CurPt = PtAddr;	/*修改页目录表*/
 			memset32((void*)((DWORD)CurPg & 0xFFFFF000), 0, 0x400);	/*清空页表*/
 			fst = (void*)((DWORD)addr & 0xFFC00000);	/*计算缺页地址所在页表的覆盖区*/
 			end = (void*)((DWORD)fst + PAGE_SIZE * 0x400);
@@ -255,7 +255,7 @@ long FillPage(EXEC_DESC *exec, void *addr, DWORD ErrCode)
 			if ((PgAddr = LockAllocPage()) == 0)	/*申请新页*/
 				return KERR_OUT_OF_PHYMEM;
 			PgAddr |= PAGE_ATTR_P | PAGE_ATTR_U;	/*设为只读*/
-			*CurPg |= PgAddr;	/*修改页表*/
+			*CurPg = PgAddr;	/*修改页表*/
 			memset32((void*)((DWORD)addr & 0xFFFFF000), 0, 0x400);	/*清空页*/
 			fst = (void*)((DWORD)addr & 0xFFFFF000);	/*计算缺页地址所在页的覆盖区*/
 			end = (void*)((DWORD)fst + PAGE_SIZE);
@@ -276,6 +276,7 @@ long FillPage(EXEC_DESC *exec, void *addr, DWORD ErrCode)
 				if (data[MSG_RES_ID] != NO_ERROR)
 					return data[MSG_RES_ID];
 				*CurPg0 = PgAddr;
+				*CurPg &= (~PAGE_ATTR_W);	/*写权限已在MapProcAddr中被打开,关闭页写权限*/
 			}
 			if (exec->DataOff < exec->DataEnd && exec->DataOff < end && exec->DataEnd > fst)	/*数据段与缺页覆盖区有重合*/
 			{
@@ -294,6 +295,7 @@ long FillPage(EXEC_DESC *exec, void *addr, DWORD ErrCode)
 				if (data[MSG_RES_ID] != NO_ERROR)
 					return data[MSG_RES_ID];
 				*CurPg0 = PgAddr;
+				*CurPg &= (~PAGE_ATTR_W);	/*写权限已在MapProcAddr中被打开,关闭页写权限*/
 			}
 		}
 	}

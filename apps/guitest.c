@@ -23,20 +23,26 @@ long MainMsgProc(THREAD_ID ptid, DWORD data[MSG_DATA_LEN])
 			CTRL_ARGS args;
 			args.width = 100;
 			args.height = 16;
-			args.x = 10;
-			args.y = 30;
+			args.x = CliX + (wnd->client.width - 100) / 2;
+			args.y = CliY + (wnd->client.height - 16) / 2 - 10;
 			args.style = 0;
 			args.MsgProc = NULL;
 			GCTxtCreate(&txt, &args, wnd->obj.gid, &wnd->obj, "hello ulios2 gui");
-			args.y = 50;
+			args.y += 20;
 			GCSedtCreate(&edt, &args, wnd->obj.gid, &wnd->obj, "hello");
 		}
 		break;
 	case GM_SIZE:
-		if (GCSetArea(&txt->obj.uda, 100, 16, &wnd->obj.uda, txt->obj.x, txt->obj.y) == NO_ERROR)
-			GCGobjDraw(&txt->obj);
-		if (GCSetArea(&edt->obj.uda, 100, 16, &wnd->obj.uda, edt->obj.x, edt->obj.y) == NO_ERROR)
-			GCGobjDraw(&edt->obj);
+		txt->obj.x = CliX + (wnd->client.width - 100) / 2;
+		txt->obj.y = CliY + (wnd->client.height - 16) / 2 - 10;
+		GCSetArea(&txt->obj.uda, 100, 16, &wnd->obj.uda, txt->obj.x, txt->obj.y);
+		GCTxtDefDrawProc(txt);
+		GUImove(GCGuiPtid, txt->obj.gid, txt->obj.x, txt->obj.y);
+		edt->obj.x = CliX + (wnd->client.width - 100) / 2;
+		edt->obj.y = CliY + (wnd->client.height - 16) / 2 + 10;
+		GCSetArea(&edt->obj.uda, 100, 16, &wnd->obj.uda, edt->obj.x, edt->obj.y);
+		GCSedtDefDrawProc(edt);
+		GUImove(GCGuiPtid, edt->obj.gid, edt->obj.x, edt->obj.y);
 		break;
 	case GM_LBUTTONDOWN:
 		x0 = (data[5] & 0xFFFF) - CliX;
@@ -68,8 +74,8 @@ int main()
 		return res;
 	if ((res = GCinit()) != NO_ERROR)
 		return res;
-	args.width = 256;
-	args.height = 128;
+	args.width = 128;
+	args.height = 80;
 	args.x = 100;
 	args.y = 100;
 	args.style = WND_STYLE_CAPTION | WND_STYLE_BORDER | WND_STYLE_CLOSEBTN | WND_STYLE_MAXBTN | WND_STYLE_MINBTN | WND_STYLE_SIZEBTN;
