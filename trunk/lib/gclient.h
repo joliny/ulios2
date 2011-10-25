@@ -181,6 +181,8 @@ typedef struct _CTRL_WND
 	CTRL_BTN *min;					/*最小化按钮*/
 	CTRL_BTN *size;					/*缩放按钮*/
 	UDI_AREA client;				/*客户绘图区*/
+	DWORD MinWidth, MinHeight;		/*最小和最大大小*/
+	DWORD MaxWidth, MaxHeight;
 	long x0, y0;					/*正常位置,大小*/
 	DWORD width0, height0;
 }CTRL_WND;	/*窗口类*/
@@ -193,6 +195,9 @@ void GCWndDefDrawProc(CTRL_WND *wnd);
 
 /*设置窗口标题文本*/
 void GCWndSetCaption(CTRL_WND *wnd, const char *caption);
+
+/*设置窗口位置大小*/
+void GCWndSetSize(CTRL_WND *wnd, long x, long y, DWORD width, DWORD height);
 
 /*取得窗口客户区位置*/
 void GCWndGetClientLoca(CTRL_WND *wnd, long *x, long *y);

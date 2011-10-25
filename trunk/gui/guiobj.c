@@ -242,8 +242,7 @@ long MoveGobj(GOBJ_DESC *gobj, long xpos, long ypos)
 		gobj->vbuf = NULL;	/*临时改变vbuf为空使gobj不被父窗体绘制*/
 		DrawGobj(ParGobj, TmpXpos, TmpYpos, TmpXend, TmpYend, xpos, ypos, TRUE);
 		gobj->vbuf = TmpVbuf;
-		if (TmpVbuf)
-			DrawGobj(gobj, 0, 0, gobj->rect.xend - gobj->rect.xpos, gobj->rect.yend - gobj->rect.ypos, xpos + gobj->rect.xpos, ypos + gobj->rect.ypos, FALSE);
+		DrawGobj(gobj, 0, 0, gobj->rect.xend - gobj->rect.xpos, gobj->rect.yend - gobj->rect.ypos, xpos + gobj->rect.xpos, ypos + gobj->rect.ypos, TRUE);
 	}
 
 	return NO_ERROR;
@@ -301,8 +300,7 @@ long SizeGobj(GOBJ_DESC *gobj, long xpos, long ypos, long width, long height, DW
 		gobj->vbuf = NULL;	/*临时改变vbuf为空使gobj不被父窗体绘制*/
 		DrawGobj(ParGobj, TmpXpos, TmpYpos, TmpXend, TmpYend, xpos, ypos, TRUE);
 		gobj->vbuf = TmpVbuf;
-		if (TmpVbuf)
-			DrawGobj(gobj, 0, 0, gobj->rect.xend - gobj->rect.xpos, gobj->rect.yend - gobj->rect.ypos, xpos + gobj->rect.xpos, ypos + gobj->rect.ypos, FALSE);
+		DrawGobj(gobj, 0, 0, gobj->rect.xend - gobj->rect.xpos, gobj->rect.yend - gobj->rect.ypos, xpos + gobj->rect.xpos, ypos + gobj->rect.ypos, TRUE);
 	}
 
 	return NO_ERROR;
