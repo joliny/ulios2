@@ -60,6 +60,7 @@ int main()
 	{
 		char *pathp = path, *exec, *args;
 
+		KSleep(10);	/*延时,防止进程间依赖关系不满足*/
 		while (*pathp != '\n' && *pathp != '\0')
 			pathp++;
 		if (*pathp)

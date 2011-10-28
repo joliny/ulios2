@@ -93,6 +93,19 @@ long ActiveGobj(GOBJ_DESC *gobj);
 
 /**********功能库相关**********/
 
+extern void *GDIvm;
+extern DWORD GDIwidth, GDIheight, GDIPixBits, GDImode;
+extern THREAD_ID GDIVesaPtid;
+
+/*贴图*/
+void GDIPutImage(long x, long y, DWORD *img, long w, long h);
+
+/*截图*/
+void GDIGetImage(long x, long y, DWORD *img, long w, long h);
+
+/*去背景色贴图*/
+void GDIPutBCImage(long x, long y, DWORD *img, long w, long h, DWORD bc);
+
 /*GUI矩形块贴图*/
 void GuiPutImage(long x, long y, DWORD *img, long memw, long w, long h);
 

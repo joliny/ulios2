@@ -93,10 +93,9 @@ WORD strcmp(BYTE *str1, BYTE *str2)
 WORD atol(BYTE *str)
 {
 	WORD i;
-	BYTE c;
 
-	for (i = 0; (c = *str) >= '0' && c <= '9'; str++)
-		i = i * 10 + c - '0';
+	for (i = 0; *str >= '0' && *str <= '9'; str++)
+		i = i * 10 + *str - '0';
 	return i;
 }
 
@@ -309,6 +308,12 @@ DWORD ReadPath(	BPB *bpb,			/*输入：分区BPB*/
 	}
 }
 
+void memzero(BYTE far *dst, WORD size)
+{
+	while (size--)
+		*dst++ = 0;
+}
+
 /*Loader程序主函数,参数为自定义参数*/
 void main(BPB *bpb)
 {
@@ -343,16 +348,21 @@ void main(BPB *bpb)
 		{
 		case 'F':	/*File*/
 		case 'f':
-			SrcDir = RootDir;
-			end = ReadPath(bpb, idx, buf, &SrcDir, &DstDir, cmd, addr);
-			if (end == 0)
-				goto errfnf;
-			if (end == addr)
-				break;
-			end = (end + 0x00000FFF) & 0xFFFFF000;		/*调整到4K边界*/
-			*BinAddr++ = addr;
-			*BinAddr++ = end - addr;
-			addr = end;
+			if (BinAddr < BIN_ADDR + 30)	/*15个加载文件限制*/
+			{
+				SrcDir = RootDir;
+				end = ReadPath(bpb, idx, buf, &SrcDir, &DstDir, cmd, addr);
+				if (end == 0)
+					goto errfnf;
+				if (end == addr)
+					break;
+				end = (end + 0x00000FFF) & 0xFFFFF000;		/*调整到4K边界*/
+				DstDir.len[0] = (0x1000 - (DstDir.len[0] & 0xFFF)) & 0xFFF;
+				memzero(LINE2FAR(end - DstDir.len[0]), (WORD)DstDir.len[0]);	/*清空文件尾内存*/
+				*BinAddr++ = addr;
+				*BinAddr++ = end - addr;
+				addr = end;
+			}
 			break;
 		case 'S':	/*SysDir*/
 		case 's':
@@ -363,7 +373,7 @@ void main(BPB *bpb)
 			*VesaMode = atol(cmd);
 			break;
 		}
-		if (*cp)	/*还有文件*/
+		if (*cp)	/*还有命令*/
 			cmd = cp;
 		else
 		{

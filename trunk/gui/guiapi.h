@@ -25,6 +25,7 @@
 #define GUI_ERR_WRONG_ARGS		-2572	/*参数错误*/
 #define GUI_ERR_NOCHG_FOCUS		-2573	/*焦点无变化*/
 #define GUI_ERR_BEING_DRAGGED	-2574	/*有窗体正在被拖拽*/
+#define GUI_ERR_WRONG_VESAMODE	-2575	/*VESA显卡显示模式错误*/
 
 #define SRV_GUI_PORT		10	/*GUI服务端口*/
 

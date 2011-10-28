@@ -5,7 +5,6 @@
 */
 
 #include "gui.h"
-#include "../lib/gdi.h"
 
 CLIPRECT ClipRectt[CLIPRECTT_LEN], *FstClipRect;	/*剪切矩形管理表指针*/
 

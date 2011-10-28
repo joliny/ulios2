@@ -5,7 +5,6 @@
 */
 
 #include "gui.h"
-#include "../lib/gdi.h"
 
 extern GOBJ_DESC gobjt[];	/*窗体描述符管理表*/
 extern GOBJ_DESC *FstGobj;	/*窗体描述符管理表指针*/
@@ -219,8 +218,12 @@ long InitGUI()
 
 	if ((res = KRegKnlPort(SRV_GUI_PORT)) != NO_ERROR)	/*注册服务端口*/
 		return res;
-	if ((res = GDIinit()) != NO_ERROR)	/*初始化GDI*/
+	if ((res = KGetKptThed(SRV_VESA_PORT, &GDIVesaPtid)) != NO_ERROR)	/*取得显卡服务线程*/
 		return res;
+	if ((res = VSGetVmem(GDIVesaPtid, &GDIvm, &GDIwidth, &GDIheight, &GDIPixBits, &GDImode)) != NO_ERROR)	/*初始化GDI*/
+		return res;
+	if (!GDImode)
+		return GUI_ERR_WRONG_VESAMODE;
 	if ((res = KGetKptThed(SRV_KBDMUS_PORT, &KbdMusPtid)) != NO_ERROR)	/*取得键盘鼠标服务线程*/
 		return res;
 	if ((res = KMSetRecv(KbdMusPtid)) != NO_ERROR)	/*取得键盘鼠标消息*/
@@ -283,7 +286,6 @@ int main()
 		else if (data[MSG_ATTR_ID] == MSG_ATTR_EXTPROCREQ)
 			break;
 	}
-	GDIrelease();
 	KUnregKnlPort(SRV_GUI_PORT);
 	return NO_ERROR;
 }
