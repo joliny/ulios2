@@ -370,6 +370,7 @@ void startgui(char *args)
 {
 	THREAD_ID ptid;
 	KCreateProcess(0, "gui.bin", NULL, &ptid);
+	KSleep(10);	/*延时,防止进程间依赖关系不满足*/
 	KCreateProcess(0, "desktop.bin", NULL, &ptid);
 	KExitProcess(NO_ERROR);
 }

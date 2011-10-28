@@ -20,7 +20,7 @@ LDFLAGS		= -T $(LDFILE) -mi386go32 -Map ../objs/guimap.txt
 DASMFLAGS	= -u -o $(ENTRYPOINT) -e $(ENTRYOFFSET)
 
 # This Program
-HEADS		= ../MkApi/ulimkapi.h ../driver/basesrv.h ../lib/gdi.h gui.h guiapi.h
+HEADS		= ../MkApi/ulimkapi.h ../driver/basesrv.h gui.h guiapi.h
 OBJS		= ../objs/apphead.o ../objs/guiapi.o ../objs/guiobj.o ../objs/guirect.o ../objs/guikbdmus.o ../objs/guilib.o
 GUIBIN		= ../out/ulios/gui.bin
 
@@ -37,7 +37,7 @@ clean :
 	rm -f $(OBJS) $(GUIBIN)
 
 $(GUIBIN) : $(OBJS) $(LDFILE)
-	$(LD) $(LDFLAGS) -o $(GUIBIN) $(OBJS) ../objs/gdi.o
+	$(LD) $(LDFLAGS) -o $(GUIBIN) $(OBJS)
 
 ../objs/apphead.o : ../MkApi/apphead.c
 	$(CC) $(CFLAGS) -o $@ $<

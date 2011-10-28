@@ -5,7 +5,6 @@
 */
 
 #include "gui.h"
-#include "../lib/gdi.h"
 
 #define MUSSTATE_MOVED	0x01	/*ÒÑÒÆ¶¯*/
 

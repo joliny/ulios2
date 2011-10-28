@@ -5,7 +5,6 @@
 */
 
 #include "gui.h"
-#include "../lib/gdi.h"
 
 GOBJ_DESC gobjt[GOBJT_LEN], *FstGobj;		/*窗体描述符管理表指针*/
 

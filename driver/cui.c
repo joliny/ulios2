@@ -171,27 +171,24 @@ int main()
 	if ((res = KRegKnlPort(SRV_CUI_PORT)) != NO_ERROR)	/*注册服务端口号*/
 		return res;
 	res = GDIinit();
-	if (res != NO_ERROR)
-	{
-		if (res == GDI_ERR_TEXTMODE)
-		{
-			GDICharHeight = GDICharWidth = 1;
-			isTextMode = TRUE;
-			width = GDIwidth;	/*计算显示字符数量*/
-			height = GDIheight;
-			BgColor = 0;
-			CharColor = 0x7;
-		}
-		else
-			return res;
-	}
-	else
+	if (res == NO_ERROR)
 	{
 		width = GDIwidth / GDICharWidth;	/*计算显示字符数量*/
 		height = GDIheight / GDICharHeight;
 		BgColor = 0;
 		CharColor = 0xFFFFFFFF;
 	}
+	else if (res == GDI_ERR_TEXTMODE)
+	{
+		GDICharHeight = GDICharWidth = 1;
+		isTextMode = TRUE;
+		width = GDIwidth;	/*计算显示字符数量*/
+		height = GDIheight;
+		BgColor = 0;
+		CharColor = 0x7;
+	}
+	else
+		return res;
 	ClearScr();
 	for (;;)
 	{

@@ -144,10 +144,9 @@ WORD namecmp(BYTE *name, BYTE *str)
 WORD atol(BYTE *str)
 {
 	WORD i;
-	BYTE c;
 
-	for (i = 0; (c = *str) >= '0' && c <= '9'; str++)
-		i = i * 10 + c - '0';
+	for (i = 0; *str >= '0' && *str <= '9'; str++)
+		i = i * 10 + *str - '0';
 	return i;
 }
 
@@ -360,16 +359,19 @@ void main(BPB0 *bpb0)
 		{
 		case 'F':	/*File*/
 		case 'f':
-			SrcDir = RootDir;
-			end = ReadPath(&bpb, idx, buf, &SrcDir, &DstDir, cmd, addr);
-			if (end == 0)
-				goto errfnf;
-			if (end == addr)
-				break;
-			end = (end + 0x00000FFF) & 0xFFFFF000;		/*调整到4K边界*/
-			*BinAddr++ = addr;
-			*BinAddr++ = end - addr;
-			addr = end;
+			if (BinAddr < BIN_ADDR + 30)	/*15个加载文件限制*/
+			{
+				SrcDir = RootDir;
+				end = ReadPath(&bpb, idx, buf, &SrcDir, &DstDir, cmd, addr);
+				if (end == 0)
+					goto errfnf;
+				if (end == addr)
+					break;
+				end = (end + 0x00000FFF) & 0xFFFFF000;		/*调整到4K边界*/
+				*BinAddr++ = addr;
+				*BinAddr++ = end - addr;
+				addr = end;
+			}
 			break;
 		case 'S':	/*SysDir*/
 		case 's':
@@ -380,7 +382,7 @@ void main(BPB0 *bpb0)
 			*VesaMode = atol(cmd);
 			break;
 		}
-		if (*cp)	/*还有文件*/
+		if (*cp)	/*还有命令*/
 			cmd = cp;
 		else
 		{
