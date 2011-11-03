@@ -17,6 +17,6 @@ Dcui.bin
 Dspeaker.bin
 Duart.bin
 Drep.bin
-Acmd.bin
-;Agui.bin
-;Adesktop.bin
+;Acmd.bin
+Agui.bin
+Adesktop.bin

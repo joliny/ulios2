@@ -7,7 +7,7 @@
 #include "knldef.h"
 
 /*»ŒŒÒ«–ªª*/
-static void SwitchTS()
+void SwitchTS()
 {
 	TSS *CurTss;
 

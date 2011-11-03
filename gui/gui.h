@@ -88,8 +88,11 @@ long SizeGobj(GOBJ_DESC *gobj, long xpos, long ypos, long width, long height, DW
 /*绘制窗体*/
 long PaintGobj(GOBJ_DESC *gobj, long xpos, long ypos, long width, long height);
 
-/*设置窗体为活动窗体(焦点)*/
-long ActiveGobj(GOBJ_DESC *gobj);
+/*设置窗体在顶端*/
+long SetTopGobj(GOBJ_DESC *gobj);
+
+/*设置窗体焦点*/
+long SetFocusGobj(GOBJ_DESC *gobj);
 
 /**********功能库相关**********/
 

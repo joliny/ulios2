@@ -92,6 +92,12 @@ long SendMsg(MESSAGE_DESC *msg)
 	DstThed->MsgCou++;
 	if (DstThed->attr & THED_ATTR_WAITMSG)	/*线程阻塞,等待消息,首先唤醒线程*/
 		wakeup(DstThed);
+	else if (DstThed->MsgCou >= THED_MSG_LEN * 3 / 4 && !(DstThed->attr & THED_ATTR_SLEEP))	/*消息队列将满时切换到目标线程*/
+	{
+		CurPmd = DstProc;
+		DstProc->CurTmd = DstThed;
+		SwitchTS();
+	}
 	sti();
 	return NO_ERROR;
 }

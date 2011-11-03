@@ -71,6 +71,9 @@ typedef struct _PROCESS_DESC
 	FREE_BLK_DESC ufdmt[UFDMT_LEN];	/*用户自由数据区管理表*/
 }PROCESS_DESC;	/*进程结构*/
 
+/*任务切换*/
+void SwitchTS();
+
 /*唤醒线程*/
 void wakeup(THREAD_DESC *thed);
 

@@ -115,10 +115,8 @@ int main()
 	MusId = Read8042();
 	OutMouse(0xF4);	/*允许鼠标发数据*/
 	/*打开中断位*/
-	Cmd8042(0x20);	/*打开键盘鼠标中断位*/
-	code = Read8042();
-	Cmd8042(0x60);
-	Write8042(code | 3);
+	Cmd8042(0x60);	/*发往8042命令寄存器*/
+	Write8042(0x47);	/*打开键盘鼠标中断位*/
 	if ((res = KRegIrq(KBD_IRQ)) != NO_ERROR)	/*注册键盘中断请求号*/
 		return res;
 	if ((res = KRegIrq(MUS_IRQ)) != NO_ERROR)	/*注册鼠标中断请求号*/

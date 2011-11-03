@@ -11,7 +11,7 @@
 void BtnProc(CTRL_BTN *btn)
 {
 	THREAD_ID ptid;
-	KCreateProcess(0, "guitest.bin", NULL, &ptid);
+	KCreateProcess(0, btn->text, NULL, &ptid);
 }
 
 /*桌面消息处理函数*/
@@ -31,11 +31,13 @@ long MainMsgProc(THREAD_ID ptid, DWORD data[MSG_DATA_LEN])
 			args.y = 16;
 			args.style = 0;
 			args.MsgProc = NULL;
-			GCBtnCreate(NULL, &args, dsk->obj.gid, &dsk->obj, "启动guitest", BtnProc);
+			GCBtnCreate(NULL, &args, dsk->obj.gid, &dsk->obj, "guitest.bin", BtnProc);
+			args.y = 40;
+			GCBtnCreate(NULL, &args, dsk->obj.gid, &dsk->obj, "calc.bin", BtnProc);
 		}
 		return NO_ERROR;
 	}
-	return GCWndDefMsgProc(ptid, data);
+	return GCDskDefMsgProc(ptid, data);
 }
 
 int main()

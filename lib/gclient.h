@@ -170,7 +170,8 @@ void GCBtnSetText(CTRL_BTN *btn, const char *text);
 #define WND_STYLE_MAXBTN	0x0008	/*最大化按钮*/
 #define WND_STYLE_MINBTN	0x0010	/*最小化按钮*/
 #define WND_STYLE_SIZEBTN	0x0020	/*拖动缩放按钮*/
-#define WND_STYLE_FOCUS		0x0040	/*焦点状态*/
+
+#define WND_STATE_TOP		0x8000	/*顶端状态*/
 
 typedef struct _CTRL_WND
 {
@@ -225,13 +226,19 @@ void GCTxtSetText(CTRL_TXT *txt, const char *text);
 
 #define SEDT_TXT_LEN		128
 
+#define SEDT_STYLE_RDONLY	0x0001	/*只读*/
+
+#define SEDT_STATE_FOCUS	0x8000	/*焦点状态*/
+
 typedef struct _CTRL_SEDT
 {
 	CTRL_GOBJ obj;
 	char text[SEDT_TXT_LEN];		/*编辑框文本*/
+	char *FstC, *CurC;				/*首字符位置,光标位置*/
+	void (*EnterProc)(struct _CTRL_SEDT *edt);	/*回车处理函数*/
 }CTRL_SEDT;	/*单行编辑框*/
 
-long GCSedtCreate(CTRL_SEDT **edt, const CTRL_ARGS *args, DWORD pid, CTRL_GOBJ *ParGobj, const char *text);
+long GCSedtCreate(CTRL_SEDT **edt, const CTRL_ARGS *args, DWORD pid, CTRL_GOBJ *ParGobj, const char *text, void (*EnterProc)(CTRL_SEDT *edt));
 
 long GCSedtDefMsgProc(THREAD_ID ptid, DWORD data[MSG_DATA_LEN]);
 
@@ -239,5 +246,8 @@ void GCSedtDefDrawProc(CTRL_SEDT *edt);
 
 /*设置单行编辑框文本*/
 void GCSedtSetText(CTRL_SEDT *edt, const char *text);
+
+/*追加单行编辑框文本*/
+void GCSedtAddText(CTRL_SEDT *edt, const char *text);
 
 #endif

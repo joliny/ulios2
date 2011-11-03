@@ -10,6 +10,7 @@ GOBJ_DESC gobjt[GOBJT_LEN], *FstGobj;		/*窗体描述符管理表指针*/
 
 extern GOBJ_DESC *MusInGobj;	/*鼠标移入的窗体*/
 extern GOBJ_DESC *DraggedGobj;	/*被拖拽的窗体*/
+extern GOBJ_DESC *FocusGobj;	/*输入焦点所在窗体*/
 
 /*分配窗体结构*/
 static GOBJ_DESC *AllocGobj()
@@ -50,6 +51,12 @@ static void FreeGobjList(GOBJ_DESC *gobj)
 		data[GUIMSG_GOBJ_ID] = gobj->ClientSign;
 		KUnmapProcAddr(gobj->vbuf, data);
 	}
+	if (MusInGobj == gobj)
+		MusInGobj = NULL;
+	if (DraggedGobj == gobj)
+		DraggedGobj = NULL;
+	if (FocusGobj == gobj)
+		FocusGobj = NULL;
 	FreeGobj(gobj);
 }
 
@@ -105,6 +112,7 @@ long CreateDesktop(THREAD_ID ptid, DWORD ClientSign, DWORD *vbuf, DWORD len)
 	gobj->rect.yend = GDIheight;
 	gobj->vbuf = vbuf;
 	DiscoverRectInter(gobj, 0, 0, GDIwidth, GDIheight);	/*为桌面创建最初的剪切矩形*/
+	FocusGobj = gobj;
 
 	return NO_ERROR;
 }
@@ -112,10 +120,6 @@ long CreateDesktop(THREAD_ID ptid, DWORD ClientSign, DWORD *vbuf, DWORD len)
 /*删除主桌面*/
 long DeleteDesktop(GOBJ_DESC *gobj)
 {
-	if (MusInGobj == gobj)
-		MusInGobj = NULL;
-	if (DraggedGobj == gobj)
-		DraggedGobj = NULL;
 	DeleteClipList(gobj);
 	FreeGobjList(gobj);
 
@@ -170,6 +174,16 @@ long CreateGobj(GOBJ_DESC *ParGobj, THREAD_ID ptid, DWORD ClientSign, long xpos,
 //		DrawGobj(gobj, 0, 0, width - xpos, height - ypos, xpos, ypos, TRUE);
 	}
 	*pgobj = gobj;
+	gobj = gobj->nxt;
+	if (gobj)	/*向失去顶端状态的窗体发消息*/
+	{
+		DWORD data[MSG_DATA_LEN];
+		data[MSG_API_ID] = MSG_ATTR_GUI | GM_SETTOP;
+		data[1] = FALSE;
+		data[GUIMSG_GOBJ_ID] = gobj->ClientSign;
+		data[MSG_RES_ID] = NO_ERROR;
+		KSendMsg(&gobj->ptid, data, 0);
+	}
 
 	return NO_ERROR;
 }
@@ -180,10 +194,6 @@ long DeleteGobj(GOBJ_DESC *gobj)
 	GOBJ_DESC *ParGobj;	/*父节点*/
 	long TmpXpos, TmpYpos, TmpXend, TmpYend, xpos, ypos, res;
 
-	if (MusInGobj == gobj)
-		MusInGobj = NULL;
-	if (DraggedGobj == gobj)
-		DraggedGobj = NULL;
 	res = DeleteClipList(gobj);
 	ParGobj = gobj->par;
 	if (ParGobj->chl == gobj)
@@ -204,6 +214,28 @@ long DeleteGobj(GOBJ_DESC *gobj)
 		CoverRectByPar(ParGobj);	/*覆盖窗体*/
 		GetGobjPos(ParGobj, &xpos, &ypos);
 		DrawGobj(ParGobj, TmpXpos, TmpYpos, TmpXend, TmpYend, xpos, ypos, TRUE);
+	}
+	gobj = ParGobj->chl;	/*向获得顶端状态的窗体发消息*/
+	if (gobj)
+	{
+		DWORD data[MSG_DATA_LEN];
+		data[MSG_API_ID] = MSG_ATTR_GUI | GM_SETTOP;
+		data[1] = TRUE;
+		data[GUIMSG_GOBJ_ID] = gobj->ClientSign;
+		data[MSG_RES_ID] = NO_ERROR;
+		KSendMsg(&gobj->ptid, data, 0);
+	}
+	if (FocusGobj == NULL)	/*向获得焦点的窗体发消息*/
+	{
+		DWORD data[MSG_DATA_LEN];
+		if (gobj == NULL)
+			gobj = ParGobj;
+		FocusGobj = gobj;
+		data[MSG_API_ID] = MSG_ATTR_GUI | GM_SETFOCUS;
+		data[1] = TRUE;
+		data[GUIMSG_GOBJ_ID] = gobj->ClientSign;
+		data[MSG_RES_ID] = NO_ERROR;
+		KSendMsg(&gobj->ptid, data, 0);
 	}
 
 	return NO_ERROR;
@@ -319,14 +351,14 @@ long PaintGobj(GOBJ_DESC *gobj, long xpos, long ypos, long width, long height)
 	return NO_ERROR;
 }
 
-/*设置窗体为活动窗体(焦点)*/
-long ActiveGobj(GOBJ_DESC *gobj)
+/*设置窗体在顶端*/
+long SetTopGobj(GOBJ_DESC *gobj)
 {
 	GOBJ_DESC *ParGobj;	/*父节点*/
 	long xpos, ypos;
 
-	if (gobj->pre == NULL)	/*已经是活动窗体了*/
-		return GUI_ERR_NOCHG_FOCUS;
+	if (gobj->pre == NULL)	/*已经是顶端窗体了*/
+		return GUI_ERR_NOCHG_TOP;
 
 	for (ParGobj = gobj->pre; ParGobj; ParGobj = ParGobj->pre)
 		CoverRectInter(ParGobj, gobj->rect.xpos - ParGobj->rect.xpos, gobj->rect.ypos - ParGobj->rect.ypos, gobj->rect.xend - ParGobj->rect.xpos, gobj->rect.yend - ParGobj->rect.ypos);
@@ -343,6 +375,74 @@ long ActiveGobj(GOBJ_DESC *gobj)
 	CoverRectByPar(gobj);	/*覆盖窗体*/
 	GetGobjPos(gobj, &xpos, &ypos);
 	DrawGobj(gobj, 0, 0, gobj->rect.xend - gobj->rect.xpos, gobj->rect.yend - gobj->rect.ypos, xpos, ypos, TRUE);
+	{
+		DWORD data[MSG_DATA_LEN];
+		gobj = gobj->nxt;	/*向失去顶端状态的窗体发消息*/
+		data[MSG_API_ID] = MSG_ATTR_GUI | GM_SETTOP;
+		data[1] = FALSE;
+		data[GUIMSG_GOBJ_ID] = gobj->ClientSign;
+		data[MSG_RES_ID] = NO_ERROR;
+		KSendMsg(&gobj->ptid, data, 0);
+	}
+
+	return NO_ERROR;
+}
+
+/*设置窗体焦点*/
+long SetFocusGobj(GOBJ_DESC *gobj)
+{
+	GOBJ_DESC *ParGobj, *FinalGobj = NULL;	/*循环父窗体,最终被绘制窗体*/
+	long xpos, ypos;
+
+	if (gobj == FocusGobj)	/*已经是焦点窗体了*/
+		return GUI_ERR_NOCHG_FOCUS;
+
+	for (ParGobj = gobj; ParGobj; ParGobj = ParGobj->par)
+	{
+		GOBJ_DESC *TmpGobj;	/*临时节点*/
+		if (ParGobj->pre == NULL)
+			continue;
+		for (TmpGobj = ParGobj->pre; TmpGobj; TmpGobj = TmpGobj->pre)
+			CoverRectInter(TmpGobj, ParGobj->rect.xpos - TmpGobj->rect.xpos, ParGobj->rect.ypos - TmpGobj->rect.ypos, ParGobj->rect.xend - TmpGobj->rect.xpos, ParGobj->rect.yend - TmpGobj->rect.ypos);
+		TmpGobj = ParGobj->par;
+		ParGobj->pre->nxt = ParGobj->nxt;
+		if (ParGobj->nxt)
+			ParGobj->nxt->pre = ParGobj->pre;
+		TmpGobj->chl->pre = ParGobj;
+		ParGobj->nxt = TmpGobj->chl;
+		ParGobj->pre = NULL;
+		TmpGobj->chl = ParGobj;
+		DeleteClipList(ParGobj);
+		DiscoverRectInter(ParGobj, 0, 0, ParGobj->rect.xend - ParGobj->rect.xpos, ParGobj->rect.yend - ParGobj->rect.ypos);	/*显露新窗体*/
+		CoverRectByPar(ParGobj);	/*覆盖窗体*/
+		FinalGobj = ParGobj;
+		{
+			DWORD data[MSG_DATA_LEN];
+			data[MSG_API_ID] = MSG_ATTR_GUI | GM_SETTOP;	/*向获得顶端状态的窗体发消息*/
+			data[MSG_RES_ID] = NO_ERROR;
+			data[1] = TRUE;
+			data[GUIMSG_GOBJ_ID] = ParGobj->ClientSign;
+			KSendMsg(&ParGobj->ptid, data, 0);
+			TmpGobj = ParGobj->nxt;	/*向失去顶端状态的窗体发消息*/
+			data[1] = FALSE;
+			data[GUIMSG_GOBJ_ID] = TmpGobj->ClientSign;
+			KSendMsg(&TmpGobj->ptid, data, 0);
+		}
+	}
+	if (FinalGobj)
+	{
+		GetGobjPos(FinalGobj, &xpos, &ypos);
+		DrawGobj(FinalGobj, 0, 0, FinalGobj->rect.xend - FinalGobj->rect.xpos, FinalGobj->rect.yend - FinalGobj->rect.ypos, xpos, ypos, TRUE);
+	}
+	{	/*向失去焦点的窗体发消息*/
+		DWORD data[MSG_DATA_LEN];
+		data[MSG_API_ID] = MSG_ATTR_GUI | GM_SETFOCUS;
+		data[1] = FALSE;
+		data[GUIMSG_GOBJ_ID] = FocusGobj->ClientSign;
+		data[MSG_RES_ID] = NO_ERROR;
+		KSendMsg(&FocusGobj->ptid, data, 0);
+	}
+	FocusGobj = gobj;
 
 	return NO_ERROR;
 }
