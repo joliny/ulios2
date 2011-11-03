@@ -23,9 +23,10 @@
 #define GUI_ERR_HAVENO_VBUF		-2570	/*显示缓冲不存在*/
 #define GUI_ERR_WRONG_VBUF		-2571	/*显示缓冲错误*/
 #define GUI_ERR_WRONG_ARGS		-2572	/*参数错误*/
-#define GUI_ERR_NOCHG_FOCUS		-2573	/*焦点无变化*/
-#define GUI_ERR_BEING_DRAGGED	-2574	/*有窗体正在被拖拽*/
-#define GUI_ERR_WRONG_VESAMODE	-2575	/*VESA显卡显示模式错误*/
+#define GUI_ERR_NOCHG_TOP		-2573	/*顶端状态无变化*/
+#define GUI_ERR_NOCHG_FOCUS		-2574	/*焦点无变化*/
+#define GUI_ERR_BEING_DRAGGED	-2575	/*有窗体正在被拖拽*/
+#define GUI_ERR_WRONG_VESAMODE	-2576	/*VESA显卡显示模式错误*/
 
 #define SRV_GUI_PORT		10	/*GUI服务端口*/
 
@@ -39,29 +40,32 @@
 #define GM_MOVE			0x03	/*移动窗体*/
 #define GM_SIZE			0x04	/*缩放窗体*/
 #define GM_PAINT		0x05	/*绘制窗体*/
-#define GM_SETFOCUS		0x06	/*焦点消息*/
-#define GM_DRAG			0x07	/*拖拽消息*/
+#define GM_SETTOP		0x06	/*顶端消息*/
+#define GM_SETFOCUS		0x07	/*焦点消息*/
+#define GM_DRAG			0x08	/*拖拽消息*/
 
 #define GM_DRAGMOD_NONE	0		/*取消拖拽模式*/
 #define GM_DRAGMOD_MOVE	1		/*拖拽移动模式*/
 #define GM_DRAGMOD_SIZE	2		/*拖拽缩放模式*/
 
-#define GM_MOUSEENTER	0x10	/*鼠标移入*/
-#define GM_MOUSELEAVE	0x11	/*鼠标移出*/
-#define GM_MOUSEMOVE	0x12	/*鼠标移动*/
-#define GM_LBUTTONDOWN	0x13	/*左键按下*/
-#define GM_RBUTTONDOWN	0x14	/*右键按下*/
-#define GM_MBUTTONDOWN	0x15	/*中键按下*/
-#define GM_LBUTTONUP	0x16	/*左键抬起*/
-#define GM_RBUTTONUP	0x17	/*右键抬起*/
-#define GM_MBUTTONUP	0x18	/*中键抬起*/
-#define GM_LBUTTONCLICK	0x19	/*左键单击*/
-#define GM_RBUTTONCLICK	0x1A	/*右键单击*/
-#define GM_MBUTTONCLICK	0x1B	/*中键单击*/
-#define GM_LBUTTONDBCLK	0x1C	/*左键双击*/
-#define GM_RBUTTONDBCLK	0x1D	/*右键双击*/
-#define GM_MBUTTONDBCLK	0x1E	/*中键双击*/
-#define GM_MOUSEWHEEL	0x1F	/*鼠标滚轮*/
+#define GM_MOUSEENTER	0x80	/*鼠标移入*/
+#define GM_MOUSELEAVE	0x81	/*鼠标移出*/
+#define GM_MOUSEMOVE	0x82	/*鼠标移动*/
+#define GM_LBUTTONDOWN	0x83	/*左键按下*/
+#define GM_RBUTTONDOWN	0x84	/*右键按下*/
+#define GM_MBUTTONDOWN	0x85	/*中键按下*/
+#define GM_LBUTTONUP	0x86	/*左键抬起*/
+#define GM_RBUTTONUP	0x87	/*右键抬起*/
+#define GM_MBUTTONUP	0x88	/*中键抬起*/
+#define GM_LBUTTONCLICK	0x89	/*左键单击*/
+#define GM_RBUTTONCLICK	0x8A	/*右键单击*/
+#define GM_MBUTTONCLICK	0x8B	/*中键单击*/
+#define GM_LBUTTONDBCLK	0x8C	/*左键双击*/
+#define GM_RBUTTONDBCLK	0x8D	/*右键双击*/
+#define GM_MBUTTONDBCLK	0x8E	/*中键双击*/
+#define GM_MOUSEWHEEL	0x8F	/*鼠标滚轮*/
+
+#define GM_KEY			0xA0	/*按键消息*/
 
 #define GM_UNMAPVBUF	0x0100	/*撤销显示缓冲映射*/
 
@@ -137,12 +141,20 @@ static inline long GUIpaint(THREAD_ID ptid, DWORD gid, short x, short y, WORD wi
 	return KSendMsg(&ptid, data, 0);
 }
 
+/*设置窗体在顶端*/
+static inline long GUISetTop(THREAD_ID ptid, DWORD gid)
+{
+	DWORD data[MSG_DATA_LEN];
+	data[MSG_API_ID] = MSG_ATTR_GUI | GM_SETTOP;
+	data[GUIMSG_GOBJ_ID] = gid;
+	return KSendMsg(&ptid, data, 0);
+}
+
 /*设置窗体焦点*/
-static inline long GUISetFocus(THREAD_ID ptid, DWORD gid, BOOL isFocus)
+static inline long GUISetFocus(THREAD_ID ptid, DWORD gid)
 {
 	DWORD data[MSG_DATA_LEN];
 	data[MSG_API_ID] = MSG_ATTR_GUI | GM_SETFOCUS;
-	data[1] = isFocus;
 	data[GUIMSG_GOBJ_ID] = gid;
 	return KSendMsg(&ptid, data, 0);
 }

@@ -4,7 +4,6 @@
 	最后修改日期：2010-12-11
 */
 
-#include "../fs/fsapi.h"
 #include "../lib/malloc.h"
 #include "../lib/gclient.h"
 
@@ -29,7 +28,7 @@ long MainMsgProc(THREAD_ID ptid, DWORD data[MSG_DATA_LEN])
 			args.MsgProc = NULL;
 			GCTxtCreate(&txt, &args, wnd->obj.gid, &wnd->obj, "hello ulios2 gui");
 			args.y += 20;
-			GCSedtCreate(&edt, &args, wnd->obj.gid, &wnd->obj, "hello");
+			GCSedtCreate(&edt, &args, wnd->obj.gid, &wnd->obj, "hello", NULL);
 		}
 		break;
 	case GM_SIZE:

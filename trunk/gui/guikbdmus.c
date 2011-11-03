@@ -20,10 +20,21 @@ GOBJ_DESC *DraggedGobj;	/*被拖拽的窗体*/
 long DragX, DragY;		/*拖拽位置差*/
 DWORD DragMode;			/*拖拽模式*/
 
+GOBJ_DESC *FocusGobj;	/*输入焦点所在窗体*/
+
 /*键盘消息处理*/
 void KeyboardProc(DWORD key)
 {
+	DWORD data[MSG_DATA_LEN];
 
+	if (FocusGobj)
+	{
+		data[MSG_API_ID] = MSG_ATTR_GUI | GM_KEY;	/*按键消息*/
+		data[1] = key;
+		data[GUIMSG_GOBJ_ID] = FocusGobj->ClientSign;
+		data[MSG_RES_ID] = NO_ERROR;
+		KSendMsg(&FocusGobj->ptid, data, 0);
+	}
 }
 
 /*鼠标初始化*/

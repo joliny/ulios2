@@ -58,17 +58,6 @@ void ApiCreate(DWORD *argv)
 		argv[MSG_API_ID] = MSG_ATTR_GUI | GM_CREATE;
 		KSendMsg((THREAD_ID*)&argv[PTID_ID], argv, 0);
 	}
-	if (argv[MSG_RES_ID] == NO_ERROR)
-	{
-		gobj = gobj->nxt;	/*向失去焦点的窗体发消息*/
-		if (gobj)
-		{
-			argv[MSG_API_ID] = MSG_ATTR_GUI | GM_SETFOCUS;
-			argv[1] = FALSE;
-			argv[GUIMSG_GOBJ_ID] = gobj->ClientSign;
-			KSendMsg(&gobj->ptid, argv, 0);
-		}
-	}
 }
 
 void ApiDestroy(DWORD *argv)
@@ -93,17 +82,6 @@ void ApiDestroy(DWORD *argv)
 	else
 		argv[MSG_RES_ID] = GUI_ERR_INVALID_GOBJID;
 	KSendMsg((THREAD_ID*)&argv[PTID_ID], argv, 0);
-	if (argv[MSG_RES_ID] == NO_ERROR && ParGobj)
-	{
-		gobj = ParGobj->chl;	/*向得到焦点的窗体发消息*/
-		if (gobj)
-		{
-			argv[MSG_API_ID] = MSG_ATTR_GUI | GM_SETFOCUS;
-			argv[1] = TRUE;
-			argv[GUIMSG_GOBJ_ID] = gobj->ClientSign;
-			KSendMsg(&gobj->ptid, argv, 0);
-		}
-	}
 }
 
 void ApiMove(DWORD *argv)
@@ -160,7 +138,7 @@ void ApiPaint(DWORD *argv)
 		PaintGobj(gobj, (short)argv[1], (short)(argv[1] >> 16), (short)argv[2], (short)(argv[2] >> 16));	/*不反馈消息*/
 }
 
-void ApiActive(DWORD *argv)
+void ApiSetTop(DWORD *argv)
 {
 	GOBJ_DESC *gobj = NULL;
 
@@ -172,22 +150,38 @@ void ApiActive(DWORD *argv)
 	}
 	if (argv[GUIMSG_GOBJ_ID] < GOBJT_LEN && ((THREAD_ID*)&argv[PTID_ID])->ProcID == (gobj = &gobjt[argv[GUIMSG_GOBJ_ID]])->ptid.ProcID)	/*检查窗体ID有效,窗体有效,进程访问自身的窗体*/
 	{
-		if ((argv[MSG_RES_ID] = ActiveGobj(gobj)) == NO_ERROR)
+		if ((argv[MSG_RES_ID] = SetTopGobj(gobj)) == NO_ERROR)
+		{
+			argv[1] = TRUE;
 			argv[GUIMSG_GOBJ_ID] = gobj->ClientSign;
+		}
 	}
 	else
 		argv[MSG_RES_ID] = GUI_ERR_INVALID_GOBJID;
 	KSendMsg((THREAD_ID*)&argv[PTID_ID], argv, 0);
-	if (argv[MSG_RES_ID] == NO_ERROR)
+}
+
+void ApiSetFocus(DWORD *argv)
+{
+	GOBJ_DESC *gobj = NULL;
+
+	if ((argv[MSG_ATTR_ID] & MSG_MAP_MASK) == MSG_ATTR_ROMAP)
 	{
-		gobj = gobj->nxt;	/*向失去焦点的窗体发消息*/
-		if (gobj)
+		argv[MSG_RES_ID] = GUI_ERR_WRONG_ARGS;
+		KUnmapProcAddr((void*)argv[MSG_ADDR_ID], argv);
+		return;
+	}
+	if (argv[GUIMSG_GOBJ_ID] < GOBJT_LEN && ((THREAD_ID*)&argv[PTID_ID])->ProcID == (gobj = &gobjt[argv[GUIMSG_GOBJ_ID]])->ptid.ProcID)	/*检查窗体ID有效,窗体有效,进程访问自身的窗体*/
+	{
+		if ((argv[MSG_RES_ID] = SetFocusGobj(gobj)) == NO_ERROR)
 		{
-			argv[1] = FALSE;
+			argv[1] = TRUE;
 			argv[GUIMSG_GOBJ_ID] = gobj->ClientSign;
-			KSendMsg(&gobj->ptid, argv, 0);
 		}
 	}
+	else
+		argv[MSG_RES_ID] = GUI_ERR_INVALID_GOBJID;
+	KSendMsg((THREAD_ID*)&argv[PTID_ID], argv, 0);
 }
 
 void ApiDrag(DWORD *argv)
@@ -206,7 +200,7 @@ void ApiDrag(DWORD *argv)
 
 /*系统调用表*/
 void (*ApiTable[])(DWORD *argv) = {
-	ApiGetGinfo, ApiCreate, ApiDestroy, ApiMove, ApiSize, ApiPaint, ApiActive, ApiDrag
+	ApiGetGinfo, ApiCreate, ApiDestroy, ApiMove, ApiSize, ApiPaint, ApiSetTop, ApiSetFocus, ApiDrag
 };
 
 /*初始化GUI,如果不成功必须退出*/

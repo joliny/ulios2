@@ -763,7 +763,7 @@ long GCWndCreate(CTRL_WND **wnd, const CTRL_ARGS *args, DWORD pid, CTRL_GOBJ *Pa
 		return res;
 	}
 	NewWnd->obj.type = GC_CTRL_TYPE_WINDOW;
-	NewWnd->obj.style |= WND_STYLE_FOCUS;
+	NewWnd->obj.style |= WND_STATE_TOP;
 	NewWnd->size = NewWnd->min = NewWnd->max = NewWnd->close = NULL;
 	if (NewWnd->obj.style & WND_STYLE_CAPTION)	/*有标题栏*/
 	{
@@ -900,14 +900,14 @@ long GCWndDefMsgProc(THREAD_ID ptid, DWORD data[MSG_DATA_LEN])
 			wnd->height0 = wnd->obj.uda.height;
 		}
 		break;
-	case GM_SETFOCUS:
+	case GM_SETTOP:
 		if (data[1])
-			wnd->obj.style |= WND_STYLE_FOCUS;
+			wnd->obj.style |= WND_STATE_TOP;
 		else
-			wnd->obj.style &= (~WND_STYLE_FOCUS);
+			wnd->obj.style &= (~WND_STATE_TOP);
 		if (wnd->obj.style & WND_STYLE_CAPTION)	/*有标题栏*/
 		{
-			if (wnd->obj.style & WND_STYLE_FOCUS)
+			if (wnd->obj.style & WND_STATE_TOP)
 				FillGradRect(&wnd->obj.uda, WND_BORDER_WIDTH, 0, wnd->obj.uda.width - WND_BORDER_WIDTH * 2, WND_CAP_HEIGHT, COL_CAP_GRADLIGHT, COL_CAP_GRADDARK);	/*绘制标题栏*/
 			else
 				FillGradRect(&wnd->obj.uda, WND_BORDER_WIDTH, 0, wnd->obj.uda.width - WND_BORDER_WIDTH * 2, WND_CAP_HEIGHT, COL_CAP_NOFCLIGHT, COL_CAP_NOFCDARK);	/*绘制无焦标题栏*/
@@ -930,11 +930,11 @@ long GCWndDefMsgProc(THREAD_ID ptid, DWORD data[MSG_DATA_LEN])
 	case GM_LBUTTONDOWN:
 		if (wnd->obj.style & WND_STYLE_CAPTION && (data[5] >> 16) < WND_CAP_HEIGHT)	/*单击标题拖动窗口*/
 			GUIdrag(GCGuiPtid, wnd->obj.gid, GM_DRAGMOD_MOVE);
-		if (!(wnd->obj.style & WND_STYLE_FOCUS))
-			GUISetFocus(GCGuiPtid, wnd->obj.gid, TRUE);
+		if (!(wnd->obj.style & WND_STATE_TOP))
+			GUISetTop(GCGuiPtid, wnd->obj.gid);
 		break;
 	case GM_LBUTTONDBCLK:
-		if (wnd->obj.style & WND_STYLE_CAPTION && (data[5] >> 16) < WND_CAP_HEIGHT)	/*双击标题缩放窗口*/
+		if ((wnd->obj.style & (WND_STYLE_CAPTION | WND_STYLE_MAXBTN)) == (WND_STYLE_CAPTION | WND_STYLE_MAXBTN) && (data[5] >> 16) < WND_CAP_HEIGHT)	/*双击标题缩放窗口*/
 			WndMaxOrNormal(wnd);
 		break;
 	case GM_CLOSE:
@@ -949,7 +949,7 @@ void GCWndDefDrawProc(CTRL_WND *wnd)
 {
 	if (wnd->obj.style & WND_STYLE_CAPTION)	/*有标题栏*/
 	{
-		if (wnd->obj.style & WND_STYLE_FOCUS)
+		if (wnd->obj.style & WND_STATE_TOP)
 			FillGradRect(&wnd->obj.uda, 0, 0, wnd->obj.uda.width, WND_CAP_HEIGHT, COL_CAP_GRADLIGHT, COL_CAP_GRADDARK);	/*绘制标题栏*/
 		else
 			FillGradRect(&wnd->obj.uda, 0, 0, wnd->obj.uda.width, WND_CAP_HEIGHT, COL_CAP_NOFCLIGHT, COL_CAP_NOFCDARK);	/*绘制无焦标题栏*/
@@ -977,7 +977,7 @@ void GCWndSetCaption(CTRL_WND *wnd, const char *caption)
 		wnd->caption[0] = 0;
 	if (wnd->obj.style & WND_STYLE_CAPTION)	/*有标题栏*/
 	{
-		if (wnd->obj.style & WND_STYLE_FOCUS)
+		if (wnd->obj.style & WND_STATE_TOP)
 			FillGradRect(&wnd->obj.uda, WND_BORDER_WIDTH, 0, wnd->obj.uda.width - WND_BORDER_WIDTH * 2, WND_CAP_HEIGHT, COL_CAP_GRADLIGHT, COL_CAP_GRADDARK);	/*绘制标题栏*/
 		else
 			FillGradRect(&wnd->obj.uda, WND_BORDER_WIDTH, 0, wnd->obj.uda.width - WND_BORDER_WIDTH * 2, WND_CAP_HEIGHT, COL_CAP_NOFCLIGHT, COL_CAP_NOFCDARK);	/*绘制无焦标题栏*/
@@ -1142,8 +1142,8 @@ long GCBtnDefMsgProc(THREAD_ID ptid, DWORD data[MSG_DATA_LEN])
 		{
 			btn->isPressDown = FALSE;
 			if (btn->PressProc)
-				btn->PressProc(btn);
-		}
+				btn->PressProc(btn);	/*执行按钮功能*/
+		}	/*继续绘制按钮*/
 	case GM_MOUSEENTER:	/*鼠标进入状态*/
 		BtnDrawButton(&btn->obj.uda, 0, 0, btn->obj.uda.width, btn->obj.uda.height, COL_ABTN_GRADLIGHT, COL_ABTN_GRADDARK, COL_BTN_BORDER, btn->text, COL_TEXT_DARK);	/*绘制按钮*/
 		GUIpaint(GCGuiPtid, btn->obj.gid, 0, 0, btn->obj.uda.width, btn->obj.uda.height);
@@ -1237,7 +1237,7 @@ void GCTxtSetText(CTRL_TXT *txt, const char *text)
 /**********单行编辑框**********/
 
 /*创建单行编辑框*/
-long GCSedtCreate(CTRL_SEDT **edt, const CTRL_ARGS *args, DWORD pid, CTRL_GOBJ *ParGobj, const char *text)
+long GCSedtCreate(CTRL_SEDT **edt, const CTRL_ARGS *args, DWORD pid, CTRL_GOBJ *ParGobj, const char *text, void (*EnterProc)(CTRL_SEDT *edt))
 {
 	CTRL_SEDT *NewEdt;
 	long res;
@@ -1257,37 +1257,147 @@ long GCSedtCreate(CTRL_SEDT **edt, const CTRL_ARGS *args, DWORD pid, CTRL_GOBJ *
 	}
 	else
 		NewEdt->text[0] = 0;
+	NewEdt->CurC = NewEdt->FstC = NewEdt->text;
+	NewEdt->EnterProc = EnterProc;
 	if (edt)
 		*edt = NewEdt;
 	return NO_ERROR;
 }
 
+/*单行编辑框文本区绘制*/
+static void SedtDrawText(CTRL_SEDT *edt)
+{
+	GCFillRect(&edt->obj.uda, 1, (edt->obj.uda.height - (long)GCCharHeight) / 2, edt->obj.uda.width - 2, GCCharHeight, COL_BTN_GRADLIGHT);	/*底色*/
+	GCDrawStr(&edt->obj.uda, 1, (edt->obj.uda.height - (long)GCCharHeight) / 2, edt->FstC, COL_TEXT_DARK);
+	if (edt->obj.style & SEDT_STATE_FOCUS)	/*获得焦点时才显示光标*/
+		GCFillRect(&edt->obj.uda, 1 + (edt->CurC - edt->FstC) * GCCharWidth, (edt->obj.uda.height - (long)GCCharHeight) / 2, 2, GCCharHeight, COL_TEXT_DARK);	/*光标*/
+	GUIpaint(GCGuiPtid, edt->obj.gid, 1, (edt->obj.uda.height - (long)GCCharHeight) / 2, edt->obj.uda.width - 2, GCCharHeight);
+}
+
 /*单行编辑框消息处理*/
 long GCSedtDefMsgProc(THREAD_ID ptid, DWORD data[MSG_DATA_LEN])
 {
+	CTRL_SEDT *edt = (CTRL_SEDT*)data[GUIMSG_GOBJ_ID];
+	switch (data[MSG_API_ID] & MSG_API_MASK)
+	{
+	case GM_SETFOCUS:
+		if (data[1])
+			edt->obj.style |= SEDT_STATE_FOCUS;
+		else
+			edt->obj.style &= (~SEDT_STATE_FOCUS);
+		break;
+	case GM_LBUTTONDOWN:	/*鼠标按下*/
+		if (!(edt->obj.style & SEDT_STATE_FOCUS))
+			GUISetFocus(GCGuiPtid, edt->obj.gid);
+		{
+			DWORD len;
+			len = ((data[5] & 0xFFFF) - 1) / GCCharWidth;
+			for (edt->CurC = edt->FstC; *edt->CurC; edt->CurC++, len--)
+				if (len == 0)
+					break;
+		}
+		break;
+	case GM_KEY:	/*按键*/
+		switch (data[1] & 0xFF)
+		{
+		case '\b':	/*退格键*/
+			if (edt->CurC > edt->text)	/*光标前还有字符*/
+			{
+				strcpy(edt->CurC - 1, edt->CurC);	/*移动字符串*/
+				edt->CurC--;	/*移动光标*/
+				if (edt->FstC > edt->text)
+					edt->FstC--;	/*移动首字符*/
+			}
+			break;
+		case '\r':	/*回车键*/
+			if (edt->EnterProc)
+				edt->EnterProc(edt);	/*执行回车动作*/
+			break;
+		case '\0':	/*无可显符号按键*/
+			switch ((data[1] >> 8) & 0xFF)
+			{
+			case 0x4B:	/*左箭头*/
+				if (edt->CurC > edt->text)
+				{
+					edt->CurC--;	/*移动光标*/
+					if (edt->FstC > edt->CurC)
+						edt->FstC = edt->CurC;	/*移动首字符*/
+				}
+				break;
+			case 0x4D:	/*右箭头*/
+				if (*edt->CurC != '\0')
+				{
+					DWORD len;
+					len = (edt->obj.uda.width - 4) / GCCharWidth;	/*计算框内可显示字符数*/
+					edt->CurC++;	/*移动光标*/
+					if (edt->FstC < edt->CurC - len)
+						edt->FstC = edt->CurC - len;	/*移动首字符*/
+				}
+				break;
+			case 0x47:	/*HOME键*/
+				edt->CurC = edt->FstC = edt->text;
+				break;
+			case 0x4F:	/*END键*/
+				{
+					DWORD len;
+					len = strlen(edt->text);
+					edt->CurC = edt->text + len;	/*移动光标*/
+					len = (edt->obj.uda.width - 4) / GCCharWidth;	/*计算框内可显示字符数*/
+					if (edt->FstC < edt->CurC - len)
+						edt->FstC = edt->CurC - len;	/*移动首字符*/
+				}
+				break;
+			case 0x53:	/*DELETE键*/
+				if (*edt->CurC != '\0')
+					strcpy(edt->CurC, edt->CurC + 1);	/*移动字符串*/
+				if (strlen(edt->FstC) < (edt->obj.uda.width - 4) / GCCharWidth && edt->FstC > edt->text)
+					edt->FstC--;	/*移动首字符*/
+				break;
+			}
+			break;
+		default:	/*其它字符插入缓冲*/
+			{
+				DWORD len;
+				len = strlen(edt->text);
+				if (len < SEDT_TXT_LEN - 1)	/*缓冲没满*/
+				{
+					char *strp;
+					strp = edt->text + len + 1;
+					do
+						*strp = *(strp - 1);
+					while (--strp > edt->CurC);	/*反向搬移字符*/
+					*edt->CurC = (char)(BYTE)data[1];
+					edt->CurC++;	/*移动光标*/
+					len = (edt->obj.uda.width - 4) / GCCharWidth;	/*计算框内可显示字符数*/
+					if (edt->FstC < edt->CurC - len)
+						edt->FstC = edt->CurC - len;	/*移动首字符*/
+				}
+			}
+		}
+		break;
+	}
+	SedtDrawText(edt);
 	return NO_ERROR;
-}
-
-/*按钮单行编辑框*/
-static void SedtDrawSLEdit(UDI_AREA *uda, long x, long y, long w, long h, DWORD c, DWORD bc, const char *text, DWORD tc)
-{
-	GCFillRect(uda, x, y, w, 1, bc);	/*上边框*/
-	GCFillRect(uda, x, y + h - 1, w, 1, bc);	/*下边框*/
-	GCFillRect(uda, x, y + 1, 1, h - 2, bc);	/*左边框*/
-	GCFillRect(uda, x + w - 1, y + 1, 1, h - 2, bc);	/*右边框*/
-	GCFillRect(uda, x + 1, y + 1, w - 2, h - 2, c);	/*底色*/
-	GCDrawStr(uda, x + 1, y + (h - (long)GCCharHeight) / 2, text, tc);
 }
 
 /*单行编辑框绘制处理*/
 void GCSedtDefDrawProc(CTRL_SEDT *edt)
 {
-	SedtDrawSLEdit(&edt->obj.uda, 0, 0, edt->obj.uda.width, edt->obj.uda.height, COL_BTN_GRADLIGHT, COL_BTN_BORDER, edt->text, COL_TEXT_DARK);	/*绘制按钮*/
+	GCFillRect(&edt->obj.uda, 0, 0, edt->obj.uda.width, 1, COL_BTN_BORDER);	/*上边框*/
+	GCFillRect(&edt->obj.uda, 0, edt->obj.uda.height - 1, edt->obj.uda.width, 1, COL_BTN_BORDER);	/*下边框*/
+	GCFillRect(&edt->obj.uda, 0, 1, 1, edt->obj.uda.height - 2, COL_BTN_BORDER);	/*左边框*/
+	GCFillRect(&edt->obj.uda, edt->obj.uda.width - 1, 1, 1, edt->obj.uda.height - 2, COL_BTN_BORDER);	/*右边框*/
+	GCFillRect(&edt->obj.uda, 1, 1, edt->obj.uda.width - 2, edt->obj.uda.height - 2, (edt->obj.style & SEDT_STYLE_RDONLY) ? COL_BTN_GRADDARK : COL_BTN_GRADLIGHT);	/*底色*/
+	GCDrawStr(&edt->obj.uda, 1, (edt->obj.uda.height - (long)GCCharHeight) / 2, edt->FstC, COL_TEXT_DARK);	/*文本*/
+	if (edt->obj.style & SEDT_STATE_FOCUS)	/*获得焦点时才显示光标*/
+		GCFillRect(&edt->obj.uda, 1 + (edt->CurC - edt->FstC) * GCCharWidth, (edt->obj.uda.height - (long)GCCharHeight) / 2, 2, GCCharHeight, COL_TEXT_DARK);	/*光标*/
 }
 
 /*设置单行编辑框文本*/
 void GCSedtSetText(CTRL_SEDT *edt, const char *text)
 {
+	DWORD len;
+
 	if (text)
 	{
 		strncpy(edt->text, text, SEDT_TXT_LEN - 1);
@@ -1295,5 +1405,28 @@ void GCSedtSetText(CTRL_SEDT *edt, const char *text)
 	}
 	else
 		edt->text[0] = 0;
+	len = strlen(edt->text);
+	edt->CurC = edt->text + len;	/*移动光标*/
+	len = (edt->obj.uda.width - 4) / GCCharWidth;	/*计算框内可显示字符数*/
+	if (edt->FstC < edt->CurC - len)
+		edt->FstC = edt->CurC - len;	/*移动首字符*/
+	GCGobjDraw(&edt->obj);
+}
+
+/*追加单行编辑框文本*/
+void GCSedtAddText(CTRL_SEDT *edt, const char *text)
+{
+	DWORD len;
+
+	if (text == NULL)
+		return;
+	len = strlen(edt->text);
+	strncpy(edt->text + len, text, SEDT_TXT_LEN - 1 - len);	/*追加字符串*/
+	edt->text[SEDT_TXT_LEN - 1] = 0;
+	len += strlen(edt->text + len);
+	edt->CurC = edt->text + len;	/*移动光标*/
+	len = (edt->obj.uda.width - 4) / GCCharWidth;	/*计算框内可显示字符数*/
+	if (edt->FstC < edt->CurC - len)
+		edt->FstC = edt->CurC - len;	/*移动首字符*/
 	GCGobjDraw(&edt->obj);
 }

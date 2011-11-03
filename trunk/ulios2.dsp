@@ -125,6 +125,10 @@ DEP_CPP_FONT_=\
 # End Source File
 # Begin Source File
 
+SOURCE=.\driver\kbdmus.c
+# End Source File
+# Begin Source File
+
 SOURCE=.\driver\Makefile
 # End Source File
 # Begin Source File
@@ -565,6 +569,10 @@ DEP_CPP_3DLIN=\
 	".\lib\gdi.h"\
 	".\MkApi\ulimkapi.h"\
 	
+# End Source File
+# Begin Source File
+
+SOURCE=.\apps\calc.c
 # End Source File
 # Begin Source File
 
