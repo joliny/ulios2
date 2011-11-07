@@ -53,7 +53,7 @@ clean :
 	$(LD) $(LDFLAGS) -o $@ $(HEADOBJ) ../objs/font.o
 
 ../out/ulios/cui.bin : ../objs/cui.o $(HEADOBJ) $(LDFILE)
-	$(LD) $(LDFLAGS) -o $@ $(HEADOBJ) ../objs/cui.o ../objs/gdi.o
+	$(LD) $(LDFLAGS) -o $@ $(HEADOBJ) ../objs/cui.o ../objs/gdi.o ../objs/malloc.o ../objs/gclient.o
 
 ../out/ulios/rep.bin : ../objs/rep.o $(HEADOBJ) $(LDFILE)
 	$(LD) $(LDFLAGS) -o $@ $(HEADOBJ) ../objs/rep.o
@@ -82,7 +82,7 @@ clean :
 ../objs/font.o : font.c $(HEADS) ../fs/fsapi.h
 	$(CC) $(CFLAGS) -o $@ $<
 
-../objs/cui.o : cui.c $(HEADS) ../lib/gdi.h
+../objs/cui.o : cui.c $(HEADS) ../lib/gdi.h ../lib/gdi.h ../lib/malloc.h ../lib/gclient.h
 	$(CC) $(CFLAGS) -o $@ $<
 
 ../objs/rep.o : rep.c $(HEADS)

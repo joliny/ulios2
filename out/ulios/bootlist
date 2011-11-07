@@ -13,10 +13,10 @@ V276
 Dkbdmus.bin
 Dvesa.bin
 Dfont.bin
-Dcui.bin
 Dspeaker.bin
 Duart.bin
+Dgui.bin
+Ddesktop.bin
+Dcui.bin
 Drep.bin
 ;Acmd.bin
-Agui.bin
-Adesktop.bin

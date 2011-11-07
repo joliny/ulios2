@@ -8,10 +8,16 @@
 #include "../lib/malloc.h"
 #include "../lib/gclient.h"
 
-void BtnProc(CTRL_BTN *btn)
+void CmdProc(CTRL_BTN *btn)
 {
 	THREAD_ID ptid;
-	KCreateProcess(0, btn->text, NULL, &ptid);
+	KCreateProcess(0, "cmd.bin", NULL, &ptid);
+}
+
+void GmgrProc(CTRL_BTN *btn)
+{
+	THREAD_ID ptid;
+	KCreateProcess(0, "gmgr.bin", NULL, &ptid);
 }
 
 /*桌面消息处理函数*/
@@ -31,9 +37,9 @@ long MainMsgProc(THREAD_ID ptid, DWORD data[MSG_DATA_LEN])
 			args.y = 16;
 			args.style = 0;
 			args.MsgProc = NULL;
-			GCBtnCreate(NULL, &args, dsk->obj.gid, &dsk->obj, "guitest.bin", BtnProc);
+			GCBtnCreate(NULL, &args, dsk->obj.gid, &dsk->obj, "命令提示符", CmdProc);
 			args.y = 40;
-			GCBtnCreate(NULL, &args, dsk->obj.gid, &dsk->obj, "calc.bin", BtnProc);
+			GCBtnCreate(NULL, &args, dsk->obj.gid, &dsk->obj, "资源管理器", GmgrProc);
 		}
 		return NO_ERROR;
 	}
@@ -65,10 +71,11 @@ int main()
 
 		if ((res = KRecvMsg(&ptid, data, INVALID)) != NO_ERROR)	/*等待消息*/
 			break;
-		if (GCDispatchMsg(ptid, data) == GC_ERR_INVALID_GUIMSG)	/*非GUI消息另行处理*/
-			;
-		else if ((data[MSG_ATTR_ID] & MSG_API_MASK) == GM_DESTROY && data[GUIMSG_GOBJ_ID] == (DWORD)dsk)	/*销毁主窗体时重建桌面*/
-			GCDskCreate(&dsk, &args, 0, NULL);
+		if (GCDispatchMsg(ptid, data) == NO_ERROR)	/*处理GUI消息*/
+		{
+			if ((data[MSG_ATTR_ID] & MSG_API_MASK) == GM_DESTROY && data[GUIMSG_GOBJ_ID] == (DWORD)dsk)	/*销毁主窗体,退出程序*/
+				break;
+		}
 	}
 	return NO_ERROR;
 }

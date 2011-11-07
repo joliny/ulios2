@@ -6,14 +6,26 @@
 
 #include "basesrv.h"
 #include "../lib/gdi.h"
+#include "../lib/malloc.h"
+#include "../lib/gclient.h"
 
 #define MAX_LINE	200	/*每行最多字符数量*/
 #define CURS_WIDTH	2	/*光标高度*/
+#define DSP_MOD_TEXT	0	/*文本显示模式*/
+#define DSP_MOD_GDI		1	/*图形设备模式*/
+#define DSP_MOD_GUI		2	/*图形界面模式*/
+#define GUI_MOD_WIDTH	80
+#define GUI_MOD_HEIGHT	25
+#define RECVPTID_LEN	0x300	/*接收消息线程ID栈长度*/
 
-BOOL isTextMode;	/*是否文本模式*/
+THREAD_ID KbdPtid;	/*键盘驱动*/
+DWORD DspMode;	/*字符显示模式*/
 DWORD width, height;	/*显示字符数量*/
+DWORD CharWidth, CharHeight;	/*字符大小*/
 DWORD CursX, CursY;		/*光标位置*/
-DWORD BgColor, CharColor;	/*当前背景,前景色*/
+DWORD CharColor, BgColor;	/*前景色,当前背景*/
+CTRL_WND *wnd;
+THREAD_ID RecvPtid[RECVPTID_LEN], *CurRecv;	/*接收消息线程ID栈*/
 
 #define TEXT_MODE_COLOR	((CharColor & 0xF) | ((BgColor & 0xF) << 4))
 
@@ -29,19 +41,95 @@ void SetTextCurs()
 	outb(0x3D5, (PortData >> 8));
 }
 
+/*向接受按键消息的线程发送消息*/
+void SendKeyMsg(DWORD data[MSG_DATA_LEN])
+{
+	data[MSG_ATTR_ID] = MSG_ATTR_CUIKEY;
+	while (CurRecv >= RecvPtid)
+	{
+		long res;
+		res = KSendMsg(CurRecv, data, 0);
+		if (res != KERR_PROC_NOT_EXIST && res != KERR_THED_NOT_EXIST)
+			break;
+		CurRecv--;	/*无法发送到栈中的线程则忽略该线程*/
+	}
+}
+
+long MainMsgProc(THREAD_ID ptid, DWORD data[MSG_DATA_LEN])
+{
+	switch (data[MSG_API_ID] & MSG_API_MASK)
+	{
+	case GM_DESTROY:
+		while (CurRecv >= RecvPtid)	/*关闭窗口时向所有服务对象发送退出请求*/
+		{
+			SendExitProcReq(*CurRecv);
+			CurRecv--;
+		}
+		wnd = NULL;
+		break;
+	case GM_SETFOCUS:
+		if (data[1])
+			wnd->obj.style |= WND_STATE_FOCUS;
+		else
+			wnd->obj.style &= (~WND_STATE_FOCUS);
+		break;
+	case GM_LBUTTONDOWN:	/*鼠标按下*/
+		if (!(wnd->obj.style & WND_STATE_FOCUS))
+			GUISetFocus(GCGuiPtid, wnd->obj.gid);
+		break;
+	case GM_KEY:	/*发送按键*/
+		SendKeyMsg(data);
+		data[MSG_API_ID] = MSG_ATTR_GUI | GM_KEY;
+		break;
+	}
+	return GCWndDefMsgProc(ptid, data);
+}
+
+/*创建图像模式窗口*/
+void CreateGuiWnd()
+{
+	CTRL_ARGS args;
+	THREAD_ID ptid;
+	DWORD data[MSG_DATA_LEN];
+
+	args.width = GUI_MOD_WIDTH * CharWidth + 2;
+	args.height = GUI_MOD_HEIGHT * CharHeight + 21;
+	args.x = 128;
+	args.y = 128;
+	args.style = WND_STYLE_CAPTION | WND_STYLE_BORDER | WND_STYLE_CLOSEBTN;
+	args.MsgProc = MainMsgProc;
+	GCWndCreate(&wnd, &args, 0, NULL, "控制台");
+	ptid = GCGuiPtid;
+	if (KRecvProcMsg(&ptid, data, INVALID) != NO_ERROR)	/*等待创建完成消息*/
+		return;
+	GCDispatchMsg(ptid, data);	/*创建完成后续处理*/
+}
+
 /*清屏*/
 void ClearScr()
 {
 	CursY = CursX = 0;
-	if (isTextMode)
+	switch (DspMode)
 	{
+	case DSP_MOD_TEXT:
 		memset32(GDIvm, (TEXT_MODE_COLOR << 8) | (TEXT_MODE_COLOR << 24), width * height / 2);
 		SetTextCurs();
-	}
-	else
-	{
+		break;
+	case DSP_MOD_GDI:
 		GDIFillRect(0, 0, GDIwidth, GDIheight, BgColor);
-		GDIFillRect(0, GDICharHeight - CURS_WIDTH, GDICharWidth, CURS_WIDTH, CharColor);	/*画光标*/
+		GDIFillRect(0, CharHeight - CURS_WIDTH, CharWidth, CURS_WIDTH, CharColor);	/*画光标*/
+		break;
+	case DSP_MOD_GUI:
+		{
+			long CliX, CliY;
+			if (!wnd)
+				CreateGuiWnd();
+			GCWndGetClientLoca(wnd, &CliX, &CliY);
+			GCFillRect(&wnd->client, 0, 0, wnd->client.width, wnd->client.height, BgColor);
+			GCFillRect(&wnd->client, 0, CharHeight - CURS_WIDTH, CharWidth, CURS_WIDTH, CharColor);	/*画光标*/
+			GUIpaint(GCGuiPtid, wnd->obj.gid, CliX, CliY, wnd->client.width, wnd->client.height);
+		}
+		break;
 	}
 }
 
@@ -52,15 +140,29 @@ void PutStr(const char *str)
 	char LineBuf[MAX_LINE], *bufp;	/*行缓冲*/
 
 	bufp = LineBuf;
-	BufX = GDICharWidth * CursX;
-	BufY = GDICharHeight * CursY;
+	BufX = CharWidth * CursX;
+	BufY = CharHeight * CursY;
 	while (*str)
 	{
 		switch (*str)
 		{
 		case '\n':
-			if (!isTextMode)
-				GDIFillRect(GDICharWidth * CursX, GDICharHeight * CursY, GDICharWidth, GDICharHeight, BgColor);	/*清除背景*/
+			switch (DspMode)
+			{
+			case DSP_MOD_GDI:
+				GDIFillRect(CharWidth * CursX, CharHeight * CursY, CharWidth, CharHeight, BgColor);	/*清除背景*/
+				break;
+			case DSP_MOD_GUI:
+				{
+					long CliX, CliY;
+					if (!wnd)
+						CreateGuiWnd();
+					GCWndGetClientLoca(wnd, &CliX, &CliY);
+					GCFillRect(&wnd->client, CharWidth * CursX, CharHeight * CursY, CharWidth, CharHeight, BgColor);	/*清除背景*/
+					GUIpaint(GCGuiPtid, wnd->obj.gid, CliX + CharWidth * CursX, CliY + CharHeight * CursY, CharWidth, CharHeight);
+				}
+				break;
+			}
 			CursX = width;
 			break;
 		case '\t':
@@ -80,62 +182,117 @@ void PutStr(const char *str)
 			if (bufp != LineBuf)
 			{
 				*bufp = '\0';
-				if (isTextMode)
+				switch (DspMode)
 				{
-					WORD *CurVm;
+				case DSP_MOD_TEXT:
+					{
+						WORD *CurVm;
 
-					CurVm = ((WORD*)GDIvm) + BufX + BufY * width;
-					for (bufp = LineBuf; *bufp; bufp++, CurVm++)
-						*CurVm = *(BYTE*)bufp | (TEXT_MODE_COLOR << 8);
-				}
-				else
-				{
-					GDIFillRect(BufX, BufY, GDICharWidth * (bufp - LineBuf), GDICharHeight, BgColor);
+						CurVm = ((WORD*)GDIvm) + BufX + BufY * width;
+						for (bufp = LineBuf; *bufp; bufp++, CurVm++)
+							*CurVm = *(BYTE*)bufp | (TEXT_MODE_COLOR << 8);
+					}
+					break;
+				case DSP_MOD_GDI:
+					GDIFillRect(BufX, BufY, CharWidth * (bufp - LineBuf), CharHeight, BgColor);
 					GDIDrawStr(BufX, BufY, LineBuf, CharColor);
+					break;
+				case DSP_MOD_GUI:
+					{
+						long CliX, CliY;
+						if (!wnd)
+							CreateGuiWnd();
+						GCWndGetClientLoca(wnd, &CliX, &CliY);
+						GCFillRect(&wnd->client, BufX, BufY, CharWidth * (bufp - LineBuf), CharHeight, BgColor);
+						GCDrawStr(&wnd->client, BufX, BufY, LineBuf, CharColor);
+						GUIpaint(GCGuiPtid, wnd->obj.gid, CliX + BufX, CliY + BufY, CharWidth * (bufp - LineBuf), CharHeight);
+					}
+					break;
 				}
 				bufp = LineBuf;
 			}
-			BufX = GDICharWidth * CursX;
-			BufY = GDICharHeight * CursY;
+			BufX = CharWidth * CursX;
+			BufY = CharHeight * CursY;
 		}
 		if (CursY >= height)	/*光标在最后一行，向上滚屏*/
 		{
 			CursY--;
-			if (isTextMode)
+			switch (DspMode)
 			{
+			case DSP_MOD_TEXT:
 				memcpy32(GDIvm, ((WORD*)GDIvm) + width, width * (height - 1) / 2);
 				memset32(((WORD*)GDIvm) + width * (height - 1), (TEXT_MODE_COLOR << 8) | (TEXT_MODE_COLOR << 24), width / 2);
+				break;
+			case DSP_MOD_GDI:
+				memcpy32(GDIvm, GDIvm + ((GDIPixBits + 7) >> 3) * GDIwidth * CharHeight, ((GDIPixBits + 7) >> 3) * GDIwidth * (GDIheight - CharHeight) / sizeof(DWORD));	/*向上滚屏*/
+				GDIFillRect(0, CharHeight * (height - 1), GDIwidth, CharHeight, BgColor);
+				break;
+			case DSP_MOD_GUI:
+				{
+					long CliX, CliY;
+					if (!wnd)
+						CreateGuiWnd();
+					GCWndGetClientLoca(wnd, &CliX, &CliY);
+					memcpy32(wnd->obj.uda.vbuf + wnd->obj.uda.width * 20, wnd->obj.uda.vbuf + wnd->obj.uda.width * (20 + CharHeight), wnd->obj.uda.width * CharHeight * (height - 1));	/*向上滚屏*/
+					GCFillRect(&wnd->client, 0, CharHeight * (height - 1), wnd->client.width, CharHeight, BgColor);
+					GUIpaint(GCGuiPtid, wnd->obj.gid, CliX, CliY, wnd->client.width, wnd->client.height);
+				}
+				break;
 			}
-			else
-			{
-				GDIMoveUp(GDICharHeight);
-				GDIFillRect(0, GDICharHeight * (height - 1), GDIwidth, GDICharHeight, BgColor);
-			}
-			BufY = GDICharHeight * CursY;
+			BufY = CharHeight * CursY;
 		}
 		str++;
 	}
 	if (bufp != LineBuf)	/*输出最后一行*/
 	{
 		*bufp = '\0';
-		if (isTextMode)
+		switch (DspMode)
 		{
-			WORD *CurVm;
+		case DSP_MOD_TEXT:
+			{
+				WORD *CurVm;
 
-			CurVm = ((WORD*)GDIvm) + BufX + BufY * width;
-			for (bufp = LineBuf; *bufp; bufp++, CurVm++)
-				*CurVm = *(BYTE*)bufp | (TEXT_MODE_COLOR << 8);
-		}
-		else
-		{
-			GDIFillRect(BufX, BufY, GDICharWidth * (bufp - LineBuf), GDICharHeight, BgColor);
+				CurVm = ((WORD*)GDIvm) + BufX + BufY * width;
+				for (bufp = LineBuf; *bufp; bufp++, CurVm++)
+					*CurVm = *(BYTE*)bufp | (TEXT_MODE_COLOR << 8);
+			}
+			break;
+		case DSP_MOD_GDI:
+			GDIFillRect(BufX, BufY, CharWidth * (bufp - LineBuf), CharHeight, BgColor);
 			GDIDrawStr(BufX, BufY, LineBuf, CharColor);
+			break;
+		case DSP_MOD_GUI:
+			{
+				long CliX, CliY;
+				if (!wnd)
+					CreateGuiWnd();
+				GCWndGetClientLoca(wnd, &CliX, &CliY);
+				GCFillRect(&wnd->client, BufX, BufY, CharWidth * (bufp - LineBuf), CharHeight, BgColor);
+				GCDrawStr(&wnd->client, BufX, BufY, LineBuf, CharColor);
+				GUIpaint(GCGuiPtid, wnd->obj.gid, CliX + BufX, CliY + BufY, CharWidth * (bufp - LineBuf), CharHeight);
+			}
+			break;
 		}
 	}
-	if (isTextMode)
+	switch (DspMode)
+	{
+	case DSP_MOD_TEXT:
 		SetTextCurs();
-	else
-		GDIFillRect(GDICharWidth * CursX, GDICharHeight * CursY + GDICharHeight - CURS_WIDTH, GDICharWidth, CURS_WIDTH, CharColor);	/*画光标*/
+		break;
+	case DSP_MOD_GDI:
+		GDIFillRect(CharWidth * CursX, CharHeight * CursY + CharHeight - CURS_WIDTH, CharWidth, CURS_WIDTH, CharColor);	/*画光标*/
+		break;
+	case DSP_MOD_GUI:
+		{
+			long CliX, CliY;
+			if (!wnd)
+				CreateGuiWnd();
+			GCWndGetClientLoca(wnd, &CliX, &CliY);
+			GCFillRect(&wnd->client, CharWidth * CursX, CharHeight * CursY + CharHeight - CURS_WIDTH, CharWidth, CURS_WIDTH, CharColor);	/*画光标*/
+			GUIpaint(GCGuiPtid, wnd->obj.gid, CliX + CharWidth * CursX, CliY + CharHeight * CursY + CharHeight - CURS_WIDTH, CharWidth, CURS_WIDTH);
+		}
+		break;
+	}
 }
 
 /*退格处理*/
@@ -143,8 +300,22 @@ void BackSp()
 {
 	if (CursX == 0 && CursY == 0)
 		return;
-	if (!isTextMode)
-		GDIFillRect(GDICharWidth * CursX, GDICharHeight * CursY + GDICharHeight - CURS_WIDTH, GDICharWidth, CURS_WIDTH, BgColor);	/*清除光标*/
+	switch (DspMode)
+	{
+	case DSP_MOD_GDI:
+		GDIFillRect(CharWidth * CursX, CharHeight * CursY + CharHeight - CURS_WIDTH, CharWidth, CURS_WIDTH, BgColor);	/*清除光标*/
+		break;
+	case DSP_MOD_GUI:
+		{
+			long CliX, CliY;
+			if (!wnd)
+				CreateGuiWnd();
+			GCWndGetClientLoca(wnd, &CliX, &CliY);
+			GCFillRect(&wnd->client, CharWidth * CursX, CharHeight * CursY + CharHeight - CURS_WIDTH, CharWidth, CURS_WIDTH, BgColor);	/*清除光标*/
+			GUIpaint(GCGuiPtid, wnd->obj.gid, CliX + CharWidth * CursX, CliY + CharHeight * CursY + CharHeight - CURS_WIDTH, CharWidth, CURS_WIDTH);
+		}
+		break;
+	}
 	if (CursX)
 		CursX--;
 	else
@@ -152,15 +323,27 @@ void BackSp()
 		CursX = width - 1;
 		CursY--;
 	}
-	if (isTextMode)
+	switch (DspMode)
 	{
+	case DSP_MOD_TEXT:
 		((WORD*)GDIvm)[CursX + CursY * width] = (TEXT_MODE_COLOR << 8);
 		SetTextCurs();
-	}
-	else
-	{
-		GDIFillRect(GDICharWidth * CursX, GDICharHeight * CursY, GDICharWidth, GDICharHeight, BgColor);	/*清除背景*/
-		GDIFillRect(GDICharWidth * CursX, GDICharHeight * CursY + GDICharHeight - CURS_WIDTH, GDICharWidth, CURS_WIDTH, CharColor);	/*画光标*/
+		break;
+	case DSP_MOD_GDI:
+		GDIFillRect(CharWidth * CursX, CharHeight * CursY, CharWidth, CharHeight, BgColor);	/*清除背景*/
+		GDIFillRect(CharWidth * CursX, CharHeight * CursY + CharHeight - CURS_WIDTH, CharWidth, CURS_WIDTH, CharColor);	/*画光标*/
+		break;
+	case DSP_MOD_GUI:
+		{
+			long CliX, CliY;
+			if (!wnd)
+				CreateGuiWnd();
+			GCWndGetClientLoca(wnd, &CliX, &CliY);
+			GCFillRect(&wnd->client, CharWidth * CursX, CharHeight * CursY, CharWidth, CharHeight, BgColor);	/*清除背景*/
+			GCFillRect(&wnd->client, CharWidth * CursX, CharHeight * CursY + CharHeight - CURS_WIDTH, CharWidth, CURS_WIDTH, CharColor);	/*画光标*/
+			GUIpaint(GCGuiPtid, wnd->obj.gid, CliX + CharWidth * CursX, CliY + CharHeight * CursY, CharWidth, CharHeight);
+		}
+		break;
 	}
 }
 
@@ -170,26 +353,53 @@ int main()
 
 	if ((res = KRegKnlPort(SRV_CUI_PORT)) != NO_ERROR)	/*注册服务端口号*/
 		return res;
-	res = GDIinit();
-	if (res == NO_ERROR)
+	if (GCinit() != NO_ERROR)	/*优先使用GUI*/
+		goto initgdi;
+	if (InitMallocTab(0x1000000) != NO_ERROR)	/*设置16MB堆内存*/
 	{
-		width = GDIwidth / GDICharWidth;	/*计算显示字符数量*/
-		height = GDIheight / GDICharHeight;
-		BgColor = 0;
-		CharColor = 0xFFFFFFFF;
+		GCrelease();
+		goto initgdi;
 	}
-	else if (res == GDI_ERR_TEXTMODE)
-	{
-		GDICharHeight = GDICharWidth = 1;
-		isTextMode = TRUE;
-		width = GDIwidth;	/*计算显示字符数量*/
-		height = GDIheight;
-		BgColor = 0;
-		CharColor = 0x7;
-	}
-	else
+	DspMode = DSP_MOD_GUI;	/*初始化GUI参数*/
+	width = GUI_MOD_WIDTH;
+	height = GUI_MOD_HEIGHT;
+	CharWidth = GCCharWidth;
+	CharHeight = GCCharHeight;
+	CharColor = 0xFF000000;
+	BgColor = 0xFFCCCCCC;
+	goto initok;
+initgdi:
+	if ((res = KGetKptThed(SRV_KBDMUS_PORT, &KbdPtid)) != NO_ERROR)	/*取得键盘服务*/
 		return res;
+	if ((res = KMSetRecv(KbdPtid)) != NO_ERROR)
+		return res;
+	res = GDIinit();	/*次之使用GDI*/
+	if (res != NO_ERROR)
+		goto inittext;
+	DspMode = DSP_MOD_GDI;
+	width = GDIwidth / GDICharWidth;	/*计算显示字符数量*/
+	height = GDIheight / GDICharHeight;
+	CharWidth = GDICharWidth;
+	CharHeight = GDICharHeight;
+	CharColor = 0xFFFFFFFF;
+	BgColor = 0;
 	ClearScr();
+	goto initok;
+inittext:
+	if (res != GDI_ERR_TEXTMODE)	/*最后使用文本模式*/
+		goto initerr;
+	DspMode = DSP_MOD_TEXT;
+	width = GDIwidth;	/*计算显示字符数量*/
+	height = GDIheight;
+	CharHeight = CharWidth = 1;
+	CharColor = 0x7;
+	BgColor = 0;
+	ClearScr();
+	goto initok;
+initerr:
+	return res;
+initok:
+	CurRecv = RecvPtid - 1;
 	for (;;)
 	{
 		THREAD_ID ptid;
@@ -197,11 +407,21 @@ int main()
 
 		if ((res = KRecvMsg(&ptid, data, INVALID)) != NO_ERROR)	/*等待消息*/
 			break;
+		if (GCDispatchMsg(ptid, data) == NO_ERROR)	/*处理GUI消息*/
+			continue;
 		switch (data[MSG_ATTR_ID] & MSG_ATTR_MASK)
 		{
+		case MSG_ATTR_KBDMUS:	/*键盘服务消息*/
+			if (data[MSG_ATTR_ID] == MSG_ATTR_KBD)
+				SendKeyMsg(data);
+			break;
 		case MSG_ATTR_CUI:	/*普通服务消息*/
 			switch (data[MSG_API_ID] & MSG_API_MASK)
 			{
+			case CUI_API_SETRECV:	/*注册接收按键消息的线程*/
+				if (CurRecv < &RecvPtid[RECVPTID_LEN - 1])	/*PTID栈不满时注册接收按键消息的线程*/
+					*(++CurRecv) = ptid;
+				break;
 			case CUI_API_GETCOL:	/*取得字符界面颜色*/
 				data[1] = CharColor;
 				data[2] = BgColor;
@@ -217,22 +437,39 @@ int main()
 				KSendMsg(&ptid, data, 0);
 				break;
 			case CUI_API_SETCUR:	/*设置光标位置*/
-				if (isTextMode)
+				switch (DspMode)
 				{
+				case DSP_MOD_TEXT:
 					if (data[1] < width)
 						CursX = data[1];
 					if (data[2] < height)
 						CursY = data[2];
 					SetTextCurs();
-				}
-				else
-				{
-					GDIFillRect(GDICharWidth * CursX, GDICharHeight * CursY + GDICharHeight - CURS_WIDTH, GDICharWidth, CURS_WIDTH, BgColor);	/*清除光标*/
+					break;
+				case DSP_MOD_GDI:
+					GDIFillRect(CharWidth * CursX, CharHeight * CursY + CharHeight - CURS_WIDTH, CharWidth, CURS_WIDTH, BgColor);	/*清除光标*/
 					if (data[1] < width)
 						CursX = data[1];
 					if (data[2] < height)
 						CursY = data[2];
-					GDIFillRect(GDICharWidth * CursX, GDICharHeight * CursY + GDICharHeight - CURS_WIDTH, GDICharWidth, CURS_WIDTH, CharColor);	/*画光标*/
+					GDIFillRect(CharWidth * CursX, CharHeight * CursY + CharHeight - CURS_WIDTH, CharWidth, CURS_WIDTH, CharColor);	/*画光标*/
+					break;
+				case DSP_MOD_GUI:
+					{
+						long CliX, CliY;
+						if (!wnd)
+							CreateGuiWnd();
+						GCWndGetClientLoca(wnd, &CliX, &CliY);
+						GCFillRect(&wnd->client, CharWidth * CursX, CharHeight * CursY + CharHeight - CURS_WIDTH, CharWidth, CURS_WIDTH, BgColor);	/*清除光标*/
+						GUIpaint(GCGuiPtid, wnd->obj.gid, CliX + CharWidth * CursX, CliY + CharHeight * CursY + CharHeight - CURS_WIDTH, CharWidth, CURS_WIDTH);
+						if (data[1] < width)
+							CursX = data[1];
+						if (data[2] < height)
+							CursY = data[2];
+						GCFillRect(&wnd->client, CharWidth * CursX, CharHeight * CursY + CharHeight - CURS_WIDTH, CharWidth, CURS_WIDTH, CharColor);	/*画光标*/
+						GUIpaint(GCGuiPtid, wnd->obj.gid, CliX + CharWidth * CursX, CliY + CharHeight * CursY + CharHeight - CURS_WIDTH, CharWidth, CURS_WIDTH);
+					}
+					break;
 				}
 				break;
 			case CUI_API_CLRSCR:	/*清屏*/
@@ -264,9 +501,14 @@ int main()
 				break;
 			}
 			KUnmapProcAddr((void*)data[MSG_ADDR_ID], data);
+			break;
+		case MSG_ATTR_USER:	/*退出请求*/
+			if (data[MSG_ATTR_ID] == MSG_ATTR_EXTPROCREQ)
+				goto quit;
+			break;
 		}
 	}
-	GDIrelease();
+quit:
 	KUnregKnlPort(SRV_CUI_PORT);
 	return NO_ERROR;
 }

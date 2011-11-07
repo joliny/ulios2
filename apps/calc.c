@@ -72,7 +72,7 @@ const char *Keyword[] =	/*关键字数组*/
 {
 	"(",	")",	" ",	/*3个控制字符*/
 	"+",	"-",	"*",	"/",	"%",	"#",	"^",	/*7个二元运算符*/
-	"abs",	"acs",	"asn",	"atn",	"cos",	"ch",	"exp",
+	"abs",	"acs",	"asn",	"atn",	"cos",	"ch",	"ep",
 	"lg",	"ln",	"sin",	"sh",	"sqr",	"tan",	"th",	/*14个函数*/
 };
 
@@ -154,7 +154,7 @@ DWORD WoCh(double *x)
 	*x = cosh(*x);
 	return WOERR_NOERR;
 }
-DWORD WoExp(double *x)
+DWORD WoEp(double *x)
 {
 	*x = exp(*x);
 	return WOERR_NOERR;
@@ -206,7 +206,7 @@ DWORD (*WoBinOp[])(double*, double) =	// 7个二元运算符
 const DWORD WoBinLev[] =	//7个二元运算的级别
 {	0,		0,		1,		1,		1,		1,		2};
 DWORD (*WoFunc[])(double*) =	// 14个函数
-{	WoAbs,	WoAcs,	WoAsn,	WoAtn,	WoCos,	WoCh,	WoExp,	WoLg,	WoLn,	WoSin,	WoSh,	WoSqr,	WoTan,	WoTh};
+{	WoAbs,	WoAcs,	WoAsn,	WoAtn,	WoCos,	WoCh,	WoEp,	WoLg,	WoLn,	WoSin,	WoSh,	WoSqr,	WoTan,	WoTh};
 
 // 取得后一个运算的级别
 DWORD NxtLev(const WONODE *wol)
@@ -539,20 +539,227 @@ char *ftoa(char *buf, double n)
 	return buf;
 }
 
+#define WND_WIDTH	244
+#define WND_HEIGHT	244
+#define EDT_WIDTH	236
+#define EDT_HEIGHT	20
+#define BTN_WIDTH	36
+#define BTN_HEIGHT	24
+#define GRA_WIDTH	288
+#define GRA_HEIGHT	216
+#define SIDE_X		3	/*左侧与客户区边距*/
+#define SIDE_Y		4	/*上侧与客户区边距*/
+
+CTRL_WND *wnd;
 CTRL_SEDT *edt;
+CTRL_BTN *but[42];
+BOOL isShowGra;
+UDI_AREA GraArea;
+long p2d[GRA_WIDTH];
+#define P3D_WID	51
+float p3d[P3D_WID][P3D_WID], a, b;
+long x0, y0;
+
+static const char *strfind(const char *str, char c)
+{
+	while (*str)
+	{
+		if (*str == c)
+			return str;
+		str++;
+	}
+	return NULL;
+}
+
+void SetGraMode(BOOL isGraMode)
+{
+	long i;
+	if (isGraMode)
+	{
+		GCBtnSetText(but[5], "<<");
+		GCWndSetSize(wnd, wnd->obj.x, wnd->obj.y, WND_WIDTH + GRA_WIDTH + 4, WND_HEIGHT);
+		GCSetArea(&GraArea, GRA_WIDTH, GRA_HEIGHT, &wnd->client, WND_WIDTH - 1, SIDE_Y);
+	}
+	else
+	{
+		GCBtnSetText(but[5], ">>");
+		GCWndSetSize(wnd, wnd->obj.x, wnd->obj.y, WND_WIDTH, WND_HEIGHT);
+	}
+	isShowGra = isGraMode;
+	GCSetArea(&edt->obj.uda, EDT_WIDTH, EDT_HEIGHT, &wnd->obj.uda, edt->obj.x, edt->obj.y);
+	GCSedtDefDrawProc(edt);
+	for (i = 0; i < 42; i++)
+	{
+		GCSetArea(&(but[i]->obj.uda), BTN_WIDTH, BTN_HEIGHT, &wnd->obj.uda, but[i]->obj.x, but[i]->obj.y);
+		GCBtnDefDrawProc(but[i]);
+	}
+	GUIpaint(GCGuiPtid, wnd->obj.gid, 4, 24, WND_WIDTH - 4 * 2, WND_HEIGHT - 20 - 4 * 2);	/*绘制完后提交*/
+}
+
+/*长整形转化为数字*/
+char *Itoa(char *buf, long n)
+{
+	static const char num[] = {'0','1','2','3','4','5','6','7','8','9'};
+	char *p, *q;
+
+	if (n < 0)
+	{
+		n = -n;
+		*buf++ = '-';
+	}
+	q = p = buf;
+	do
+	{
+		*p++ = num[n % 10];
+		n /= 10;
+	}
+	while (n);
+	buf = p;	/*确定字符串尾部*/
+	*p-- = '\0';
+	while (p > q)	/*翻转字符串*/
+	{
+		char c = *q;
+		*q++ = *p;
+		*p-- = c;
+	}
+	return buf;
+}
+
+void Calc2D()
+{
+	static const char *varnam[] = {"x"};
+	double x, y;
+	long i;
+	for (i = 0; i < GRA_WIDTH; i++)
+	{
+		x = 0.05 * (i - GRA_WIDTH / 2);	//x缩小转换
+		if (workout(edt->text, varnam, &x, 1, &y) == WOERR_NOERR)	//代入未知数计算
+			p2d[i] = (GRA_HEIGHT / 2) - (long)(20.0 * y);	//y放大转换
+		else
+			p2d[i] = -1;
+	}
+}
+
+void Draw2D()
+{
+	long i;
+	GCFillRect(&GraArea, 0, 0, GRA_WIDTH, GRA_HEIGHT, 0xFFFFFF);	// 清屏
+	for (i = 4; i < GRA_WIDTH; i += 20)
+		GCFillRect(&GraArea, i, 0, 1, GRA_HEIGHT, 0xFFFF00);
+	for (i = 8; i < GRA_HEIGHT; i += 20)
+		GCFillRect(&GraArea, 0, i, GRA_WIDTH, 1, 0xFFFF00);
+	GCFillRect(&GraArea, GRA_WIDTH / 2, 0, 1, GRA_HEIGHT, 0xFF0000);
+	GCFillRect(&GraArea, 0, GRA_HEIGHT / 2, GRA_WIDTH, 1, 0xFF0000);
+	for (i = -7; i <= 7; i++)
+	{
+		char buf[4];
+		Itoa(buf, i);
+		GCDrawStr(&GraArea, i * 20 + GRA_WIDTH / 2 - 6, GRA_HEIGHT / 2 + 1, buf, 0xFF0000);
+	}
+	for (i = -5; i <= 5; i++)
+	{
+		char buf[4];
+		Itoa(buf, i);
+		GCDrawStr(&GraArea, GRA_WIDTH / 2 - 6, i * 20 + GRA_HEIGHT / 2 + 1, buf, 0xFF0000);
+	}
+	GCDrawAscii(&GraArea, GRA_WIDTH - 6, GRA_HEIGHT / 2 + 1, 'X', 0);
+	GCDrawAscii(&GraArea, GRA_WIDTH / 2 - 6, 1, 'Y', 0);
+	for (i = 1; i < GRA_WIDTH; i++)	//点连点画出函数图像
+	{
+		if (p2d[i - 1] != -1 && p2d[i] != -1)	//异常点不画
+			GCDrawLine(&GraArea, i - 1, p2d[i - 1], i, p2d[i], 0);
+	}
+	GUIpaint(GCGuiPtid, wnd->obj.gid, WND_WIDTH, 20 + SIDE_Y, GRA_WIDTH, GRA_HEIGHT);	/*绘制完后提交*/
+}
+
+void Calc3D()
+{
+	static const char *varnam[] = {"x", "y"};
+	double val[2], z;
+	long i, j;
+	for (j = 0; j < P3D_WID; j++)
+	{
+		val[1] = 0.2 * j - 5.0;	//y缩小转换
+		for (i = 0; i < P3D_WID; i++)
+		{
+			val[0] = 0.2 * i - 5.0;	//x缩小转换
+			if (workout(edt->text, varnam, val, 2, &z) == WOERR_NOERR)	//代入未知数计算
+				p3d[i][j] = (float)(5.0 * z);	//z放大转换
+			else
+				p3d[i][j] = 999999.f;
+		}
+	}
+}
+
+void Draw3D()
+{
+	long i, j;
+	long x3d[P3D_WID][P3D_WID], y3d[P3D_WID][P3D_WID];
+	float sa, ca, sb, cb;
+	sa = (float)sin(a);
+	ca = (float)cos(a);
+	sb = (float)sin(b);
+	cb = (float)cos(b);
+	for (j = 0; j < P3D_WID; j++)	//三维变换
+	{
+		for (i = 0; i < P3D_WID; i++)
+		{
+			float x, y, z;
+			x = (i - P3D_WID / 2) * ca + (j - P3D_WID / 2) * sa;
+			y = (j - P3D_WID / 2) * ca - (i - P3D_WID / 2) * sa;
+			z = p3d[i][j] * cb + x * sb;
+			x = (x * cb - p3d[i][j] * sb) * 10.f;
+			x3d[i][j] = GRA_WIDTH / 2 + (long)(6000.f * y / (1200.f - x));
+			y3d[i][j] = GRA_HEIGHT / 2 - (long)(6000.f * z / (1200.f - x));
+		}
+	}
+	GCFillRect(&GraArea, 0, 0, GRA_WIDTH, GRA_HEIGHT, 0xFFFFFF);	// 清屏
+	for (j = 0; j < P3D_WID; j++)	//点连点画出函数图像
+	{
+		for (i = 1; i < P3D_WID; i++)
+		{
+			if (p3d[i][j] == 999999.f)	//异常点不画
+				continue;
+			if (p3d[i - 1][j] != 999999.f)
+				GCDrawLine(&GraArea, x3d[i - 1][j], y3d[i - 1][j], x3d[i][j], y3d[i][j], 0);
+			if (p3d[j][i - 1] != 999999.f)
+				GCDrawLine(&GraArea, x3d[j][i - 1], y3d[j][i - 1], x3d[j][i], y3d[j][i], 0);
+		}
+	}
+	GUIpaint(GCGuiPtid, wnd->obj.gid, WND_WIDTH, 20 + SIDE_Y, GRA_WIDTH, GRA_HEIGHT);	/*绘制完后提交*/
+}
 
 /*编辑框回车处理*/
 void EdtEnterProc(CTRL_SEDT *edt)
 {
-	double wores;
-	DWORD res;
-	char buf[128], *bufp;
-
-	if ((res = workout(edt->text, NULL, NULL, 0, &wores)) != WOERR_NOERR)
-		strcpy(buf, WoErrStr[res]);
+	if (strfind(edt->text, 'y'))	/*有y,绘制三维图像*/
+	{
+		if (!isShowGra)
+			SetGraMode(TRUE);
+		Calc3D();
+		Draw3D();
+	}
+	else if (strfind(edt->text, 'x'))	/*有x,绘制二维图像*/
+	{
+		if (!isShowGra)
+			SetGraMode(TRUE);
+		Calc2D();
+		Draw2D();
+	}
 	else
-		ftoa(buf, wores);
-	GCSedtSetText(edt, buf);
+	{
+		char buf[128];
+		double wores;
+		DWORD res;
+
+		if (isShowGra)
+			SetGraMode(FALSE);
+		if ((res = workout(edt->text, NULL, NULL, 0, &wores)) != WOERR_NOERR)
+			strcpy(buf, WoErrStr[res]);
+		else
+			ftoa(buf, wores);
+		GCSedtSetText(edt, buf);
+	}
 }
 
 /*等号按钮处理*/
@@ -596,7 +803,7 @@ void QutPressProc(CTRL_BTN *btn)
 /*图像按钮处理*/
 void GrpPressProc(CTRL_BTN *btn)
 {
-
+	SetGraMode(!isShowGra);
 }
 
 /*其余按钮处理*/
@@ -611,7 +818,7 @@ long MainMsgProc(THREAD_ID ptid, DWORD data[MSG_DATA_LEN])
 	{
 		"=",	"退格",	"清除",	"帮助",	"退出",	">>",
 		"sin",	"cos",	"tan",	"asn",	"acs",	"atn",
-		"sh",	"ch",	"th",	"exp",	"lg",	"ln",
+		"sh",	"ch",	"th",	"ep",	"lg",	"ln",
 		"7",	"8",	"9",	"/",	"abs",	"sqr",
 		"4",	"5",	"6",	"*",	"%",	"#",
 		"1",	"2",	"3",	"-",	"(",	")",
@@ -627,27 +834,41 @@ long MainMsgProc(THREAD_ID ptid, DWORD data[MSG_DATA_LEN])
 			long i, CliX, CliY;
 			CTRL_ARGS args;
 			GCWndGetClientLoca(wnd, &CliX, &CliY);
-			args.width = 236;
-			args.height = 20;
-			args.x = CliX + 3;
-			args.y = CliY + 4;
+			args.width = EDT_WIDTH;
+			args.height = EDT_HEIGHT;
+			args.x = CliX + SIDE_X;
+			args.y = CliY + SIDE_Y;
 			args.style = 0;
 			args.MsgProc = NULL;
 			GCSedtCreate(&edt, &args, wnd->obj.gid, &wnd->obj, NULL, EdtEnterProc);
-			args.width = 36;
-			args.height = 24;
-			args.y = CliY + 28;
+			args.width = BTN_WIDTH;
+			args.height = BTN_HEIGHT;
+			args.y = CliY + EDT_HEIGHT + 8;
 			for (i = 0; i < 6; i++)
 			{
-				args.x = CliX + 3 + i * 40;
-				GCBtnCreate(NULL, &args, wnd->obj.gid, &wnd->obj, btnam[i], BtnPressProc[i]);
+				args.x = CliX + SIDE_X + i * (BTN_WIDTH + 4);
+				GCBtnCreate(&but[i], &args, wnd->obj.gid, &wnd->obj, btnam[i], BtnPressProc[i]);
 			}
 			for (; i < 42; i++)
 			{
-				args.x = CliX + 3 + (i % 6) * 40;
-				args.y = CliY + 28 + (i / 6) * 28;
-				GCBtnCreate(NULL, &args, wnd->obj.gid, &wnd->obj, btnam[i], OthPressProc);
+				args.x = CliX + SIDE_X + (i % 6) * (BTN_WIDTH + 4);
+				args.y = CliY + EDT_HEIGHT + 8 + (i / 6) * (BTN_HEIGHT + 4);
+				GCBtnCreate(&but[i], &args, wnd->obj.gid, &wnd->obj, btnam[i], OthPressProc);
 			}
+		}
+		break;
+	case GM_LBUTTONDOWN:
+		x0 = (short)(data[5] & 0xFFFF);
+		y0 = (short)(data[5] >> 16);
+		break;
+	case GM_MOUSEMOVE:
+		if (data[1] & MUS_STATE_LBUTTON)
+		{
+			a += (x0 - (short)(data[5] & 0xFFFF)) * 0.007f;
+			b += (y0 - (short)(data[5] >> 16)) * 0.007f;
+			x0 = (short)(data[5] & 0xFFFF);
+			y0 = (short)(data[5] >> 16);
+			Draw3D();
 		}
 		break;
 	}
@@ -656,7 +877,6 @@ long MainMsgProc(THREAD_ID ptid, DWORD data[MSG_DATA_LEN])
 
 int main()
 {
-	CTRL_WND *wnd;
 	CTRL_ARGS args;
 	long res;
 
@@ -664,10 +884,10 @@ int main()
 		return res;
 	if ((res = GCinit()) != NO_ERROR)
 		return res;
-	args.width = 244;
-	args.height = 244;
-	args.x = 100;
-	args.y = 100;
+	args.width = WND_WIDTH;
+	args.height = WND_HEIGHT;
+	args.x = 128;
+	args.y = 128;
 	args.style = WND_STYLE_CAPTION | WND_STYLE_BORDER | WND_STYLE_CLOSEBTN;
 	args.MsgProc = MainMsgProc;
 	GCWndCreate(&wnd, &args, 0, NULL, "可视函数计算器");
@@ -679,10 +899,11 @@ int main()
 
 		if ((res = KRecvMsg(&ptid, data, INVALID)) != NO_ERROR)	/*等待消息*/
 			break;
-		if (GCDispatchMsg(ptid, data) == GC_ERR_INVALID_GUIMSG)	/*非GUI消息另行处理*/
-			;
-		else if ((data[MSG_ATTR_ID] & MSG_API_MASK) == GM_DESTROY && data[GUIMSG_GOBJ_ID] == (DWORD)wnd)	/*销毁主窗体,退出程序*/
-			break;
+		if (GCDispatchMsg(ptid, data) == NO_ERROR)	/*处理GUI消息*/
+		{
+			if ((data[MSG_ATTR_ID] & MSG_API_MASK) == GM_DESTROY && data[GUIMSG_GOBJ_ID] == (DWORD)wnd)	/*销毁主窗体,退出程序*/
+				break;
+		}
 	}
 	return NO_ERROR;
 }

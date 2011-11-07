@@ -240,16 +240,26 @@ static inline long FNTGetFont(THREAD_ID ptid, const BYTE **font, DWORD *CharWidt
 #define SRV_CUI_PORT	7	/*CUI字符界面服务端口*/
 
 #define MSG_ATTR_CUI	0x01070000	/*CUI字符界面消息*/
+#define MSG_ATTR_CUIKEY	0x01070001	/*CUI按键消息*/
 
-#define CUI_API_GETCOL	0	/*取得字符界面颜色功能号*/
-#define CUI_API_SETCOL	1	/*设置字符界面颜色功能号*/
-#define CUI_API_GETCUR	2	/*取得光标位置功能号*/
-#define CUI_API_SETCUR	3	/*设置光标位置功能号*/
-#define CUI_API_CLRSCR	4	/*清屏功能号*/
-#define CUI_API_PUTC	5	/*输出字符功能号*/
-#define CUI_API_PUTS	6	/*输出字符串功能号*/
+#define CUI_API_SETRECV	0	/*注册接收按键消息的线程功能号*/
+#define CUI_API_GETCOL	1	/*取得字符界面颜色功能号*/
+#define CUI_API_SETCOL	2	/*设置字符界面颜色功能号*/
+#define CUI_API_GETCUR	3	/*取得光标位置功能号*/
+#define CUI_API_SETCUR	4	/*设置光标位置功能号*/
+#define CUI_API_CLRSCR	5	/*清屏功能号*/
+#define CUI_API_PUTC	6	/*输出字符功能号*/
+#define CUI_API_PUTS	7	/*输出字符串功能号*/
 
 #define CUI_ERR_ARGS	-1792	/*参数错误*/
+
+/*注册接收按键消息的线程*/
+static inline long CUISetRecv(THREAD_ID ptid)
+{
+	DWORD data[MSG_DATA_LEN];
+	data[MSG_API_ID] = MSG_ATTR_CUI | CUI_API_SETRECV;
+	return KSendMsg(&ptid, data, 0);
+}
 
 /*取得字符界面颜色*/
 static inline long CUIGetCol(THREAD_ID ptid, DWORD *CharColor, DWORD *BgColor)
