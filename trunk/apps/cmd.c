@@ -6,11 +6,12 @@
 
 #include "../driver/basesrv.h"
 #include "../fs/fsapi.h"
+#include "../gui/guiapi.h"
 
 #define CMD_LEN		256
 #define PROMPT		"命令:"
 
-THREAD_ID TimePtid, FsPtid, KbdPtid, CuiPtid;
+THREAD_ID TimePtid, FsPtid, CuiPtid;
 char cmd[CMD_LEN], *cmdp;	/*输入命令缓冲*/
 
 /*双字转化为数字*/
@@ -155,7 +156,6 @@ void SetColor(char *args)
 /*退出*/
 void exitcmd(char *args)
 {
-	SendExitProcReq(FsPtid);
 	KExitProcess(NO_ERROR);
 }
 
@@ -243,11 +243,16 @@ void partlist(char *args)
 		FSGetPart(FsPtid, pid, &pi.info);
 		Sprintf(buf, "/%u\t容量:%uMB\t剩余:%uMB\t格式:%s\t卷标:%s\n", pid, (DWORD)(pi.info.size / 0x100000), (DWORD)(pi.info.remain / 0x100000), pi.fstype, pi.info.label);
 		CUIPutS(CuiPtid, buf);
-		ptid = KbdPtid;
-		if (KRecvProcMsg(&ptid, (DWORD*)buf, 0) == NO_ERROR && ((DWORD*)buf)[MSG_ATTR_ID] == MSG_ATTR_KBD && buf[4] == 27)
+		ptid = CuiPtid;
+		if (KRecvProcMsg(&ptid, (DWORD*)buf, 0) == NO_ERROR)
 		{
-			CUIPutS(CuiPtid, "用户取消！\n");
-			break;
+			if (((DWORD*)buf)[MSG_ATTR_ID] == MSG_ATTR_CUIKEY && buf[4] == 27)	/*按下ESC键*/
+			{
+				CUIPutS(CuiPtid, "用户取消！\n");
+				break;
+			}
+			else if (((DWORD*)buf)[MSG_ATTR_ID] == MSG_ATTR_EXTPROCREQ)	/*退出请求*/
+				KExitProcess(NO_ERROR);
 		}
 		pid++;
 	}
@@ -273,11 +278,16 @@ void dir(char *args)
 		TMLocalTime(TimePtid, fi.ModifyTime, &tm);
 		Sprintf(buf, "%d-%d-%d\t%d:%d:%d   \t%s\t%d\t%c%c%c%c%c%c\t%s\n", tm.yer, tm.mon, tm.day, tm.hor, tm.min, tm.sec, (fi.attr & FILE_ATTR_DIREC) ? "目录" : "文件", (DWORD)fi.size, (fi.attr & FILE_ATTR_RDONLY) ? 'R' : ' ', (fi.attr & FILE_ATTR_HIDDEN) ? 'H' : ' ', (fi.attr & FILE_ATTR_SYSTEM) ? 'S' : ' ', (fi.attr & FILE_ATTR_LABEL) ? 'L' : ' ', (fi.attr & FILE_ATTR_ARCH) ? 'A' : ' ', (fi.attr & FILE_ATTR_EXEC) ? 'X' : ' ', fi.name);
 		CUIPutS(CuiPtid, buf);
-		ptid = KbdPtid;
-		if (KRecvProcMsg(&ptid, (DWORD*)buf, 0) == NO_ERROR && ((DWORD*)buf)[MSG_ATTR_ID] == MSG_ATTR_KBD && buf[4] == 27)
+		ptid = CuiPtid;
+		if (KRecvProcMsg(&ptid, (DWORD*)buf, 0) == NO_ERROR)
 		{
-			CUIPutS(CuiPtid, "用户取消！\n");
-			break;
+			if (((DWORD*)buf)[MSG_ATTR_ID] == MSG_ATTR_CUIKEY && buf[4] == 27)	/*按下ESC键*/
+			{
+				CUIPutS(CuiPtid, "用户取消！\n");
+				break;
+			}
+			else if (((DWORD*)buf)[MSG_ATTR_ID] == MSG_ATTR_EXTPROCREQ)	/*退出请求*/
+				KExitProcess(NO_ERROR);
 		}
 	}
 	FSclose(FsPtid, dh);
@@ -313,11 +323,16 @@ void show(char *args)
 
 		buf[siz] = '\0';
 		CUIPutS(CuiPtid, buf);
-		ptid = KbdPtid;
-		if (KRecvProcMsg(&ptid, (DWORD*)buf, 0) == NO_ERROR && ((DWORD*)buf)[MSG_ATTR_ID] == MSG_ATTR_KBD && buf[4] == 27)
+		ptid = CuiPtid;
+		if (KRecvProcMsg(&ptid, (DWORD*)buf, 0) == NO_ERROR)
 		{
-			CUIPutS(CuiPtid, "用户取消！\n");
-			break;
+			if (((DWORD*)buf)[MSG_ATTR_ID] == MSG_ATTR_CUIKEY && buf[4] == 27)	/*按下ESC键*/
+			{
+				CUIPutS(CuiPtid, "用户取消！\n");
+				break;
+			}
+			else if (((DWORD*)buf)[MSG_ATTR_ID] == MSG_ATTR_EXTPROCREQ)	/*退出请求*/
+				KExitProcess(NO_ERROR);
 		}
 	}
 	FSclose(FsPtid, fh);
@@ -348,11 +363,16 @@ void proclist(char *args)
 
 		Sprintf(buf, "PID:%d\t%s\n", pid, fi.name);
 		CUIPutS(CuiPtid, buf);
-		ptid = KbdPtid;
-		if (KRecvProcMsg(&ptid, (DWORD*)buf, 0) == NO_ERROR && ((DWORD*)buf)[MSG_ATTR_ID] == MSG_ATTR_KBD && buf[4] == 27)
+		ptid = CuiPtid;
+		if (KRecvProcMsg(&ptid, (DWORD*)buf, 0) == NO_ERROR)
 		{
-			CUIPutS(CuiPtid, "用户取消！\n");
-			break;
+			if (((DWORD*)buf)[MSG_ATTR_ID] == MSG_ATTR_CUIKEY && buf[4] == 27)	/*按下ESC键*/
+			{
+				CUIPutS(CuiPtid, "用户取消！\n");
+				break;
+			}
+			else if (((DWORD*)buf)[MSG_ATTR_ID] == MSG_ATTR_EXTPROCREQ)	/*退出请求*/
+				KExitProcess(NO_ERROR);
 		}
 		pid++;
 	}
@@ -369,9 +389,18 @@ void killproc(char *args)
 void startgui(char *args)
 {
 	THREAD_ID ptid;
+	
+	if (KGetKptThed(SRV_GUI_PORT, &ptid) == NO_ERROR)
+	{
+		CUIPutS(CuiPtid, "图形界面已启动！\n");
+		return;
+	}
+	SendExitProcReq(CuiPtid);	/*关闭CUI*/
 	KCreateProcess(0, "gui.bin", NULL, &ptid);
-	KSleep(10);	/*延时,防止进程间依赖关系不满足*/
+	KSleep(5);	/*延时,防止进程间依赖关系不满足*/
 	KCreateProcess(0, "desktop.bin", NULL, &ptid);
+	KSleep(5);
+	KCreateProcess(0, "cui.bin", NULL, &ptid);	/*启动图像模式CUI*/
 	KExitProcess(NO_ERROR);
 }
 
@@ -542,9 +571,7 @@ int main()
 		return res;
 	if ((res = KGetKptThed(SRV_CUI_PORT, &CuiPtid)) != NO_ERROR)
 		return res;
-	if ((res = KGetKptThed(SRV_KBDMUS_PORT, &KbdPtid)) != NO_ERROR)
-		return res;
-	if ((res = KMSetRecv(KbdPtid)) != NO_ERROR)
+	if ((res = CUISetRecv(CuiPtid)) != NO_ERROR)
 		return res;
 	CUIPutS(CuiPtid,
 		"欢迎来到\n"
@@ -563,8 +590,10 @@ int main()
 
 		if ((res = KRecvMsg(&ptid, data, INVALID)) != NO_ERROR)
 			break;
-		if (data[MSG_ATTR_ID] == MSG_ATTR_KBD)	/*键盘消息*/
+		if (data[MSG_ATTR_ID] == MSG_ATTR_CUIKEY)	/*按键消息*/
 			KeyProc(data[1]);
+		else if (data[MSG_ATTR_ID] == MSG_ATTR_EXTPROCREQ)
+			break;
 	}
 	return NO_ERROR;
 }

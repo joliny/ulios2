@@ -171,7 +171,8 @@ void GCBtnSetText(CTRL_BTN *btn, const char *text);
 #define WND_STYLE_MINBTN	0x0010	/*×îÐ¡»¯°´Å¥*/
 #define WND_STYLE_SIZEBTN	0x0020	/*ÍÏ¶¯Ëõ·Å°´Å¥*/
 
-#define WND_STATE_TOP		0x8000	/*¶¥¶Ë×´Ì¬*/
+#define WND_STATE_FOCUS		0x8000	/*½¹µã×´Ì¬*/
+#define WND_STATE_TOP		0x4000	/*¶¥¶Ë×´Ì¬*/
 
 typedef struct _CTRL_WND
 {

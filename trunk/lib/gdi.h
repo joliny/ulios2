@@ -43,9 +43,6 @@ long GDIGetImage(long x, long y, DWORD *img, long w, long h);
 /*填充矩形*/
 long GDIFillRect(long x, long y, long w, long h, DWORD c);
 
-/*向上滚屏*/
-long GDIMoveUp(DWORD pix);
-
 /*画线*/
 long GDIDrawLine(long x1, long y1, long x2, long y2, DWORD c);
 

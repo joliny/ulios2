@@ -1285,17 +1285,19 @@ long GCSedtDefMsgProc(THREAD_ID ptid, DWORD data[MSG_DATA_LEN])
 			edt->obj.style |= SEDT_STATE_FOCUS;
 		else
 			edt->obj.style &= (~SEDT_STATE_FOCUS);
+		SedtDrawText(edt);
 		break;
 	case GM_LBUTTONDOWN:	/*鼠标按下*/
 		if (!(edt->obj.style & SEDT_STATE_FOCUS))
 			GUISetFocus(GCGuiPtid, edt->obj.gid);
 		{
 			DWORD len;
-			len = ((data[5] & 0xFFFF) - 1) / GCCharWidth;
+			len = ((data[5] & 0xFFFF) - 1 + GCCharWidth / 2) / GCCharWidth;
 			for (edt->CurC = edt->FstC; *edt->CurC; edt->CurC++, len--)
 				if (len == 0)
 					break;
 		}
+		SedtDrawText(edt);
 		break;
 	case GM_KEY:	/*按键*/
 		switch (data[1] & 0xFF)
@@ -1374,9 +1376,9 @@ long GCSedtDefMsgProc(THREAD_ID ptid, DWORD data[MSG_DATA_LEN])
 				}
 			}
 		}
+		SedtDrawText(edt);
 		break;
 	}
-	SedtDrawText(edt);
 	return NO_ERROR;
 }
 

@@ -124,7 +124,7 @@ int main()
 	KbdState = KbdFlag = 0;
 	MusKey = MusCou = 0;
 	MusZ = MusY = MusX = 0;
-	CurRecv = NULL;
+	CurRecv = RecvPtid - 1;
 	for (;;)
 	{
 		THREAD_ID ptid;
@@ -302,15 +302,12 @@ int main()
 					KbdKey |= KbdState;
 					data[MSG_ATTR_ID] = MSG_ATTR_KBD;
 					data[1] = KbdKey;
-					while (CurRecv)
+					while (CurRecv >= RecvPtid)
 					{
 						res = KSendMsg(CurRecv, data, 0);
 						if (res != KERR_PROC_NOT_EXIST && res != KERR_THED_NOT_EXIST)
 							break;
-						if (CurRecv != RecvPtid)	/*无法发送到栈中的线程则忽略该线程*/
-							CurRecv--;
-						else
-							CurRecv = NULL;
+						CurRecv--;	/*无法发送到栈中的线程则忽略该线程*/
 					}
 				}
 				KbdFlag = 0;
@@ -351,28 +348,20 @@ int main()
 				data[2] = MusX;
 				data[3] = MusY;
 				data[4] = MusZ;
-				while (CurRecv)
+				while (CurRecv >= RecvPtid)
 				{
 					res = KSendMsg(CurRecv, data, 0);
 					if (res != KERR_PROC_NOT_EXIST && res != KERR_THED_NOT_EXIST)
 						break;
-					if (CurRecv != RecvPtid)	/*无法发送到栈中的线程则忽略该线程*/
-						CurRecv--;
-					else
-						CurRecv = NULL;
+					CurRecv--;	/*无法发送到栈中的线程则忽略该线程*/
 				}
 				break;
 			}
 			break;
 		case MSG_ATTR_KBDMUS:	/*应用请求消息*/
-			if ((data[MSG_API_ID] & MSG_API_MASK) == KBDMUS_API_SETRECV && CurRecv != &RecvPtid[RECVPTID_LEN - 1])	/*PTID栈不满时注册接收键盘鼠标消息的线程*/
-			{
-				if (CurRecv)
-					CurRecv++;
-				else
-					CurRecv = RecvPtid;
-				*CurRecv = ptid;
-			}
+			if ((data[MSG_API_ID] & MSG_API_MASK) == KBDMUS_API_SETRECV)
+				if (CurRecv < &RecvPtid[RECVPTID_LEN - 1])	/*PTID栈不满时注册接收键盘鼠标消息的线程*/
+					*(++CurRecv) = ptid;
 			break;
 		}
 	}

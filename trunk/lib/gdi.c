@@ -453,15 +453,6 @@ long GDIFillRect(long x, long y, long w, long h, DWORD c)
 	return NO_ERROR;
 }
 
-/*向上滚屏*/
-long GDIMoveUp(DWORD pix)
-{
-	if (pix >= GDIheight)
-		return GDI_ERR_LOCATION;
-	memcpy32(GDIvm, GDIvm + ((GDIPixBits + 7) >> 3) * GDIwidth * pix, ((GDIPixBits + 7) >> 3) * GDIwidth * (GDIheight - pix) / sizeof(DWORD));
-	return NO_ERROR;
-}
-
 #define abs(v) ((v) >= 0 ? (v) : -(v))
 
 /*无越界判断画点*/

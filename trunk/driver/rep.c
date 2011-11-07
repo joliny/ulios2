@@ -111,8 +111,6 @@ int main()
 
 	if ((res = KRegKnlPort(SRV_REP_PORT)) != NO_ERROR)	/*注册服务端口号*/
 		return res;
-	if ((res = KGetKptThed(SRV_CUI_PORT, &CuiPtid)) != NO_ERROR)
-		return res;
 	if ((res = KGetKptThed(SRV_SPK_PORT, &SpkPtid)) != NO_ERROR)
 		return res;
 	for (;;)
@@ -124,16 +122,19 @@ int main()
 		if ((res = KRecvMsg(&ptid, data, INVALID)) != NO_ERROR)	/*等待消息*/
 			break;
 		SPKSound(SpkPtid, 1000);	/*发出报警声音*/
-		switch (data[MSG_ATTR_ID] & MSG_ATTR_MASK)
+		if (KGetKptThed(SRV_CUI_PORT, &CuiPtid) == NO_ERROR)
 		{
-		case MSG_ATTR_ISR:
-			Sprintf(buf, "报告：线程(pid=%d tid=%d)出现不可恢复的异常。ISR=%u：%s，错误码=0x%X，程序地址EIP=0x%X\n", ptid.ProcID, ptid.ThedID, data[1], IsrStr[data[1]], data[2], data[3]);
-			CUIPutS(CuiPtid, buf);
-			break;
-		case MSG_ATTR_EXCEP:
-			Sprintf(buf, "报告：线程(pid=%d tid=%d)不正常退出。错误=%d，异常地址=0x%X，程序地址EIP=0x%X\n", ptid.ProcID, ptid.ThedID, data[MSG_RES_ID], data[MSG_ADDR_ID], data[MSG_SIZE_ID]);
-			CUIPutS(CuiPtid, buf);
-			break;
+			switch (data[MSG_ATTR_ID] & MSG_ATTR_MASK)
+			{
+			case MSG_ATTR_ISR:
+				Sprintf(buf, "报告：线程(pid=%d tid=%d)出现不可恢复的异常。ISR=%u：%s，错误码=0x%X，程序地址EIP=0x%X\n", ptid.ProcID, ptid.ThedID, data[1], IsrStr[data[1]], data[2], data[3]);
+				CUIPutS(CuiPtid, buf);
+				break;
+			case MSG_ATTR_EXCEP:
+				Sprintf(buf, "报告：线程(pid=%d tid=%d)不正常退出。错误=%d，异常地址=0x%X，程序地址EIP=0x%X\n", ptid.ProcID, ptid.ThedID, data[MSG_RES_ID], data[MSG_ADDR_ID], data[MSG_SIZE_ID]);
+				CUIPutS(CuiPtid, buf);
+				break;
+			}
 		}
 		KSleep(20);
 		SPKNosound(SpkPtid);

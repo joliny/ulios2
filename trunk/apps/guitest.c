@@ -88,10 +88,11 @@ int main()
 
 		if ((res = KRecvMsg(&ptid, data, INVALID)) != NO_ERROR)	/*等待消息*/
 			break;
-		if (GCDispatchMsg(ptid, data) == GC_ERR_INVALID_GUIMSG)	/*非GUI消息另行处理*/
-			;
-		else if ((data[MSG_ATTR_ID] & MSG_API_MASK) == GM_DESTROY && data[GUIMSG_GOBJ_ID] == (DWORD)wnd)	/*销毁主窗体,退出程序*/
-			break;
+		if (GCDispatchMsg(ptid, data) == NO_ERROR)	/*处理GUI消息*/
+		{
+			if ((data[MSG_ATTR_ID] & MSG_API_MASK) == GM_DESTROY && data[GUIMSG_GOBJ_ID] == (DWORD)wnd)	/*销毁主窗体,退出程序*/
+				break;
+		}
 	}
 	return NO_ERROR;
 }
