@@ -66,6 +66,7 @@
 #define GM_MOUSEWHEEL	0x8F	/*鼠标滚轮*/
 
 #define GM_KEY			0xA0	/*按键消息*/
+#define GM_IMEPUTKEY	0xA1	/*输入法出字消息*/
 
 #define GM_UNMAPVBUF	0x0100	/*撤销显示缓冲映射*/
 
