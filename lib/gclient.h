@@ -230,6 +230,7 @@ void GCTxtSetText(CTRL_TXT *txt, const char *text);
 #define SEDT_STYLE_RDONLY	0x0001	/*只读*/
 
 #define SEDT_STATE_FOCUS	0x8000	/*焦点状态*/
+#define SEDT_STATE_IME		0x4000	/*开启输入法*/
 
 typedef struct _CTRL_SEDT
 {

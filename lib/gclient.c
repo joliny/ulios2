@@ -1288,6 +1288,8 @@ long GCSedtDefMsgProc(THREAD_ID ptid, DWORD data[MSG_DATA_LEN])
 		SedtDrawText(edt);
 		break;
 	case GM_LBUTTONDOWN:	/*鼠标按下*/
+		if (edt->obj.style & SEDT_STYLE_RDONLY)
+			break;
 		if (!(edt->obj.style & SEDT_STATE_FOCUS))
 			GUISetFocus(GCGuiPtid, edt->obj.gid);
 		{
@@ -1300,6 +1302,39 @@ long GCSedtDefMsgProc(THREAD_ID ptid, DWORD data[MSG_DATA_LEN])
 		SedtDrawText(edt);
 		break;
 	case GM_KEY:	/*按键*/
+		if (edt->obj.style & SEDT_STYLE_RDONLY)
+			break;
+		if ((data[1] & (KBD_STATE_LCTRL | KBD_STATE_RCTRL)) && (data[1] & 0xFF) == ' ')	/*按下Ctrl+空格,开关输入法*/
+		{
+			THREAD_ID ime;
+			if (KGetKptThed(SRV_IME_PORT, &ime) == NO_ERROR)	/*输入法服务正常*/
+			{
+				if (edt->obj.style & SEDT_STATE_IME)
+				{
+					edt->obj.style &= (~SEDT_STATE_IME);
+					IMECloseBar(ime);
+				}
+				else
+				{
+					edt->obj.style |= SEDT_STATE_IME;
+					IMEOpenBar(ime, edt->obj.x + edt->obj.par->x, edt->obj.y + edt->obj.par->y - 20);
+				}
+			}
+			break;
+		}
+		else if (edt->obj.style & SEDT_STATE_IME)	/*输入法已开启*/
+		{
+			THREAD_ID ime;
+			if (KGetKptThed(SRV_IME_PORT, &ime) == NO_ERROR)	/*输入法服务正常*/
+			{
+				data[MSG_API_ID] = MSG_ATTR_IME | IME_API_PUTKEY;
+				KSendMsg(&ime, data, 0);
+				data[MSG_API_ID] = MSG_ATTR_GUI | GM_KEY;
+			}
+			else	/*不正常时不使用输入法*/
+				edt->obj.style &= (~SEDT_STATE_IME);
+			break;
+		}
 		switch (data[1] & 0xFF)
 		{
 		case '\b':	/*退格键*/
@@ -1377,6 +1412,27 @@ long GCSedtDefMsgProc(THREAD_ID ptid, DWORD data[MSG_DATA_LEN])
 			}
 		}
 		SedtDrawText(edt);
+		break;
+	case GM_IMEPUTKEY:
+		{
+			DWORD len;
+			len = strlen(edt->text);
+			if (len < SEDT_TXT_LEN - 2)	/*缓冲没满*/
+			{
+				char *strp;
+				strp = edt->text + len + 2;
+				do
+				*strp = *(strp - 2);
+				while (--strp > edt->CurC);	/*反向搬移字符*/
+				*edt->CurC = (char)(BYTE)data[1];
+				*(edt->CurC + 1) = (char)(BYTE)(data[1] >> 8);
+				edt->CurC += 2;	/*移动光标*/
+				len = (edt->obj.uda.width - 4) / GCCharWidth;	/*计算框内可显示字符数*/
+				if (edt->FstC < edt->CurC - len)
+					edt->FstC = edt->CurC - len;	/*移动首字符*/
+				SedtDrawText(edt);
+			}
+		}
 		break;
 	}
 	return NO_ERROR;

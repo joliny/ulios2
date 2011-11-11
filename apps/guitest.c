@@ -57,7 +57,10 @@ long MainMsgProc(THREAD_ID ptid, DWORD data[MSG_DATA_LEN])
 		}
 		break;
 	case GM_LBUTTONDBCLK:
-		GCWndSetCaption(wnd, "哈喽老婆！");
+		GCWndSetCaption(wnd, "双击了！");
+		break;
+	case GM_MOUSEWHEEL:
+		GUImove(GCGuiPtid, wnd->obj.gid, wnd->obj.x, wnd->obj.y + (long)data[4]);
 		break;
 	}
 	return GCWndDefMsgProc(ptid, data);
@@ -90,7 +93,7 @@ int main()
 			break;
 		if (GCDispatchMsg(ptid, data) == NO_ERROR)	/*处理GUI消息*/
 		{
-			if ((data[MSG_ATTR_ID] & MSG_API_MASK) == GM_DESTROY && data[GUIMSG_GOBJ_ID] == (DWORD)wnd)	/*销毁主窗体,退出程序*/
+			if ((data[MSG_API_ID] & MSG_API_MASK) == GM_DESTROY && data[GUIMSG_GOBJ_ID] == (DWORD)wnd)	/*销毁主窗体,退出程序*/
 				break;
 		}
 	}

@@ -125,6 +125,10 @@ DEP_CPP_FONT_=\
 # End Source File
 # Begin Source File
 
+SOURCE=.\driver\ime.c
+# End Source File
+# Begin Source File
+
 SOURCE=.\driver\kbdmus.c
 # End Source File
 # Begin Source File

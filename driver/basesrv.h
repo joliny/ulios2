@@ -431,4 +431,40 @@ static inline long UARTReadCom(THREAD_ID ptid, DWORD com, void *buf, DWORD siz, 
 	return data[MSG_RES_ID];
 }
 
+/**********输入法服务相关**********/
+#define SRV_IME_PORT	11	/*输入法服务端口*/
+
+#define MSG_ATTR_IME	0x010B0000	/*输入法消息*/
+
+#define IME_API_OPENBAR		0	/*打开输入法工具条功能号*/
+#define IME_API_CLOSEBAR	1	/*关闭输入法工具条功能号*/
+#define IME_API_PUTKEY		2	/*向输入法发送按键功能号*/
+
+/*打开输入法工具条*/
+static inline long IMEOpenBar(THREAD_ID ptid, long x, long y)
+{
+	DWORD data[MSG_DATA_LEN];
+	data[MSG_API_ID] = MSG_ATTR_IME | IME_API_OPENBAR;
+	data[1] = x;
+	data[2] = y;
+	return KSendMsg(&ptid, data, 0);
+}
+
+/*关闭输入法工具条*/
+static inline long IMECloseBar(THREAD_ID ptid)
+{
+	DWORD data[MSG_DATA_LEN];
+	data[MSG_API_ID] = MSG_ATTR_IME | IME_API_CLOSEBAR;
+	return KSendMsg(&ptid, data, 0);
+}
+
+/*向输入法发送按键*/
+static inline long IMEPutKey(THREAD_ID ptid, DWORD key)
+{
+	DWORD data[MSG_DATA_LEN];
+	data[MSG_API_ID] = MSG_ATTR_IME | IME_API_PUTKEY;
+	data[1] = key;
+	return KSendMsg(&ptid, data, 0);
+}
+
 #endif

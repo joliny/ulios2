@@ -73,7 +73,7 @@ int main()
 			break;
 		if (GCDispatchMsg(ptid, data) == NO_ERROR)	/*处理GUI消息*/
 		{
-			if ((data[MSG_ATTR_ID] & MSG_API_MASK) == GM_DESTROY && data[GUIMSG_GOBJ_ID] == (DWORD)dsk)	/*销毁主窗体,退出程序*/
+			if ((data[MSG_API_ID] & MSG_API_MASK) == GM_DESTROY && data[GUIMSG_GOBJ_ID] == (DWORD)dsk)	/*销毁主窗体,退出程序*/
 				break;
 		}
 	}
