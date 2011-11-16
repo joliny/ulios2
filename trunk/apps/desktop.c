@@ -8,6 +8,49 @@
 #include "../lib/malloc.h"
 #include "../lib/gclient.h"
 
+/*双线性插值24位图像缩放,参数:源缓冲,源尺寸,目的缓冲,目的尺寸*/
+void ZoomImage(DWORD *src, DWORD sw, DWORD sh, DWORD *dst, DWORD dw, DWORD dh)
+{
+	DWORD ScaleX, ScaleY, x, y, IdxX, IdxY, DecX, DecY;	// 比例,循环计数,源数组索引,点间偏移小数
+	ScaleX = ((sw - 1) << 16) / dw;
+	ScaleY = ((sh - 1) << 16) / dh;
+	IdxY = 0;
+	y = dh;
+	do
+	{
+		DecY = (IdxY >> 8) & 0xFF;
+		IdxX = 0;
+		x = dw;
+		do
+		{
+			DecX = (IdxX >> 8) & 0xFF;
+
+			DWORD tr1, tg1, tb1, tr2, tg2, tb2;	// 三原色临时变量
+			DWORD a, b, c, d;
+			DWORD *psrc = &src[(IdxX >> 16) + (IdxY >> 16) * sw];
+			a = *(psrc);	// 取得源中与目标点相关的四个点
+			b = *(psrc + 1);
+			c = *(psrc + sw);
+			d = *(psrc + sw + 1);
+
+			tr1 = DecX * (long)((b & 0x0000FF) - (a & 0x0000FF)) + ((a & 0x0000FF) << 8);	// a和b c和d横向计算
+			tg1 = DecX * (long)((b & 0x00FF00) - (a & 0x00FF00)) + ((a & 0x00FF00) << 8);
+			tb1 = DecX * (long)((b & 0xFF0000) - (a & 0xFF0000)) + ((a & 0xFF0000) << 8);
+			tr2 = DecX * (long)((d & 0x0000FF) - (c & 0x0000FF)) + ((c & 0x0000FF) << 8);
+			tg2 = DecX * (long)((d & 0x00FF00) - (c & 0x00FF00)) + ((c & 0x00FF00) << 8);
+			tb2 = DecX * (long)((d & 0xFF0000) - (c & 0xFF0000)) + ((c & 0xFF0000) << 8);
+			tr1 += DecY * (long)((tr2 >> 8) - (tr1 >> 8));	// 纵向计算
+			tg1 += DecY * (long)((tg2 >> 8) - (tg1 >> 8));
+			tb1 += DecY * (long)((tb2 >> 8) - (tb1 >> 8));
+			*dst++ = ((tr1 & 0x0000FF00) | (tg1 & 0x00FF0000) | (tb1 & 0xFF000000)) >> 8;	// 三原色合成
+			IdxX += ScaleX;
+		}
+		while (--x > 0);
+		IdxY += ScaleY;
+	}
+	while (--y > 0);
+}
+
 void CmdProc(CTRL_BTN *btn)
 {
 	THREAD_ID ptid;
@@ -28,7 +71,14 @@ long MainMsgProc(THREAD_ID ptid, DWORD data[MSG_DATA_LEN])
 	{
 	case GM_CREATE:
 		GCDskDefMsgProc(ptid, data);
-		GCLoadBmp("desktop.bmp", dsk->obj.uda.vbuf, dsk->obj.uda.width * dsk->obj.uda.height, NULL, NULL);
+		{
+			DWORD *bmp, BmpWidth, BmpHeight;
+			GCLoadBmp("desktop.bmp", NULL, 0, &BmpWidth, &BmpHeight);
+			bmp = (DWORD*)malloc(BmpWidth * BmpHeight * sizeof(DWORD));
+			GCLoadBmp("desktop.bmp", bmp, BmpWidth * BmpHeight, NULL, NULL);
+			ZoomImage(bmp, BmpWidth, BmpHeight, dsk->obj.uda.vbuf, dsk->obj.uda.width, dsk->obj.uda.height);
+			free(bmp);
+		}
 		{
 			CTRL_ARGS args;
 			args.width = 80;

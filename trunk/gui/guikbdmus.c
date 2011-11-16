@@ -42,7 +42,7 @@ long InitMouse()
 {
 	long res;
 
-	if ((res = LoadBmp("guimouse.bmp", MusPic, MUSPIC_MAXLEN, &MusPicWidth, &MusPicHeight)) != NO_ERROR)
+	if ((res = LoadBmp("guimouse.bmp", MusPic, MUSPIC_MAXLEN, (DWORD*)&MusPicWidth, (DWORD*)&MusPicHeight)) != NO_ERROR)
 		return res;
 	MusX = GDIwidth / 2;
 	MusY = GDIheight / 2;

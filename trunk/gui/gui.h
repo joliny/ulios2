@@ -113,7 +113,7 @@ void GDIPutBCImage(long x, long y, DWORD *img, long w, long h, DWORD bc);
 void GuiPutImage(long x, long y, DWORD *img, long memw, long w, long h);
 
 /*加载BMP图像文件*/
-long LoadBmp(char *path, DWORD *buf, DWORD len, long *width, long *height);
+long LoadBmp(char *path, DWORD *buf, DWORD len, DWORD *width, DWORD *height);
 
 /**********键盘鼠标功能相关**********/
 
