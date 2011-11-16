@@ -333,11 +333,12 @@ void GuiPutImage(long x, long y, DWORD *img, long memw, long w, long h)
 }
 
 /*加载BMP图像文件*/
-long LoadBmp(char *path, DWORD *buf, DWORD len, long *width, long *height)
+long LoadBmp(char *path, DWORD *buf, DWORD len, DWORD *width, DWORD *height)
 {
 	BYTE BmpHead[32];
 	THREAD_ID FsPtid;
-	long bmpw, bmph, file, res;
+	DWORD bmpw, bmph;
+	long file, res;
 
 	if ((res = KGetKptThed(SRV_FS_PORT, &FsPtid)) != NO_ERROR)	/*取得文件系统服务线程*/
 		return res;
@@ -348,16 +349,20 @@ long LoadBmp(char *path, DWORD *buf, DWORD len, long *width, long *height)
 		FSclose(FsPtid, file);
 		return -1;
 	}
-	bmpw = *((long*)&BmpHead[20]);
-	bmph = *((long*)&BmpHead[24]);
+	bmpw = *((DWORD*)&BmpHead[20]);
+	bmph = *((DWORD*)&BmpHead[24]);
+	if (width)
+		*width = bmpw;
+	if (height)
+		*height = bmph;
 	if (bmpw * bmph > len)
 	{
 		FSclose(FsPtid, file);
 		return -1;
 	}
 	FSseek(FsPtid, file, 54, FS_SEEK_SET);
-	len = ((DWORD)bmpw * 3 + 3) & 0xFFFFFFFC;
-	for (res = bmph, buf += bmpw * (res - 1); res > 0; res--, buf -= bmpw)
+	len = (bmpw * 3 + 3) & 0xFFFFFFFC;
+	for (buf += bmpw * (bmph - 1); bmph > 0; bmph--, buf -= bmpw)
 	{
 		BYTE *src, *dst;
 
@@ -377,9 +382,5 @@ long LoadBmp(char *path, DWORD *buf, DWORD len, long *width, long *height)
 		}
 	}
 	FSclose(FsPtid, file);
-	if (width)
-		*width = bmpw;
-	if (height)
-		*height = bmph;
 	return NO_ERROR;
 }

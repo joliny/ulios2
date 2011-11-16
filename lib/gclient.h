@@ -75,7 +75,7 @@ long GCDrawAscii(UDI_AREA *uda, long x, long y, DWORD ch, DWORD c);
 long GCDrawStr(UDI_AREA *uda, long x, long y, const char *str, DWORD c);
 
 /*加载BMP图像文件*/
-long GCLoadBmp(char *path, DWORD *buf, DWORD len, long *width, long *height);
+long GCLoadBmp(char *path, DWORD *buf, DWORD len, DWORD *width, DWORD *height);
 
 /**********GUI客户端自定义消息**********/
 
