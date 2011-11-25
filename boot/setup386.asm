@@ -184,35 +184,6 @@ PteLop:	stosd
 	add	eax,	0x1000
 	loop	PteLop
 ;----------------------------------------
-;对8259中断芯片进行编程,参考linux 0.11
-	mov	al,	0x11
-	out	0x20,	al
-	out	0xA0,	al
-	mov	al,	0x20
-	out	0x21,	al
-	mov	al,	0x28
-	out	0xA1,	al
-	mov	al,	0x04
-	out	0x21,	al
-	mov	al,	0x02
-	out	0xA1,	al
-	mov	al,	0x01
-	out	0x21,	al
-	out	0xA1,	al
-	mov	al,	0xFF	;禁止所有中断
-	out	0x21,	al
-	out	0xA1,	al
-;----------------------------------------
-;对8253时钟芯片进行编程,参考linux 0.00
-	mov	al,	0x36
-	mov	dx,	0x43
-	out	dx,	al
-	mov	ax,	0x2E9A	;时钟中断频率:100HZ
-	mov	dx,	0x40
-	out	dx,	al
-	mov	al,	ah
-	out	dx,	al
-;----------------------------------------
 ;加载idt,gdt,pde
 	mov	ax,	cs
 	mov	ds,	ax

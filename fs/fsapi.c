@@ -25,6 +25,7 @@ extern long SetSize(PROCRES_DESC *pres, DWORD fhi, QWORD siz);
 extern long OpenDir(PROCRES_DESC *pres, const char *path, DWORD *fhi);
 extern long ReadDir(PROCRES_DESC *pres, DWORD fhi, FILE_INFO *fi);
 extern long ChDir(PROCRES_DESC *pres, const char *path);
+extern long GetCwd(PROCRES_DESC *pres, char *path, DWORD *siz);
 extern long MkDir(PROCRES_DESC *pres, const char *path);
 extern long remove(PROCRES_DESC *pres, const char *path);
 extern long rename(PROCRES_DESC *pres, const char *path, const char *name);
@@ -273,6 +274,23 @@ void ApiChDir(DWORD *argv)
 	KUnmapProcAddr((void*)path, argv);
 }
 
+void ApiGetCwd(DWORD *argv)
+{
+	char *path;
+
+	if ((argv[MSG_ATTR_ID] & MSG_MAP_MASK) != MSG_ATTR_ROMAP)
+		return;
+	if ((argv[MSG_ATTR_ID] & MSG_ATTR_MASK) == MSG_ATTR_ROMAP)
+	{
+		argv[MSG_RES_ID] = FS_ERR_WRONG_ARGS;
+		KUnmapProcAddr((void*)argv[MSG_ADDR_ID], argv);
+		return;
+	}
+	path = (char*)argv[MSG_ADDR_ID];
+	argv[MSG_RES_ID] = GetCwd(pret[((THREAD_ID*)&argv[PTID_ID])->ProcID], path, &argv[MSG_SIZE_ID]);
+	KUnmapProcAddr((void*)path, argv);
+}
+
 void ApiMkDir(DWORD *argv)
 {
 	const char *path;
@@ -386,7 +404,7 @@ void ApiProcInfo(DWORD *argv)
 void (*ApiTable[])(DWORD *argv) = {
 	ApiGetExec, ApiReadPage, ApiProcExit, ApiEnumPart, ApiGetPart, ApiSetPart, ApiCreat, ApiOpen,
 	ApiClose, ApiRead, ApiWrite, ApiSeek, ApiSetSize, ApiOpenDir, ApiReadDir, ApiChDir,
-	ApiMkDir, ApiRemove, ApiReName, ApiGetAttr, ApiSetAttr, ApiSetTime, ApiProcInfo
+	ApiGetCwd, ApiMkDir, ApiRemove, ApiReName, ApiGetAttr, ApiSetAttr, ApiSetTime, ApiProcInfo
 };
 
 /*高速缓冲保存线程*/

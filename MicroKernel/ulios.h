@@ -149,12 +149,26 @@ SEG_GATE_DESC IsrIdtTable[] = {
 static inline void InitINTR()
 {
 	memcpy32(idt, IsrIdtTable, sizeof(IsrIdtTable) / sizeof(DWORD));	/*复制20个ISR的门描述符*/
-	SetGate(&idt[INTN_APICALL], KCODE_SEL, (DWORD)AsmApiCall, DESC_ATTR_P | DESC_ATTR_DPL3 | GATE_ATTR_T_TRAP);	/*系统调用*/
+	SetGate(&idt[INTN_APICALL], KCODE_SEL, (DWORD)AsmApiCall, DESC_ATTR_P | DESC_ATTR_DPL3 | GATE_ATTR_T_TRAP);	/*设置系统调用*/
 	memset32(IrqPort, INVALID, IRQ_LEN * sizeof(THREAD_ID) / sizeof(DWORD));	/*初始化IRQ端口注册表*/
 	/*开时钟和从片8259中断*/
 	SetGate(&idt[0x20 + IRQN_TIMER], KCODE_SEL, (DWORD)AsmIrq0, DESC_ATTR_P | DESC_ATTR_DPL0 | GATE_ATTR_T_INTR);
 	SetGate(&idt[0x20 + IRQN_SLAVE8259], KCODE_SEL, (DWORD)AsmIrq2, DESC_ATTR_P | DESC_ATTR_DPL0 | GATE_ATTR_T_INTR);
-	outb(MASTER8259_PORT, IRQ_INIT_MASK);
+	/*对8259中断芯片进行编程,参考linux 0.11*/
+	outb(0x20, 0x11);
+	outb(0xA0, 0x11);
+	outb(MASTER8259_PORT, 0x20);
+	outb(SLAVER8259_PORT, 0x28);
+	outb(MASTER8259_PORT, 0x04);
+	outb(SLAVER8259_PORT, 0x02);
+	outb(MASTER8259_PORT, 0x01);
+	outb(SLAVER8259_PORT, 0x01);
+	outb(MASTER8259_PORT, 0xFA);	/*主8259A只开启时钟*/
+	outb(SLAVER8259_PORT, 0xFF);	/*从8259A全部禁止*/
+	/*对8253时钟芯片进行编程,参考linux 0.00*/
+	outb(0x43, 0x36);
+	outb(0x40, 0x9C);	/*时钟中断频率:100HZ,写入字:1193180/100*/
+	outb(0x40, 0x2E);
 }
 
 /*初始化基础服务*/

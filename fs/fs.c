@@ -990,6 +990,57 @@ long ChDir(PROCRES_DESC *pres, const char *path)
 	return NO_ERROR;
 }
 
+/*递归取得目录项的绝对路径*/
+char *GetAbsPath(FILE_DESC *fd, char *path, DWORD siz)
+{
+	if (fd->par)	/*取得父目录*/
+	{
+		char *TmpPath;	/*路径尾指针*/
+		TmpPath = GetAbsPath(fd->par, path, siz);
+		if (TmpPath > path)
+		{
+			DWORD TmpSiz;
+			siz -= TmpPath - path;	/*计算剩余字符数*/
+			TmpSiz = strlen(fd->file.name);
+			if (1 + TmpSiz <= siz)
+			{
+				*TmpPath++ = '/';
+				memcpy8(TmpPath, fd->file.name, TmpSiz);
+				path = TmpPath + TmpSiz;
+			}
+		}
+	}
+	else	/*取得根目录*/
+	{
+		if (siz >= 3)	/*容得下/??三个字符*/
+		{
+			DWORD id;
+			id = fd->part - part;
+			*path++ = '/';
+			if (id >= 10)	/*简易itoa*/
+				*path++ = '0' + id / 10;
+			*path++ = '0' + id % 10;
+		}
+	}
+	return path;
+}
+
+/*取得当前目录*/
+long GetCwd(PROCRES_DESC *pres, char *path, DWORD *siz)
+{
+	FILE_DESC *CurFile;
+	char *TmpPath;	/*路径尾指针*/
+
+	if ((CurFile = pres->CurDir) == NULL)
+		return FS_ERR_WRONG_CURDIR;
+	TmpPath = GetAbsPath(CurFile, path, *siz - 1);
+	if (TmpPath <= path)
+		return FS_ERR_WRONG_ARGS;
+	*TmpPath++ = '\0';
+	*siz = TmpPath - path;
+	return NO_ERROR;
+}
+
 /*创建目录*/
 long MkDir(PROCRES_DESC *pres, const char *path)
 {

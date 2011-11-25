@@ -210,7 +210,7 @@ int Fat32Setup(PART_INF *part, BOOL isAdvCpu)
 	if (RwSector(part->drv, FALSE, part->fst, 1, FAR2LINE((DWORD)((void far *)&dbr))) != NO_ERROR)
 		return ERROR_DISK;
 	printf("Reading... f32boot\n");
-	if ((f = fopen("F32BOOT", "rb")) == NULL)
+	if ((f = fopen("f32boot", "rb")) == NULL)
 		return ERROR_FILE;
 	fread(&boot, sizeof(FAT32_BOOTSEC), 1, f);
 	fclose(f);
@@ -222,7 +222,7 @@ int Fat32Setup(PART_INF *part, BOOL isAdvCpu)
 	memset(buf, 0, sizeof(buf));
 
 	printf("Reading... f32ldr\n");
-	if ((f = fopen("F32LDR", "rb")) == NULL)
+	if ((f = fopen("f32ldr", "rb")) == NULL)
 		return ERROR_FILE;
 	fseek(f, 0xF00, SEEK_SET);
 	fread(buf, 0xA00, 1, f);
@@ -230,13 +230,13 @@ int Fat32Setup(PART_INF *part, BOOL isAdvCpu)
 	if (isAdvCpu)
 	{
 		printf("Reading... setup\n");
-		if ((f = fopen("SETUP", "rb")) == NULL)
+		if ((f = fopen("setup", "rb")) == NULL)
 			return ERROR_FILE;
 	}
 	else
 	{
 		printf("Reading... setup386\n");
-		if ((f = fopen("SETUP386", "rb")) == NULL)
+		if ((f = fopen("setup386", "rb")) == NULL)
 			return ERROR_FILE;
 	}
 	fread(&buf[0xA00], 0x400, 1, f);
@@ -249,7 +249,7 @@ int Fat32Setup(PART_INF *part, BOOL isAdvCpu)
 	if (RwSector(part->drv, TRUE, part->fst, 1, FAR2LINE((DWORD)((void far *)&boot))) != NO_ERROR)
 		return ERROR_DISK;
 	printf("Writing... f32boot.sec\n");
-	if ((f = fopen("F32BOOT.SEC", "wb")) == NULL)
+	if ((f = fopen("f32boot.sec", "wb")) == NULL)
 		return ERROR_FILE;
 	fwrite(&boot, sizeof(FAT32_BOOTSEC), 1, f);
 	fclose(f);
@@ -267,7 +267,7 @@ int UlifsSetup(PART_INF *part, BOOL isAdvCpu)
 	if (RwSector(part->drv, FALSE, part->fst, 1, FAR2LINE((DWORD)((void far *)&dbr))) != NO_ERROR)
 		return ERROR_DISK;
 	printf("Reading... uliboot\n");
-	if ((f = fopen("ULIBOOT", "rb")) == NULL)
+	if ((f = fopen("uliboot", "rb")) == NULL)
 		return ERROR_FILE;
 	fread(&boot, sizeof(ULIFS_BOOTSEC), 1, f);
 	fclose(f);
@@ -278,7 +278,7 @@ int UlifsSetup(PART_INF *part, BOOL isAdvCpu)
 	memset(buf, 0, sizeof(buf));
 
 	printf("Reading... ulildr\n");
-	if ((f = fopen("ULILDR", "rb")) == NULL)
+	if ((f = fopen("ulildr", "rb")) == NULL)
 		return ERROR_FILE;
 	fseek(f, 0xF00, SEEK_SET);
 	fread(buf, 0xA00, 1, f);
@@ -286,13 +286,13 @@ int UlifsSetup(PART_INF *part, BOOL isAdvCpu)
 	if (isAdvCpu)
 	{
 		printf("Reading... setup\n");
-		if ((f = fopen("SETUP", "rb")) == NULL)
+		if ((f = fopen("setup", "rb")) == NULL)
 			return ERROR_FILE;
 	}
 	else
 	{
 		printf("Reading... setup386\n");
-		if ((f = fopen("SETUP386", "rb")) == NULL)
+		if ((f = fopen("setup386", "rb")) == NULL)
 			return ERROR_FILE;
 	}
 	fread(&buf[0xA00], 0x400, 1, f);
@@ -305,7 +305,7 @@ int UlifsSetup(PART_INF *part, BOOL isAdvCpu)
 	if (RwSector(part->drv, TRUE, part->fst, 1, FAR2LINE((DWORD)((void far *)&boot))) != NO_ERROR)
 		return ERROR_DISK;
 	printf("Writing... uliboot.sec\n");
-	if ((f = fopen("ULIBOOT.SEC", "wb")) == NULL)
+	if ((f = fopen("uliboot.sec", "wb")) == NULL)
 		return ERROR_FILE;
 	fwrite(&boot, sizeof(ULIFS_BOOTSEC), 1, f);
 	fclose(f);

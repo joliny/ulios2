@@ -75,13 +75,14 @@ typedef struct _FILE_INFO
 #define FS_API_OPENDIR	13	/*打开目录*/
 #define FS_API_READDIR	14	/*读取目录*/
 #define FS_API_CHDIR	15	/*切换当前目录*/
-#define FS_API_MKDIR	16	/*创建目录*/
-#define FS_API_REMOVE	17	/*删除文件或空目录*/
-#define FS_API_RENAME	18	/*重命名文件或目录*/
-#define FS_API_GETATTR	19	/*取得文件或目录的属性信息*/
-#define FS_API_SETATTR	20	/*设置文件或目录的属性*/
-#define FS_API_SETTIME	21	/*设置文件或目录的时间*/
-#define FS_API_PROCINFO	22	/*取得进程信息*/
+#define FS_API_GETCWD	16	/*取得当前目录*/
+#define FS_API_MKDIR	17	/*创建目录*/
+#define FS_API_REMOVE	18	/*删除文件或空目录*/
+#define FS_API_RENAME	19	/*重命名文件或目录*/
+#define FS_API_GETATTR	20	/*取得文件或目录的属性信息*/
+#define FS_API_SETATTR	21	/*设置文件或目录的属性*/
+#define FS_API_SETTIME	22	/*设置文件或目录的时间*/
+#define FS_API_PROCINFO	23	/*取得进程信息*/
 
 /*错误定义*/
 #define FS_ERR_HAVENO_FILD		-256	/*文件描述符不足*/
@@ -147,9 +148,8 @@ static inline long FSSetPart(THREAD_ID ptid, DWORD pid, PART_INFO *pi)
 static inline long FScreat(THREAD_ID ptid, const char *path)
 {
 	DWORD data[MSG_DATA_LEN];
-	char buf[MAX_PATH];
 	data[MSG_API_ID] = FS_API_CREAT;
-	if ((data[0] = KWriteProcAddr(buf, strcpy(buf, path) - buf, &ptid, data, INVALID)) != NO_ERROR)
+	if ((data[0] = KWriteProcAddr(path, strlen(path) + 1, &ptid, data, INVALID)) != NO_ERROR)
 		return data[0];
 	if (data[MSG_RES_ID] != NO_ERROR)
 		return data[MSG_RES_ID];
@@ -160,10 +160,9 @@ static inline long FScreat(THREAD_ID ptid, const char *path)
 static inline long FSopen(THREAD_ID ptid, const char *path, DWORD op)
 {
 	DWORD data[MSG_DATA_LEN];
-	char buf[MAX_PATH];
 	data[MSG_API_ID] = FS_API_OPEN;
 	data[3] = op;
-	if ((data[0] = KWriteProcAddr(buf, strcpy(buf, path) - buf, &ptid, data, INVALID)) != NO_ERROR)
+	if ((data[0] = KWriteProcAddr(path, strlen(path) + 1, &ptid, data, INVALID)) != NO_ERROR)
 		return data[0];
 	if (data[MSG_RES_ID] != NO_ERROR)
 		return data[MSG_RES_ID];
@@ -236,9 +235,8 @@ static inline long FSSetSize(THREAD_ID ptid, DWORD handle, QWORD siz)
 static inline long FSOpenDir(THREAD_ID ptid, const char *path)
 {
 	DWORD data[MSG_DATA_LEN];
-	char buf[MAX_PATH];
 	data[MSG_API_ID] = FS_API_OPENDIR;
-	if ((data[0] = KWriteProcAddr(buf, strcpy(buf, path) - buf, &ptid, data, INVALID)) != NO_ERROR)
+	if ((data[0] = KWriteProcAddr(path, strlen(path) + 1, &ptid, data, INVALID)) != NO_ERROR)
 		return data[0];
 	if (data[MSG_RES_ID] != NO_ERROR)
 		return data[MSG_RES_ID];
@@ -260,20 +258,30 @@ static inline long FSReadDir(THREAD_ID ptid, DWORD handle, FILE_INFO *fi)
 static inline long FSChDir(THREAD_ID ptid, const char *path)
 {
 	DWORD data[MSG_DATA_LEN];
-	char buf[MAX_PATH];
 	data[MSG_API_ID] = FS_API_CHDIR;
-	if ((data[0] = KWriteProcAddr(buf, strcpy(buf, path) - buf, &ptid, data, INVALID)) != NO_ERROR)
+	if ((data[0] = KWriteProcAddr(path, strlen(path) + 1, &ptid, data, INVALID)) != NO_ERROR)
 		return data[0];
 	return data[MSG_RES_ID];
+}
+
+/*取得当前目录*/
+static inline long FSGetCwd(THREAD_ID ptid, char *path, DWORD siz)
+{
+	DWORD data[MSG_DATA_LEN];
+	data[MSG_API_ID] = FS_API_GETCWD;
+	if ((data[0] = KReadProcAddr(path, siz, &ptid, data, INVALID)) != NO_ERROR)
+		return data[0];
+	if (data[MSG_RES_ID] != NO_ERROR)
+		return data[MSG_RES_ID];
+	return data[MSG_SIZE_ID];
 }
 
 /*创建目录*/
 static inline long FSMkDir(THREAD_ID ptid, const char *path)
 {
 	DWORD data[MSG_DATA_LEN];
-	char buf[MAX_PATH];
 	data[MSG_API_ID] = FS_API_MKDIR;
-	if ((data[0] = KWriteProcAddr(buf, strcpy(buf, path) - buf, &ptid, data, INVALID)) != NO_ERROR)
+	if ((data[0] = KWriteProcAddr(path, strlen(path) + 1, &ptid, data, INVALID)) != NO_ERROR)
 		return data[0];
 	return data[MSG_RES_ID];
 }
@@ -282,9 +290,8 @@ static inline long FSMkDir(THREAD_ID ptid, const char *path)
 static inline long FSremove(THREAD_ID ptid, const char *path)
 {
 	DWORD data[MSG_DATA_LEN];
-	char buf[MAX_PATH];
 	data[MSG_API_ID] = FS_API_REMOVE;
-	if ((data[0] = KWriteProcAddr(buf, strcpy(buf, path) - buf, &ptid, data, INVALID)) != NO_ERROR)
+	if ((data[0] = KWriteProcAddr(path, strlen(path) + 1, &ptid, data, INVALID)) != NO_ERROR)
 		return data[0];
 	return data[MSG_RES_ID];
 }
@@ -318,10 +325,9 @@ static inline long FSGetAttr(THREAD_ID ptid, const char *path, FILE_INFO *fi)
 static inline long FSSetAttr(THREAD_ID ptid, const char *path, DWORD attr)
 {
 	DWORD data[MSG_DATA_LEN];
-	char buf[MAX_PATH];
 	data[MSG_API_ID] = FS_API_SETATTR;
 	data[3] = attr;
-	if ((data[0] = KWriteProcAddr(buf, strcpy(buf, path) - buf, &ptid, data, INVALID)) != NO_ERROR)
+	if ((data[0] = KWriteProcAddr(path, strlen(path) + 1, &ptid, data, INVALID)) != NO_ERROR)
 		return data[0];
 	return data[MSG_RES_ID];
 }
@@ -330,11 +336,10 @@ static inline long FSSetAttr(THREAD_ID ptid, const char *path, DWORD attr)
 static inline long FSSetTime(THREAD_ID ptid, const char *path, DWORD time, DWORD cma)
 {
 	DWORD data[MSG_DATA_LEN];
-	char buf[MAX_PATH];
 	data[MSG_API_ID] = FS_API_SETTIME;
 	data[3] = time;
 	data[4] = cma;
-	if ((data[0] = KWriteProcAddr(buf, strcpy(buf, path) - buf, &ptid, data, INVALID)) != NO_ERROR)
+	if ((data[0] = KWriteProcAddr(path, strlen(path) + 1, &ptid, data, INVALID)) != NO_ERROR)
 		return data[0];
 	return data[MSG_RES_ID];
 }

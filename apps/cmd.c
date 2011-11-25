@@ -296,8 +296,24 @@ void dir(char *args)
 /*切换目录*/
 void cd(char *args)
 {
-	if (FSChDir(FsPtid, args) != NO_ERROR)
-		CUIPutS(CuiPtid, "目录不存在！\n");
+	if (*args)
+	{
+		if (FSChDir(FsPtid, args) != NO_ERROR)
+			CUIPutS(CuiPtid, "目录不存在！\n");
+	}
+	else
+	{
+		char path[MAX_PATH];
+		long siz;
+		if ((siz = FSGetCwd(FsPtid, path, MAX_PATH - 1)) < 0)
+			CUIPutS(CuiPtid, "当前路径错误！\n");
+		else
+		{
+			path[siz - 1] = '\n';
+			path[siz] = '\0';
+			CUIPutS(CuiPtid, path);
+		}
+	}
 }
 
 /*创建目录*/
@@ -431,7 +447,7 @@ void help(char *args)
 		"copy SrcPath DestPath:复制文件\n"
 		"ren path name:重命名\n"
 		"dir DirPath:目录列表\n"
-		"cd DirPath:切换目录\n"
+		"cd DirPath:显示或切换当前目录\n"
 		"md DirPath:创建目录\n"
 		"show FilePath:显示文件内容\n"
 		"time:显示当前时间\n"
