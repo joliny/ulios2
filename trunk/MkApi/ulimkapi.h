@@ -269,7 +269,7 @@ static inline long KFreeAddr(void *addr)
 }
 
 /*映射进程地址写入*/
-static inline long KWriteProcAddr(void *addr, DWORD siz, THREAD_ID *ptid, DWORD data[MSG_DATA_LEN], DWORD CentiSeconds)
+static inline long KWriteProcAddr(const void *addr, DWORD siz, THREAD_ID *ptid, DWORD data[MSG_DATA_LEN], DWORD CentiSeconds)
 {
 	register long res;
 	__asm__ __volatile__("int $0xF0": "=a"(res), "=b"(*ptid): "0"(0x140000), "1"(*ptid), "c"(siz), "d"(CentiSeconds), "S"(data), "D"(addr): "memory");

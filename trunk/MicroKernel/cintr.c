@@ -54,9 +54,9 @@ long RegIrq(DWORD IrqN)
 	}
 	else
 	{
-		mask = inb(SLAVE8259_PORT);	/*从片*/
+		mask = inb(SLAVER8259_PORT);	/*从片*/
 		mask &= (~(1ul << (IrqN & 7)));
-		outb(SLAVE8259_PORT, mask);
+		outb(SLAVER8259_PORT, mask);
 	}
 	sti();
 	return NO_ERROR;
@@ -92,9 +92,9 @@ long UnregIrq(DWORD IrqN)
 	}
 	else
 	{
-		mask = inb(SLAVE8259_PORT);	/*从片*/
+		mask = inb(SLAVER8259_PORT);	/*从片*/
 		mask |= (1ul << (IrqN & 7));
-		outb(SLAVE8259_PORT, mask);
+		outb(SLAVER8259_PORT, mask);
 	}
 	*(DWORD*)(&IrqPort[IrqN]) = INVALID;
 	idt[0x20 + IrqN].d1 = 0;
@@ -126,9 +126,9 @@ void UnregAllIrq()
 			}
 			else
 			{
-				mask = inb(SLAVE8259_PORT);	/*从片*/
+				mask = inb(SLAVER8259_PORT);	/*从片*/
 				mask |= (1ul << (i & 7));
-				outb(SLAVE8259_PORT, mask);
+				outb(SLAVER8259_PORT, mask);
 			}
 			*(DWORD*)(&IrqPort[i]) = INVALID;
 			idt[0x20 + i].d1 = 0;
