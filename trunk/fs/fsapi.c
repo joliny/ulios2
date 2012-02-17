@@ -456,7 +456,9 @@ int main()
 
 		if ((res = KRecvMsg((THREAD_ID*)&data[PTID_ID], data, INVALID)) != NO_ERROR)	/*等待消息*/
 			break;
-		if ((data[MSG_ATTR_ID] & MSG_ATTR_MASK) == MSG_ATTR_PROCEXIT)
+		if ((data[MSG_ATTR_ID] & MSG_ATTR_MASK) == MSG_ATTR_THEDEXIT)	/*子线程退出*/
+			SubthCou--;
+		else if ((data[MSG_ATTR_ID] & MSG_ATTR_MASK) == MSG_ATTR_PROCEXIT)
 			data[MSG_ATTR_ID] = MSG_ATTR_FS | FS_API_PROCEXIT;
 		if ((data[MSG_ATTR_ID] & MSG_MAP_MASK) == MSG_ATTR_ROMAP || (data[MSG_ATTR_ID] & MSG_ATTR_MASK) == MSG_ATTR_FS)
 		{
@@ -482,12 +484,12 @@ int main()
 			{
 				memcpy32(buf, data, MSG_DATA_LEN + 1);
 				KCreateThread((void(*)(void*))ApiProc, 0x40000, buf, &ptid);
+				SubthCou++;
 			}
 		}
 		else if (data[MSG_ATTR_ID] == MSG_ATTR_EXTPROCREQ)
 			break;
 	}
-	KSleep(100);
 	CloseFS();
 	return NO_ERROR;
 }

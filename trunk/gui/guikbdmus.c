@@ -110,29 +110,13 @@ void MouseProc(DWORD key, long x, long y, long z)
 		GDIPutBCImage(MusX, MusY, MusPic, MusPicWidth, MusPicHeight, 0xFFFFFFFF);
 		if (DraggedGobj)
 		{
-			switch (DragMode)
-			{
-			case GM_DRAGMOD_MOVE:
-				if (MoveGobj(DraggedGobj, MusX - DragX, MusY - DragY) == NO_ERROR)
-				{
-					data[MSG_API_ID] = MSG_ATTR_GUI | GM_MOVE;	/*被移动消息*/
-					data[1] = DraggedGobj->rect.xpos;
-					data[2] = DraggedGobj->rect.ypos;
-					data[GUIMSG_GOBJ_ID] = DraggedGobj->ClientSign;
-					KSendMsg(&DraggedGobj->ptid, data, 0);
-					data[GUIMSG_GOBJ_ID] = gobj->ClientSign;
-				}
-				break;
-			case GM_DRAGMOD_SIZE:
-				data[MSG_API_ID] = MSG_ATTR_GUI | GM_DRAG;	/*拖拽缩放消息*/
-				data[1] = GM_DRAGMOD_SIZE;
-				data[2] = MusX - DragX;
-				data[3] = MusY - DragY;
-				data[GUIMSG_GOBJ_ID] = DraggedGobj->ClientSign;
-				KSendMsg(&DraggedGobj->ptid, data, 0);
-				data[GUIMSG_GOBJ_ID] = gobj->ClientSign;
-				break;
-			}
+			data[MSG_API_ID] = MSG_ATTR_GUI | GM_DRAG;	/*拖拽消息*/
+			data[1] = DragMode;
+			data[2] = MusX - DragX;
+			data[3] = MusY - DragY;
+			data[GUIMSG_GOBJ_ID] = DraggedGobj->ClientSign;
+			KSendMsg(&DraggedGobj->ptid, data, 0);
+			data[GUIMSG_GOBJ_ID] = gobj->ClientSign;
 		}
 		else
 		{
@@ -197,7 +181,15 @@ void MouseProc(DWORD key, long x, long y, long z)
 						KSendMsg(&gobj->ptid, data, 0);
 					}
 				}
-				DraggedGobj = NULL;	/*鼠标键抬起,停止拖拽*/
+				if (DraggedGobj)
+				{
+					data[MSG_API_ID] = MSG_ATTR_GUI | GM_DRAG;	/*取消拖拽消息*/
+					data[1] = GM_DRAGMOD_NONE;
+					data[GUIMSG_GOBJ_ID] = DraggedGobj->ClientSign;
+					KSendMsg(&DraggedGobj->ptid, data, 0);
+					data[GUIMSG_GOBJ_ID] = gobj->ClientSign;
+					DraggedGobj = NULL;	/*鼠标键抬起,停止拖拽*/
+				}
 			}
 			break;
 		}

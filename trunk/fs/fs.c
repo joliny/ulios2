@@ -47,6 +47,7 @@ FILE_DESC** EndFd;			/*最后非空文件描述符下一项指针*/
 DWORD filtl;				/*文件管理表锁*/
 PROCRES_DESC* pret[PRET_LEN];	/*进程资源表*/
 DWORD prel;					/*进程资源表管理锁*/
+DWORD SubthCou;				/*子线程计数*/
 
 /*初始化文件系统,如果不成功必须退出*/
 long InitFS()
@@ -81,6 +82,7 @@ long InitFS()
 	filtl = FALSE;
 	memset32(pret, 0, PRET_LEN * sizeof(PROCRES_DESC*) / sizeof(DWORD));	/*初始化进程资源表*/
 	prel = FALSE;
+	SubthCou = 0;
 	return NO_ERROR;
 }
 
@@ -177,6 +179,14 @@ void CloseFS()
 {
 	PART_DESC *CurPart;
 
+	while (SubthCou)	/*等待所有子线程退出*/
+	{
+		THREAD_ID ptid;
+		DWORD data[MSG_DATA_LEN];
+		KRecvMsg(&ptid, data, INVALID);	/*等待消息*/
+		if ((data[MSG_ATTR_ID] & MSG_ATTR_MASK) == MSG_ATTR_THEDEXIT)	/*子线程退出*/
+			SubthCou--;
+	}
 	for (CurPart = part; CurPart < &part[PART_LEN]; CurPart++)	/*卸载分区*/
 		if (CurPart->FsID != INVALID && CurPart->data)
 			fsuit[CurPart->FsID].UmntPart(CurPart);
