@@ -9,7 +9,40 @@
 
 CTRL_TXT *txt;
 CTRL_SEDT *edt;
+CTRL_SCRL *scl;
+CTRL_LST *lst;
 long CliX, CliY, x0, y0;
+
+/*双字转化为数字*/
+char *Itoa(char *buf, DWORD n, DWORD r)
+{
+	static const char num[] = {'0','1','2','3','4','5','6','7','8','9','A','B','C','D','E','F'};
+	char *p, *q;
+
+	q = p = buf;
+	do
+	{
+		*p++ = num[n % r];
+		n /= r;
+	}
+	while (n);
+	buf = p;	/*确定字符串尾部*/
+	*p-- = '\0';
+	while (p > q)	/*翻转字符串*/
+	{
+		char c = *q;
+		*q++ = *p;
+		*p-- = c;
+	}
+	return buf;
+}
+
+void ScrlChg(CTRL_SCRL *scrl)
+{
+	char buf[12];
+	Itoa(buf, scrl->pos, 10);
+	GCTxtSetText(txt, buf);
+}
 
 long MainMsgProc(THREAD_ID ptid, DWORD data[MSG_DATA_LEN])
 {
@@ -29,6 +62,17 @@ long MainMsgProc(THREAD_ID ptid, DWORD data[MSG_DATA_LEN])
 			GCTxtCreate(&txt, &args, wnd->obj.gid, &wnd->obj, "hello ulios2 gui");
 			args.y += 20;
 			GCSedtCreate(&edt, &args, wnd->obj.gid, &wnd->obj, "hello", NULL);
+			args.x = CliX;
+			args.y = CliY + wnd->client.height - 16;
+			args.width = wnd->client.width - 16;
+			GCScrlCreate(&scl, &args, wnd->obj.gid, &wnd->obj, 0, 100, 32, 16, ScrlChg);
+			args.width = 100;
+			args.height = 80;
+			args.x = CliX + 100;
+			args.y = CliY + 10;
+			args.style = 0;
+			args.MsgProc = NULL;
+			GCLstCreate(&lst, &args, wnd->obj.gid, &wnd->obj, NULL);
 		}
 		break;
 	case GM_SIZE:
@@ -42,10 +86,23 @@ long MainMsgProc(THREAD_ID ptid, DWORD data[MSG_DATA_LEN])
 		GCSetArea(&edt->obj.uda, 100, 16, &wnd->obj.uda, edt->obj.x, edt->obj.y);
 		GCSedtDefDrawProc(edt);
 		GUImove(GCGuiPtid, edt->obj.gid, edt->obj.x, edt->obj.y);
+
+		GCScrlSetSize(scl, CliX, CliY + wnd->client.height - 16, wnd->client.width - 16, 16);
 		break;
 	case GM_LBUTTONDOWN:
 		x0 = (data[5] & 0xFFFF) - CliX;
 		y0 = (data[5] >> 16) - CliY;
+		{
+			static DWORD num;
+			static LIST_ITEM *item;
+			DWORD i;
+			char buf[128];
+			num++;
+			for (i = 0; i < num; i++)
+				buf[i] = num + 'A';
+			buf[i] = 0;
+			GCLstInsertItem(lst, item, buf, &item);
+		}
 		break;
 	case GM_MOUSEMOVE:
 		if (data[1] & MUS_STATE_LBUTTON)
@@ -76,8 +133,8 @@ int main()
 		return res;
 	if ((res = GCinit()) != NO_ERROR)
 		return res;
-	args.width = 128;
-	args.height = 80;
+	args.width = 256;
+	args.height = 200;
 	args.x = 100;
 	args.y = 100;
 	args.style = WND_STYLE_CAPTION | WND_STYLE_BORDER | WND_STYLE_CLOSEBTN | WND_STYLE_MAXBTN | WND_STYLE_MINBTN | WND_STYLE_SIZEBTN;

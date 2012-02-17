@@ -1,7 +1,7 @@
 /*	gclient.h for ulios graphical user interface
-	作者：孙亮
-	功能：GUI客户端功能库定义
-	最后修改日期：2011-08-15
+作者：孙亮
+功能：GUI客户端功能库定义
+最后修改日期：2011-08-15
 */
 
 #ifndef	_GCLIENT_H_
@@ -15,7 +15,7 @@
 #define GC_ERR_AREASIZE			-2689	/*尺寸错误*/
 #define GC_ERR_OUT_OF_MEM		-2690	/*内存不足*/
 #define GC_ERR_INVALID_GUIMSG	-2691	/*非法GUI消息*/
-#define GC_ERR_WRONG_GUIMSG		-2692	/*出错的GUI消息*/
+#define GC_ERR_WRONG_ARGS		-2692	/*参数错误*/
 
 typedef struct _UDI_AREA
 {
@@ -89,6 +89,9 @@ long GCLoadBmp(char *path, DWORD *buf, DWORD len, DWORD *width, DWORD *height);
 #define GC_CTRL_TYPE_BUTTON		2		/*按钮*/
 #define GC_CTRL_TYPE_TEXT		3		/*静态文本框*/
 #define GC_CTRL_TYPE_SLEDIT		4		/*单行编辑框*/
+#define GC_CTRL_TYPE_MLEDIT		5		/*多行编辑框*/
+#define GC_CTRL_TYPE_SCROLL		6		/*滚动条*/
+#define GC_CTRL_TYPE_LIST		7		/*列表框*/
 
 typedef long (*MSGPROC)(THREAD_ID ptid, DWORD data[MSG_DATA_LEN]);	/*窗体消息处理函数*/
 
@@ -125,6 +128,12 @@ void GCGobjDraw(CTRL_GOBJ *gobj);
 
 /*GUI客户端消息调度*/
 long GCDispatchMsg(THREAD_ID ptid, DWORD data[MSG_DATA_LEN]);
+
+/*移动简单窗体*/
+void GCGobjMove(CTRL_GOBJ *gobj, long x, long y);
+
+/*设置简单窗体位置大小*/
+void GCGobjSetSize(CTRL_GOBJ *gobj, long x, long y, DWORD width, DWORD height);
 
 /**********桌面**********/
 
@@ -251,5 +260,81 @@ void GCSedtSetText(CTRL_SEDT *edt, const char *text);
 
 /*追加单行编辑框文本*/
 void GCSedtAddText(CTRL_SEDT *edt, const char *text);
+
+/**********多行编辑框**********/
+
+/**********滚动条**********/
+
+#define SCRL_STYLE_HOR	0x0000	/*水平*/
+#define SCRL_STYLE_VER	0x0001	/*竖直*/
+
+typedef struct _CTRL_SCRL
+{
+	CTRL_GOBJ obj;
+	long min, max;			/*最小最大值*/
+	long pos, page;			/*位置值,页大小*/
+	CTRL_BTN *sub;			/*减小按钮*/
+	CTRL_BTN *add;			/*增大按钮*/
+	CTRL_BTN *drag;			/*拖动按钮*/
+	void (*ChangeProc)(struct _CTRL_SCRL *scl);	/*值改变处理函数*/
+}CTRL_SCRL;	/*滚动条*/
+
+long GCScrlCreate(CTRL_SCRL **scl, const CTRL_ARGS *args, DWORD pid, CTRL_GOBJ *ParGobj, long min, long max, long pos, long page, void (*ChangeProc)(CTRL_SCRL *scl));
+
+long GCScrlDefMsgProc(THREAD_ID ptid, DWORD data[MSG_DATA_LEN]);
+
+void GCScrlDefDrawProc(CTRL_SCRL *scl);
+
+/*设置滚动条位置大小*/
+void GCScrlSetSize(CTRL_SCRL *scl, long x, long y, DWORD width, DWORD height);
+
+/*设置滚动条参数*/
+long GCScrlSetData(CTRL_SCRL *scl, long min, long max, long pos, long page);
+
+/**********列表框**********/
+
+#define LSTITM_ATTR_SELECTED	0x00000001	/*被选中*/
+#define LSTITM_TXT_LEN		128
+
+typedef struct _LIST_ITEM
+{
+	struct _LIST_ITEM *pre, *nxt;	/*前后指针*/
+	DWORD attr;			/*属性*/
+	char text[LSTITM_TXT_LEN];	/*列表框单项文本*/
+}LIST_ITEM;	/*列表框单项*/
+
+typedef struct _CTRL_LST
+{
+	CTRL_GOBJ obj;
+	DWORD ItemCou;		/*总项数*/
+	DWORD CurPos;		/*当前项位置*/
+	DWORD MaxWidth;		/*最长字符串像素宽度*/
+	DWORD TextX;		/*文本横向偏移*/
+	UDI_AREA cont;		/*内容绘图区*/
+	LIST_ITEM *item;	/*项列表指针*/
+	LIST_ITEM *CurItem;	/*当前项*/
+	LIST_ITEM *SelItem;	/*被选项*/
+	CTRL_SCRL *hscl;	/*横滚动条*/
+	CTRL_SCRL *vscl;	/*纵滚动条*/
+	void (*SelProc)(struct _CTRL_LST *lst);	/*被选项改变处理函数*/
+}CTRL_LST;	/*列表框*/
+
+long GCLstCreate(CTRL_LST **lst, const CTRL_ARGS *args, DWORD pid, CTRL_GOBJ *ParGobj, void (*SelProc)(CTRL_LST *lst));
+
+long GCLstDefMsgProc(THREAD_ID ptid, DWORD data[MSG_DATA_LEN]);
+
+void GCLstDefDrawProc(CTRL_LST *lst);
+
+/*设置列表框位置大小*/
+void GCLstSetSize(CTRL_LST *lst, long x, long y, DWORD width, DWORD height);
+
+/*插入项*/
+long GCLstInsertItem(CTRL_LST *lst, LIST_ITEM *pre, const char *text, LIST_ITEM **item);
+
+/*删除项*/
+long GCLstDeleteItem(CTRL_LST *lst, LIST_ITEM *item);
+
+/*删除所有项*/
+long GCLstDelAllItem(CTRL_LST *lst);
 
 #endif

@@ -70,9 +70,13 @@ long MainMsgProc(THREAD_ID ptid, DWORD data[MSG_DATA_LEN])
 	switch (data[MSG_API_ID] & MSG_API_MASK)
 	{
 	case GM_CREATE:
-		GCDskDefMsgProc(ptid, data);
 		{
 			DWORD *bmp, BmpWidth, BmpHeight;
+			if (dsk->obj.gid)	/*非主桌面,主动退出*/
+			{
+				GUIdestroy(GCGuiPtid, dsk->obj.gid);
+				break;
+			}
 			GCLoadBmp("desktop.bmp", NULL, 0, &BmpWidth, &BmpHeight);
 			bmp = (DWORD*)malloc(BmpWidth * BmpHeight * sizeof(DWORD));
 			GCLoadBmp("desktop.bmp", bmp, BmpWidth * BmpHeight, NULL, NULL);
@@ -91,7 +95,7 @@ long MainMsgProc(THREAD_ID ptid, DWORD data[MSG_DATA_LEN])
 			args.y = 40;
 			GCBtnCreate(NULL, &args, dsk->obj.gid, &dsk->obj, "资源管理器", GmgrProc);
 		}
-		return NO_ERROR;
+		break;
 	}
 	return GCDskDefMsgProc(ptid, data);
 }
