@@ -40,5 +40,5 @@ clean :
 ../objs/gdi.o : ../lib/gdi.c ../lib/gdi.h $(HEADS)
 	$(CC) $(CFLAGS) -o $@ $<
 
-../objs/gclient.o : ../lib/gclient.c ../lib/gclient.h ../lib/malloc.h ../gui/guiapi.h $(HEADS)
+../objs/gclient.o : ../lib/gclient.c ../lib/gclient.h ../lib/gcres.h ../lib/malloc.h ../gui/guiapi.h $(HEADS)
 	$(CC) $(CFLAGS) -o $@ $<

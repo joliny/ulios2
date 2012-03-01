@@ -94,8 +94,6 @@ typedef struct _PROCRES_DESC
 	FILE_HANDLE fht[FHT_LEN];	/*打开文件列表*/
 }PROCRES_DESC;	/*进程资源描述符*/
 
-extern THREAD_ID AthdPtid;	/*磁盘服务ID*/
-extern THREAD_ID TimePtid;	/*时间服务ID*/
 #define PART_LEN	0x40	/*最多支持64个分区*/
 extern PART_DESC part[];	/*分区信息表*/
 #define FILT_LEN	0x1000	/*最多打开4k个目录项*/

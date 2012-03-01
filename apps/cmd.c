@@ -11,7 +11,6 @@
 #define CMD_LEN		256
 #define PROMPT		"命令:"
 
-THREAD_ID TimePtid, FsPtid, CuiPtid;
 char cmd[CMD_LEN], *cmdp;	/*输入命令缓冲*/
 
 /*双字转化为数字*/
@@ -129,7 +128,7 @@ DWORD Atoi16(const char *str)
 /*清屏*/
 void cls(char *args)
 {
-	CUIClrScr(CuiPtid);
+	CUIClrScr();
 }
 
 /*设置字符颜色和背景颜色*/
@@ -146,11 +145,11 @@ void SetColor(char *args)
 		}
 		if (*p == '\0')
 		{
-			CUIPutS(CuiPtid, "参数: 前景色 背景色\n");
+			CUIPutS("参数: 前景色 背景色\n");
 			return;
 		}
 	}
-	CUISetCol(CuiPtid, Atoi16(args), Atoi16(p));
+	CUISetCol(Atoi16(args), Atoi16(p));
 }
 
 /*退出*/
@@ -162,8 +161,8 @@ void exitcmd(char *args)
 /*删除文件*/
 void delfile(char *args)
 {
-	if (FSremove(FsPtid, args) != NO_ERROR)
-		CUIPutS(CuiPtid, "无法删除！\n");
+	if (FSremove(args) != NO_ERROR)
+		CUIPutS("无法删除！\n");
 }
 
 /*复制文件*/
@@ -181,25 +180,25 @@ void copy(char *args)
 		}
 		if (*bufp == '\0')
 		{
-			CUIPutS(CuiPtid, "参数: 源文件路径 目的路径\n");
+			CUIPutS("参数: 源文件路径 目的路径\n");
 			return;
 		}
 	}
-	if ((in = FSopen(FsPtid, args, FS_OPEN_READ)) < 0)
+	if ((in = FSopen(args, FS_OPEN_READ)) < 0)
 	{
-		CUIPutS(CuiPtid, "源文件不存在！\n");
+		CUIPutS("源文件不存在！\n");
 		return;
 	}
-	if ((out = FScreat(FsPtid, bufp)) < 0)
+	if ((out = FScreat(bufp)) < 0)
 	{
-		FSclose(FsPtid, in);
-		CUIPutS(CuiPtid, "无法创建目的文件！\n");
+		FSclose(in);
+		CUIPutS("无法创建目的文件！\n");
 		return;
 	}
-	while ((siz = FSread(FsPtid, in, buf, sizeof(buf))) > 0)
-		FSwrite(FsPtid, out, buf, siz);
-	FSclose(FsPtid, out);
-	FSclose(FsPtid, in);
+	while ((siz = FSread(in, buf, sizeof(buf))) > 0)
+		FSwrite(out, buf, siz);
+	FSclose(out);
+	FSclose(in);
 }
 
 /*重命名*/
@@ -216,12 +215,12 @@ void ren(char *args)
 		}
 		if (*p == '\0')
 		{
-			CUIPutS(CuiPtid, "参数: 目标路径 新名称\n");
+			CUIPutS("参数: 目标路径 新名称\n");
 			return;
 		}
 	}
-	if (FSrename(FsPtid, args, p) != NO_ERROR)
-		CUIPutS(CuiPtid, "重命名出错！\n");
+	if (FSrename(args, p) != NO_ERROR)
+		CUIPutS("重命名出错！\n");
 }
 
 /*显示分区列表*/
@@ -235,20 +234,21 @@ void partlist(char *args)
 	DWORD pid;
 
 	pid = 0;
-	while (FSEnumPart(FsPtid, &pid) == NO_ERROR)
+	while (FSEnumPart(&pid) == NO_ERROR)
 	{
 		THREAD_ID ptid;
 		char buf[4096];
 
-		FSGetPart(FsPtid, pid, &pi.info);
+		FSGetPart(pid, &pi.info);
 		Sprintf(buf, "/%u\t容量:%uMB\t剩余:%uMB\t格式:%s\t卷标:%s\n", pid, (DWORD)(pi.info.size / 0x100000), (DWORD)(pi.info.remain / 0x100000), pi.fstype, pi.info.label);
-		CUIPutS(CuiPtid, buf);
-		ptid = CuiPtid;
+		CUIPutS(buf);
+		ptid.ProcID = SRV_CUI_PORT;
+		ptid.ThedID = INVALID;
 		if (KRecvProcMsg(&ptid, (DWORD*)buf, 0) == NO_ERROR)
 		{
 			if (((DWORD*)buf)[MSG_ATTR_ID] == MSG_ATTR_CUIKEY && buf[4] == 27)	/*按下ESC键*/
 			{
-				CUIPutS(CuiPtid, "用户取消！\n");
+				CUIPutS("用户取消！\n");
 				break;
 			}
 			else if (((DWORD*)buf)[MSG_ATTR_ID] == MSG_ATTR_EXTPROCREQ)	/*退出请求*/
@@ -264,33 +264,34 @@ void dir(char *args)
 	FILE_INFO fi;
 	long dh;
 
-	if ((dh = FSOpenDir(FsPtid, args)) < 0)
+	if ((dh = FSOpenDir(args)) < 0)
 	{
-		CUIPutS(CuiPtid, "目录不存在！\n");
+		CUIPutS("目录不存在！\n");
 		return;
 	}
-	while (FSReadDir(FsPtid, dh, &fi) == NO_ERROR)
+	while (FSReadDir(dh, &fi) == NO_ERROR)
 	{
 		THREAD_ID ptid;
 		TM tm;
 		char buf[4096];
 
-		TMLocalTime(TimePtid, fi.ModifyTime, &tm);
+		TMLocalTime(fi.ModifyTime, &tm);
 		Sprintf(buf, "%d-%d-%d\t%d:%d:%d   \t%s\t%d\t%c%c%c%c%c%c\t%s\n", tm.yer, tm.mon, tm.day, tm.hor, tm.min, tm.sec, (fi.attr & FILE_ATTR_DIREC) ? "目录" : "文件", (DWORD)fi.size, (fi.attr & FILE_ATTR_RDONLY) ? 'R' : ' ', (fi.attr & FILE_ATTR_HIDDEN) ? 'H' : ' ', (fi.attr & FILE_ATTR_SYSTEM) ? 'S' : ' ', (fi.attr & FILE_ATTR_LABEL) ? 'L' : ' ', (fi.attr & FILE_ATTR_ARCH) ? 'A' : ' ', (fi.attr & FILE_ATTR_EXEC) ? 'X' : ' ', fi.name);
-		CUIPutS(CuiPtid, buf);
-		ptid = CuiPtid;
+		CUIPutS(buf);
+		ptid.ProcID = SRV_CUI_PORT;
+		ptid.ThedID = INVALID;
 		if (KRecvProcMsg(&ptid, (DWORD*)buf, 0) == NO_ERROR)
 		{
 			if (((DWORD*)buf)[MSG_ATTR_ID] == MSG_ATTR_CUIKEY && buf[4] == 27)	/*按下ESC键*/
 			{
-				CUIPutS(CuiPtid, "用户取消！\n");
+				CUIPutS("用户取消！\n");
 				break;
 			}
 			else if (((DWORD*)buf)[MSG_ATTR_ID] == MSG_ATTR_EXTPROCREQ)	/*退出请求*/
 				KExitProcess(NO_ERROR);
 		}
 	}
-	FSclose(FsPtid, dh);
+	FSclose(dh);
 }
 
 /*切换目录*/
@@ -298,20 +299,20 @@ void cd(char *args)
 {
 	if (*args)
 	{
-		if (FSChDir(FsPtid, args) != NO_ERROR)
-			CUIPutS(CuiPtid, "目录不存在！\n");
+		if (FSChDir(args) != NO_ERROR)
+			CUIPutS("目录不存在！\n");
 	}
 	else
 	{
 		char path[MAX_PATH];
 		long siz;
-		if ((siz = FSGetCwd(FsPtid, path, MAX_PATH - 1)) < 0)
-			CUIPutS(CuiPtid, "当前路径错误！\n");
+		if ((siz = FSGetCwd(path, MAX_PATH - 1)) < 0)
+			CUIPutS("当前路径错误！\n");
 		else
 		{
 			path[siz - 1] = '\n';
 			path[siz] = '\0';
-			CUIPutS(CuiPtid, path);
+			CUIPutS(path);
 		}
 	}
 }
@@ -319,8 +320,8 @@ void cd(char *args)
 /*创建目录*/
 void md(char *args)
 {
-	if (FSMkDir(FsPtid, args) != NO_ERROR)
-		CUIPutS(CuiPtid, "无法创建目录！\n");
+	if (FSMkDir(args) != NO_ERROR)
+		CUIPutS("无法创建目录！\n");
 }
 
 void show(char *args)
@@ -328,30 +329,31 @@ void show(char *args)
 	long fh, siz;
 	char buf[4097];
 
-	if ((fh = FSopen(FsPtid, args, FS_OPEN_READ)) < 0)
+	if ((fh = FSopen(args, FS_OPEN_READ)) < 0)
 	{
-		CUIPutS(CuiPtid, "文件不存在！\n");
+		CUIPutS("文件不存在！\n");
 		return;
 	}
-	while ((siz = FSread(FsPtid, fh, buf, 4096)) > 0)
+	while ((siz = FSread(fh, buf, 4096)) > 0)
 	{
 		THREAD_ID ptid;
 
 		buf[siz] = '\0';
-		CUIPutS(CuiPtid, buf);
-		ptid = CuiPtid;
+		CUIPutS(buf);
+		ptid.ProcID = SRV_CUI_PORT;
+		ptid.ThedID = INVALID;
 		if (KRecvProcMsg(&ptid, (DWORD*)buf, 0) == NO_ERROR)
 		{
 			if (((DWORD*)buf)[MSG_ATTR_ID] == MSG_ATTR_CUIKEY && buf[4] == 27)	/*按下ESC键*/
 			{
-				CUIPutS(CuiPtid, "用户取消！\n");
+				CUIPutS("用户取消！\n");
 				break;
 			}
 			else if (((DWORD*)buf)[MSG_ATTR_ID] == MSG_ATTR_EXTPROCREQ)	/*退出请求*/
 				KExitProcess(NO_ERROR);
 		}
 	}
-	FSclose(FsPtid, fh);
+	FSclose(fh);
 }
 
 /*显示时间*/
@@ -360,9 +362,9 @@ void showtim(char *args)
 	static const char *WeekName[7] = {"日", "一", "二", "三", "四", "五", "六"};
 	TM tm;
 	char buf[40];
-	TMCurTime(TimePtid, &tm);
+	TMCurTime(&tm);
 	Sprintf(buf, "现在时刻:%d年%d月%d日 星期%s %d时%d分%d秒\n", tm.yer, tm.mon, tm.day, WeekName[tm.wday], tm.hor, tm.min, tm.sec);
-	CUIPutS(CuiPtid, buf);
+	CUIPutS(buf);
 }
 
 /*显示进程列表*/
@@ -372,19 +374,20 @@ void proclist(char *args)
 	DWORD pid;
 
 	pid = 0;
-	while (FSProcInfo(FsPtid, &pid, &fi) == NO_ERROR)
+	while (FSProcInfo(&pid, &fi) == NO_ERROR)
 	{
 		THREAD_ID ptid;
 		char buf[4096];
 
 		Sprintf(buf, "PID:%d\t%s\n", pid, fi.name);
-		CUIPutS(CuiPtid, buf);
-		ptid = CuiPtid;
+		CUIPutS(buf);
+		ptid.ProcID = SRV_CUI_PORT;
+		ptid.ThedID = INVALID;
 		if (KRecvProcMsg(&ptid, (DWORD*)buf, 0) == NO_ERROR)
 		{
 			if (((DWORD*)buf)[MSG_ATTR_ID] == MSG_ATTR_CUIKEY && buf[4] == 27)	/*按下ESC键*/
 			{
-				CUIPutS(CuiPtid, "用户取消！\n");
+				CUIPutS("用户取消！\n");
 				break;
 			}
 			else if (((DWORD*)buf)[MSG_ATTR_ID] == MSG_ATTR_EXTPROCREQ)	/*退出请求*/
@@ -398,7 +401,7 @@ void proclist(char *args)
 void killproc(char *args)
 {
 	if (KKillProcess(Atoi10(args)) != NO_ERROR)
-		CUIPutS(CuiPtid, "强行结束进程失败！\n");
+		CUIPutS("强行结束进程失败！\n");
 }
 
 /*启动GUI和桌面应用程序*/
@@ -408,10 +411,12 @@ void startgui(char *args)
 	
 	if (KGetKptThed(SRV_GUI_PORT, &ptid) == NO_ERROR)
 	{
-		CUIPutS(CuiPtid, "图形界面已启动！\n");
+		CUIPutS("图形界面已启动！\n");
 		return;
 	}
-	SendExitProcReq(CuiPtid);	/*关闭CUI*/
+	ptid.ProcID = SRV_CUI_PORT;
+	ptid.ThedID = INVALID;
+	SendExitProcReq(ptid);	/*关闭CUI*/
 	KCreateProcess(0, "gui.bin", NULL, &ptid);
 	KSleep(5);	/*延时,防止进程间依赖关系不满足*/
 	KCreateProcess(0, "desktop.bin", NULL, &ptid);
@@ -423,22 +428,19 @@ void startgui(char *args)
 /*发声*/
 void sound(char *args)
 {
-	THREAD_ID SpkPtid;
-
-	if (KGetKptThed(SRV_SPK_PORT, &SpkPtid) != NO_ERROR)
+	if (SPKSound(Atoi10(args)) != NO_ERROR)
 	{
-		CUIPutS(CuiPtid, "扬声器驱动未启动！\n");
+		CUIPutS("无法连接到扬声器驱动！\n");
 		return;
 	}
-	SPKSound(SpkPtid, Atoi10(args));
 	KSleep(100);
-	SPKNosound(SpkPtid);
+	SPKNosound();
 }
 
 /*帮助*/
 void help(char *args)
 {
-	CUIPutS(CuiPtid,
+	CUIPutS(
 		"cls:清屏\n"
 		"color rrggbb rrggbb:设置前景和背景色\n"
 		"exit:退出\n"
@@ -532,7 +534,7 @@ void CmdProc(char *str)
 		if ((args = cmdcmp(CMD[i].str, str)) != NULL)
 		{
 			CMD[i].cmd(args);	/*内部命令*/
-			CUIPutS(CuiPtid, PROMPT);
+			CUIPutS(PROMPT);
 			return;
 		}
 	ProcStr(str, &exec, &args);
@@ -540,7 +542,7 @@ void CmdProc(char *str)
 		Sprintf(buf, "无效的命令或可执行文件!\n%s", PROMPT);
 	else
 		Sprintf(buf, "进程ID: %d\n%s", ptid.ProcID, PROMPT);
-	CUIPutS(CuiPtid, buf);
+	CUIPutS(buf);
 }
 
 /*键盘输入响应*/
@@ -554,11 +556,11 @@ void KeyProc(char c)
 		if (cmdp != cmd)
 		{
 			cmdp--;	/*删除字符*/
-			CUIPutC(CuiPtid, '\b');
+			CUIPutC('\b');
 		}
 		break;
 	case '\r':
-		CUIPutC(CuiPtid, '\n');
+		CUIPutC('\n');
 		*cmdp = '\0';
 		CmdProc(cmd);	/*执行命令*/
 		cmdp = cmd;
@@ -570,7 +572,7 @@ void KeyProc(char c)
 			if (c == '\t')
 				c = ' ';
 			*cmdp++ = c;
-			CUIPutC(CuiPtid, c);
+			CUIPutC(c);
 		}
 		break;
 	}
@@ -581,15 +583,9 @@ int main()
 	THREAD_ID ptid;
 	long res;
 
-	if ((res = KGetKptThed(SRV_TIME_PORT, &TimePtid)) != NO_ERROR)
+	if ((res = CUISetRecv()) != NO_ERROR)
 		return res;
-	if ((res = KGetKptThed(SRV_FS_PORT, &FsPtid)) != NO_ERROR)
-		return res;
-	if ((res = KGetKptThed(SRV_CUI_PORT, &CuiPtid)) != NO_ERROR)
-		return res;
-	if ((res = CUISetRecv(CuiPtid)) != NO_ERROR)
-		return res;
-	CUIPutS(CuiPtid,
+	CUIPutS(
 		"欢迎来到\n"
 		"┏┓┏┓┏┓　　┏━━┓┏━━┓┏━━┓\n"
 		"┃┃┃┃┃┃　　┗┓┏┛┃┏┓┃┃┏━┛\n"
@@ -598,7 +594,7 @@ int main()
 		"┃┗┛┃┃┗━┓┏┛┗┓┃┗┛┃┏━┛┃\n"
 		"┗━━┛┗━━┛┗━━┛┗━━┛┗━━┛\n"
 		"输入help获得命令帮助!\n");
-	CUIPutS(CuiPtid, PROMPT);
+	CUIPutS(PROMPT);
 	cmdp = cmd;
 	for (;;)
 	{

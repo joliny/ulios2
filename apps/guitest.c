@@ -80,12 +80,12 @@ long MainMsgProc(THREAD_ID ptid, DWORD data[MSG_DATA_LEN])
 		txt->obj.y = CliY + (wnd->client.height - 16) / 2 - 10;
 		GCSetArea(&txt->obj.uda, 100, 16, &wnd->obj.uda, txt->obj.x, txt->obj.y);
 		GCTxtDefDrawProc(txt);
-		GUImove(GCGuiPtid, txt->obj.gid, txt->obj.x, txt->obj.y);
+		GUImove(txt->obj.gid, txt->obj.x, txt->obj.y);
 		edt->obj.x = CliX + (wnd->client.width - 100) / 2;
 		edt->obj.y = CliY + (wnd->client.height - 16) / 2 + 10;
 		GCSetArea(&edt->obj.uda, 100, 16, &wnd->obj.uda, edt->obj.x, edt->obj.y);
 		GCSedtDefDrawProc(edt);
-		GUImove(GCGuiPtid, edt->obj.gid, edt->obj.x, edt->obj.y);
+		GUImove(edt->obj.gid, edt->obj.x, edt->obj.y);
 
 		GCScrlSetSize(scl, CliX, CliY + wnd->client.height - 16, wnd->client.width - 16, 16);
 		break;
@@ -110,14 +110,14 @@ long MainMsgProc(THREAD_ID ptid, DWORD data[MSG_DATA_LEN])
 			GCDrawLine(&wnd->client, x0, y0, (data[5] & 0xFFFF) - CliX, (data[5] >> 16) - CliY, 0);
 			x0 = (data[5] & 0xFFFF) - CliX;
 			y0 = (data[5] >> 16) - CliY;
-			GUIpaint(GCGuiPtid, wnd->obj.gid, 0, 0, wnd->obj.uda.width, wnd->obj.uda.height);
+			GUIpaint(wnd->obj.gid, 0, 0, wnd->obj.uda.width, wnd->obj.uda.height);
 		}
 		break;
 	case GM_LBUTTONDBCLK:
 		GCWndSetCaption(wnd, "Ë«»÷ÁË£¡");
 		break;
 	case GM_MOUSEWHEEL:
-		GUImove(GCGuiPtid, wnd->obj.gid, wnd->obj.x, wnd->obj.y + (long)data[4]);
+		GUImove(wnd->obj.gid, wnd->obj.x, wnd->obj.y + (long)data[4]);
 		break;
 	}
 	return GCWndDefMsgProc(ptid, data);

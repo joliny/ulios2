@@ -13,16 +13,13 @@ int main()
 {
 	float x[PN], y[PN], z[PN];
 	long sx[PN], sy[PN];
-	THREAD_ID ptid;
 	long i, res;
 
-	if ((res = KGetKptThed(SRV_TIME_PORT, &ptid)) != NO_ERROR)
-		return res;
 	for (i = 0; i < PN; i++)
 	{
-		x[i] = (float)((TMGetRand(ptid) & 0x1FF) - 256);
-		y[i] = (float)((TMGetRand(ptid) & 0x1FF) - 256);
-		z[i] = (float)((TMGetRand(ptid) & 0x1FF) - 256);
+		x[i] = (float)((TMGetRand() & 0x1FF) - 256);
+		y[i] = (float)((TMGetRand() & 0x1FF) - 256);
+		z[i] = (float)((TMGetRand() & 0x1FF) - 256);
 	}
 	if ((res = GDIinit()) != NO_ERROR)
 		return res;

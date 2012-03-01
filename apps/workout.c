@@ -540,16 +540,13 @@ char *ftoa(char *buf, double n)
 
 int main(int argc, char *argv[])
 {
-	THREAD_ID CuiPtid;
 	double wores;
 	DWORD res;
 	int i;
 
-	if (KGetKptThed(SRV_CUI_PORT, &CuiPtid) != NO_ERROR)
-		return NO_ERROR;
 	if (argc <= 1)
 	{
-		CUIPutS(CuiPtid,
+		CUIPutS(
 			"参数:表达式1 [表达式2] [表达式3] ...\n"
 			"表达式为标准的数学表达式\n"
 			"可使用括号，如(1+2)*abs(-3)或sin(3.14)\n"
@@ -577,7 +574,7 @@ int main(int argc, char *argv[])
 			bufp = ftoa(bufp, wores);
 			strcpy(bufp, "\n");
 		}
-		CUIPutS(CuiPtid, buf);
+		CUIPutS(buf);
 	}
 	return NO_ERROR;
 }

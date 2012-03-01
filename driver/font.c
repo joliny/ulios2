@@ -12,24 +12,21 @@
 
 int main()
 {
-	THREAD_ID ptid;
 	void *addr;
 	long res;	/*返回结果*/
 	BYTE font[FONT_SIZE];	/*字体*/
 
 	if ((res = KRegKnlPort(SRV_FONT_PORT)) != NO_ERROR)	/*注册服务端口号*/
 		return res;
-	if ((res = KGetKptThed(SRV_FS_PORT, &ptid)) != NO_ERROR)	/*取得文件系统线程ID*/
-		return res;
 	if ((res = KMapPhyAddr(&addr, 0x90280, 0x7C)) != NO_ERROR)	/*取得系统目录*/
 		return res;
-	if ((res = FSChDir(ptid, (const char*)addr)) != NO_ERROR)	/*切换到系统目录*/
+	if ((res = FSChDir((const char*)addr)) != NO_ERROR)	/*切换到系统目录*/
 		return res;
-	if ((res = FSopen(ptid, FONT_FILE, FS_OPEN_READ)) < 0)	/*打开字体文件*/
+	if ((res = FSopen(FONT_FILE, FS_OPEN_READ)) < 0)	/*打开字体文件*/
 		return res;
-	if (FSread(ptid, res, font, FONT_SIZE) <= 0)	/*读取字体文件*/
+	if (FSread(res, font, FONT_SIZE) <= 0)	/*读取字体文件*/
 		return -1;
-	FSclose(ptid, res);
+	FSclose(res);
 	KFreeAddr(addr);
 	for (;;)
 	{

@@ -589,11 +589,11 @@ static void DataToInfo(FILE_INFO *fi, FAT32_DIR *fd)
 	TM tm;
 	DirToName(fi->name, fd->name);
 	DirToTime(&tm, fd->crtdate, fd->crttime);
-	TMMkTime(TimePtid, &fi->CreateTime, &tm);
+	TMMkTime(&fi->CreateTime, &tm);
 	DirToTime(&tm, fd->mdfdate, fd->mdftime);
-	TMMkTime(TimePtid, &fi->ModifyTime, &tm);
+	TMMkTime(&fi->ModifyTime, &tm);
 	DirToTime(&tm, fd->acsdate, 0);
-	TMMkTime(TimePtid, &fi->AccessTime, &tm);
+	TMMkTime(&fi->AccessTime, &tm);
 	fi->attr = fd->attr;
 	fi->size = fd->size;
 }
@@ -603,11 +603,11 @@ static void InfoToData(FAT32_DIR *fd, FILE_INFO *fi)
 {
 	TM tm;
 	NameToDir(fd->name, fi->name);
-	TMLocalTime(TimePtid, fi->CreateTime, &tm);
+	TMLocalTime(fi->CreateTime, &tm);
 	TimeToDir(&fd->crtdate, &fd->crttime, &tm);
-	TMLocalTime(TimePtid, fi->ModifyTime, &tm);
+	TMLocalTime(fi->ModifyTime, &tm);
 	TimeToDir(&fd->mdfdate, &fd->mdftime, &tm);
-	TMLocalTime(TimePtid, fi->AccessTime, &tm);
+	TMLocalTime(fi->AccessTime, &tm);
 	TimeToDir(&fd->acsdate, NULL, &tm);
 	fd->attr = fi->attr & 0x3F;
 	fd->size = fi->size;

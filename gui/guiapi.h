@@ -71,9 +71,12 @@
 #define GM_UNMAPVBUF	0x0100	/*撤销显示缓冲映射*/
 
 /*取得GUI信息*/
-static inline long GUIGetGinfo(THREAD_ID ptid, DWORD *GUIwidth, DWORD *GUIheight)
+static inline long GUIGetGinfo(DWORD *GUIwidth, DWORD *GUIheight)
 {
+	THREAD_ID ptid;
 	DWORD data[MSG_DATA_LEN];
+	ptid.ProcID = SRV_GUI_PORT;
+	ptid.ThedID = INVALID;
 	data[MSG_API_ID] = MSG_ATTR_GUI | GM_GETGINFO;
 	if ((data[0] = KSendMsg(&ptid, data, SRV_OUT_TIME)) != NO_ERROR)
 		return data[0];
@@ -83,9 +86,12 @@ static inline long GUIGetGinfo(THREAD_ID ptid, DWORD *GUIwidth, DWORD *GUIheight
 }
 
 /*创建窗体*/
-static inline long GUIcreate(THREAD_ID ptid, DWORD pid, DWORD ClintSign, short x, short y, WORD width, WORD height, DWORD *vbuf)
+static inline long GUIcreate(DWORD pid, DWORD ClintSign, short x, short y, WORD width, WORD height, DWORD *vbuf)
 {
+	THREAD_ID ptid;
 	DWORD data[MSG_DATA_LEN];
+	ptid.ProcID = SRV_GUI_PORT;
+	ptid.ThedID = INVALID;
 	data[MSG_API_ID] = MSG_ATTR_GUI | GM_CREATE;
 	data[3] = (WORD)x | ((DWORD)(WORD)y << 16);
 	data[4] = width | ((DWORD)height << 16);
@@ -98,18 +104,24 @@ static inline long GUIcreate(THREAD_ID ptid, DWORD pid, DWORD ClintSign, short x
 }
 
 /*销毁窗体*/
-static inline long GUIdestroy(THREAD_ID ptid, DWORD gid)
+static inline long GUIdestroy(DWORD gid)
 {
+	THREAD_ID ptid;
 	DWORD data[MSG_DATA_LEN];
+	ptid.ProcID = SRV_GUI_PORT;
+	ptid.ThedID = INVALID;
 	data[MSG_API_ID] = MSG_ATTR_GUI | GM_DESTROY;
 	data[GUIMSG_GOBJ_ID] = gid;
 	return KSendMsg(&ptid, data, 0);
 }
 
 /*移动窗体*/
-static inline long GUImove(THREAD_ID ptid, DWORD gid, long x, long y)
+static inline long GUImove(DWORD gid, long x, long y)
 {
+	THREAD_ID ptid;
 	DWORD data[MSG_DATA_LEN];
+	ptid.ProcID = SRV_GUI_PORT;
+	ptid.ThedID = INVALID;
 	data[MSG_API_ID] = MSG_ATTR_GUI | GM_MOVE;
 	data[1] = x;
 	data[2] = y;
@@ -118,9 +130,12 @@ static inline long GUImove(THREAD_ID ptid, DWORD gid, long x, long y)
 }
 
 /*设置窗体大小*/
-static inline long GUIsize(THREAD_ID ptid, DWORD gid, DWORD *vbuf, short x, short y, WORD width, WORD height)
+static inline long GUIsize(DWORD gid, DWORD *vbuf, short x, short y, WORD width, WORD height)
 {
+	THREAD_ID ptid;
 	DWORD data[MSG_DATA_LEN];
+	ptid.ProcID = SRV_GUI_PORT;
+	ptid.ThedID = INVALID;
 	data[MSG_API_ID] = MSG_ATTR_GUI | GM_SIZE;
 	data[3] = (WORD)x | ((DWORD)(WORD)y << 16);
 	data[4] = width | ((DWORD)height << 16);
@@ -132,9 +147,12 @@ static inline long GUIsize(THREAD_ID ptid, DWORD gid, DWORD *vbuf, short x, shor
 }
 
 /*重绘窗体区域*/
-static inline long GUIpaint(THREAD_ID ptid, DWORD gid, short x, short y, WORD width, WORD height)
+static inline long GUIpaint(DWORD gid, short x, short y, WORD width, WORD height)
 {
+	THREAD_ID ptid;
 	DWORD data[MSG_DATA_LEN];
+	ptid.ProcID = SRV_GUI_PORT;
+	ptid.ThedID = INVALID;
 	data[MSG_API_ID] = MSG_ATTR_GUI | GM_PAINT;
 	data[1] = (WORD)x | ((DWORD)(WORD)y << 16);
 	data[2] = width | ((DWORD)height << 16);
@@ -143,27 +161,36 @@ static inline long GUIpaint(THREAD_ID ptid, DWORD gid, short x, short y, WORD wi
 }
 
 /*设置窗体在顶端*/
-static inline long GUISetTop(THREAD_ID ptid, DWORD gid)
+static inline long GUISetTop(DWORD gid)
 {
+	THREAD_ID ptid;
 	DWORD data[MSG_DATA_LEN];
+	ptid.ProcID = SRV_GUI_PORT;
+	ptid.ThedID = INVALID;
 	data[MSG_API_ID] = MSG_ATTR_GUI | GM_SETTOP;
 	data[GUIMSG_GOBJ_ID] = gid;
 	return KSendMsg(&ptid, data, 0);
 }
 
 /*设置窗体焦点*/
-static inline long GUISetFocus(THREAD_ID ptid, DWORD gid)
+static inline long GUISetFocus(DWORD gid)
 {
+	THREAD_ID ptid;
 	DWORD data[MSG_DATA_LEN];
+	ptid.ProcID = SRV_GUI_PORT;
+	ptid.ThedID = INVALID;
 	data[MSG_API_ID] = MSG_ATTR_GUI | GM_SETFOCUS;
 	data[GUIMSG_GOBJ_ID] = gid;
 	return KSendMsg(&ptid, data, 0);
 }
 
 /*发送拖拽消息*/
-static inline long GUIdrag(THREAD_ID ptid, DWORD gid, DWORD mode)
+static inline long GUIdrag(DWORD gid, DWORD mode)
 {
+	THREAD_ID ptid;
 	DWORD data[MSG_DATA_LEN];
+	ptid.ProcID = SRV_GUI_PORT;
+	ptid.ThedID = INVALID;
 	data[MSG_API_ID] = MSG_ATTR_GUI | GM_DRAG;
 	data[1] = mode;
 	data[GUIMSG_GOBJ_ID] = gid;

@@ -17,6 +17,12 @@
 #define GC_ERR_INVALID_GUIMSG	-2691	/*非法GUI消息*/
 #define GC_ERR_WRONG_ARGS		-2692	/*参数错误*/
 
+typedef struct _UDI_IMAGE
+{
+	DWORD width, height;	/*尺寸*/
+	DWORD buf[];			/*位图缓冲,扩展到width*height大小*/
+}UDI_IMAGE;	/*GUI位图*/
+
 typedef struct _UDI_AREA
 {
 	DWORD width, height;	/*尺寸*/
@@ -27,7 +33,6 @@ typedef struct _UDI_AREA
 extern const BYTE *GCfont;
 extern DWORD GCwidth, GCheight;
 extern DWORD GCCharWidth, GCCharHeight;
-extern THREAD_ID GCGuiPtid, GCFontPtid;
 
 /*初始化GC库*/
 long GCinit();
@@ -152,15 +157,18 @@ void GCDskDefDrawProc(CTRL_DSK *dsk);
 
 #define BTN_TXT_LEN			32
 
+#define BTN_STYLE_DISABLED	0x0001	/*不可用*/
+
 typedef struct _CTRL_BTN
 {
 	CTRL_GOBJ obj;
 	char text[BTN_TXT_LEN];			/*按钮文本*/
+	UDI_IMAGE *img;					/*按钮图片*/
 	BOOL isPressDown;				/*是否已按下*/
 	void (*PressProc)(struct _CTRL_BTN *btn);	/*点击处理函数*/
 }CTRL_BTN;	/*按钮类*/
 
-long GCBtnCreate(CTRL_BTN **btn, const CTRL_ARGS *args, DWORD pid, CTRL_GOBJ *ParGobj, const char *text, void (*PressProc)(CTRL_BTN *btn));
+long GCBtnCreate(CTRL_BTN **btn, const CTRL_ARGS *args, DWORD pid, CTRL_GOBJ *ParGobj, const char *text, UDI_IMAGE *img, void (*PressProc)(CTRL_BTN *btn));
 
 long GCBtnDefMsgProc(THREAD_ID ptid, DWORD data[MSG_DATA_LEN]);
 
@@ -168,6 +176,9 @@ void GCBtnDefDrawProc(CTRL_BTN *btn);
 
 /*设置按钮文本*/
 void GCBtnSetText(CTRL_BTN *btn, const char *text);
+
+/*设置按钮为不可用样式*/
+void GCBtnSetDisable(CTRL_BTN *btn, BOOL isDisable);
 
 /**********窗口**********/
 
@@ -265,8 +276,8 @@ void GCSedtAddText(CTRL_SEDT *edt, const char *text);
 
 /**********滚动条**********/
 
-#define SCRL_STYLE_HOR	0x0000	/*水平*/
-#define SCRL_STYLE_VER	0x0001	/*竖直*/
+#define SCRL_STYLE_HOR		0x0000	/*水平*/
+#define SCRL_STYLE_VER		0x0001	/*竖直*/
 
 typedef struct _CTRL_SCRL
 {

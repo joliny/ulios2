@@ -18,12 +18,13 @@ typedef struct _POINT3D
 	long sx, sy;		/*ÆÁÄ»×ø±ê*/
 }POINT3D;
 
-THREAD_ID TimePtid;
+DWORD RandSeed;
 POINT3D point[PN];
 
-static inline long rand(DWORD x)
+long rand(DWORD x)
 {
-	return (DWORD)TMGetRand(TimePtid) % x;
+	RandSeed = RandSeed * 1103515245 + 12345;
+	return RandSeed % x;
 }
 
 void t0()
@@ -208,8 +209,7 @@ int main()
 	DWORD colr = 128, colg = 128, colb = 255;
 	long res;
 
-	if ((res = KGetKptThed(SRV_TIME_PORT, &TimePtid)) != NO_ERROR)
-		return res;
+	RandSeed = (DWORD)TMGetRand();
 	for (i = 0; i < PN; i++)
 	{
 		point[i].x = (float)(rand(400) - 200);

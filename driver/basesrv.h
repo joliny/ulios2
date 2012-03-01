@@ -25,9 +25,12 @@
 #define ATHD_ERR_HAVENO_REQ		-513	/*无法接受更多的服务请求*/
 
 /*写硬盘扇区*/
-static inline long HDWriteSector(THREAD_ID ptid, DWORD drv, DWORD sec, BYTE cou, void *buf)
+static inline long HDWriteSector(DWORD drv, DWORD sec, BYTE cou, void *buf)
 {
+	THREAD_ID ptid;
 	DWORD data[MSG_DATA_LEN];
+	ptid.ProcID = SRV_ATHD_PORT;
+	ptid.ThedID = INVALID;
 	data[MSG_API_ID] = ATHD_API_WRITESECTOR;
 	data[3] = drv;
 	data[4] = sec;
@@ -37,9 +40,12 @@ static inline long HDWriteSector(THREAD_ID ptid, DWORD drv, DWORD sec, BYTE cou,
 }
 
 /*读硬盘扇区*/
-static inline long HDReadSector(THREAD_ID ptid, DWORD drv, DWORD sec, BYTE cou, void *buf)
+static inline long HDReadSector(DWORD drv, DWORD sec, BYTE cou, void *buf)
 {
+	THREAD_ID ptid;
 	DWORD data[MSG_DATA_LEN];
+	ptid.ProcID = SRV_ATHD_PORT;
+	ptid.ThedID = INVALID;
 	data[MSG_API_ID] = ATHD_API_READSECTOR;
 	data[3] = drv;
 	data[4] = sec;
@@ -75,9 +81,12 @@ typedef struct _TM
 }TM;	/*时间结构*/
 
 /*取得1970年经过的秒*/
-static inline long TMCurSecond(THREAD_ID ptid, DWORD *sec)
+static inline long TMCurSecond(DWORD *sec)
 {
+	THREAD_ID ptid;
 	DWORD data[MSG_DATA_LEN];
+	ptid.ProcID = SRV_TIME_PORT;
+	ptid.ThedID = INVALID;
 	data[MSG_API_ID] = MSG_ATTR_TIME | TIME_API_CURSECOND;
 	if ((data[0] = KSendMsg(&ptid, data, SRV_OUT_TIME)) != NO_ERROR)
 		return data[0];
@@ -86,9 +95,12 @@ static inline long TMCurSecond(THREAD_ID ptid, DWORD *sec)
 }
 
 /*取得当前时间*/
-static inline long TMCurTime(THREAD_ID ptid, TM *tm)
+static inline long TMCurTime(TM *tm)
 {
+	THREAD_ID ptid;
 	DWORD data[MSG_DATA_LEN];
+	ptid.ProcID = SRV_TIME_PORT;
+	ptid.ThedID = INVALID;
 	data[MSG_API_ID] = MSG_ATTR_TIME | TIME_API_CURTIME;
 	if ((data[0] = KSendMsg(&ptid, data, SRV_OUT_TIME)) != NO_ERROR)
 		return data[0];
@@ -97,9 +109,12 @@ static inline long TMCurTime(THREAD_ID ptid, TM *tm)
 }
 
 /*TM结构转换为秒*/
-static inline long TMMkTime(THREAD_ID ptid, DWORD *sec, const TM *tm)
+static inline long TMMkTime(DWORD *sec, const TM *tm)
 {
+	THREAD_ID ptid;
 	DWORD data[MSG_DATA_LEN];
+	ptid.ProcID = SRV_TIME_PORT;
+	ptid.ThedID = INVALID;
 	data[MSG_API_ID] = MSG_ATTR_TIME | TIME_API_MKTIME;
 	memcpy32(&data[1], tm, sizeof(TM) / sizeof(DWORD));
 	if ((data[0] = KSendMsg(&ptid, data, SRV_OUT_TIME)) != NO_ERROR)
@@ -111,9 +126,12 @@ static inline long TMMkTime(THREAD_ID ptid, DWORD *sec, const TM *tm)
 }
 
 /*秒转换为TM结构*/
-static inline long TMLocalTime(THREAD_ID ptid, DWORD sec, TM *tm)
+static inline long TMLocalTime(DWORD sec, TM *tm)
 {
+	THREAD_ID ptid;
 	DWORD data[MSG_DATA_LEN];
+	ptid.ProcID = SRV_TIME_PORT;
+	ptid.ThedID = INVALID;
 	data[MSG_API_ID] = MSG_ATTR_TIME | TIME_API_LOCALTIME;
 	data[1] = sec;
 	if ((data[0] = KSendMsg(&ptid, data, SRV_OUT_TIME)) != NO_ERROR)
@@ -123,9 +141,12 @@ static inline long TMLocalTime(THREAD_ID ptid, DWORD sec, TM *tm)
 }
 
 /*取得随机数*/
-static inline long TMGetRand(THREAD_ID ptid)
+static inline long TMGetRand()
 {
+	THREAD_ID ptid;
 	DWORD data[MSG_DATA_LEN];
+	ptid.ProcID = SRV_TIME_PORT;
+	ptid.ThedID = INVALID;
 	data[MSG_API_ID] = MSG_ATTR_TIME | TIME_API_GETRAND;
 	if ((data[0] = KSendMsg(&ptid, data, SRV_OUT_TIME)) != NO_ERROR)
 		return data[0];
@@ -163,9 +184,12 @@ static inline long TMGetRand(THREAD_ID ptid)
 #define KBDMUS_API_SETRECV		0	/*注册接收键盘鼠标消息的线程功能号*/
 
 /*注册接收键盘鼠标消息的线程*/
-static inline long KMSetRecv(THREAD_ID ptid)
+static inline long KMSetRecv()
 {
+	THREAD_ID ptid;
 	DWORD data[MSG_DATA_LEN];
+	ptid.ProcID = SRV_KBDMUS_PORT;
+	ptid.ThedID = INVALID;
 	data[MSG_API_ID] = MSG_ATTR_KBDMUS | KBDMUS_API_SETRECV;
 	return KSendMsg(&ptid, data, 0);
 }
@@ -182,9 +206,12 @@ static inline long KMSetRecv(THREAD_ID ptid)
 #define VESA_ERR_ARGS		-1280	/*参数错误*/
 
 /*取得显存映射*/
-static inline long VSGetVmem(THREAD_ID ptid, void **vm, DWORD *width, DWORD *height, DWORD *PixBits, DWORD *CurMode)
+static inline long VSGetVmem(void **vm, DWORD *width, DWORD *height, DWORD *PixBits, DWORD *CurMode)
 {
+	THREAD_ID ptid;
 	DWORD data[MSG_DATA_LEN];
+	ptid.ProcID = SRV_VESA_PORT;
+	ptid.ThedID = INVALID;
 	data[MSG_API_ID] = MSG_ATTR_VESA | VESA_API_GETVMEM;
 	if ((data[0] = KSendMsg(&ptid, data, SRV_OUT_TIME)) != NO_ERROR)
 		return data[0];
@@ -199,9 +226,12 @@ static inline long VSGetVmem(THREAD_ID ptid, void **vm, DWORD *width, DWORD *hei
 }
 
 /*取得模式列表*/
-static inline long VSGetMode(THREAD_ID ptid, WORD mode[VESA_MAX_MODE], DWORD *ModeCou, DWORD *CurMode)
+static inline long VSGetMode(WORD mode[VESA_MAX_MODE], DWORD *ModeCou, DWORD *CurMode)
 {
+	THREAD_ID ptid;
 	DWORD data[MSG_DATA_LEN];
+	ptid.ProcID = SRV_VESA_PORT;
+	ptid.ThedID = INVALID;
 	data[MSG_API_ID] = VESA_API_GETMODE;
 	if ((data[0] = KReadProcAddr(mode, VESA_MAX_MODE * sizeof(WORD), &ptid, data, SRV_OUT_TIME)) != NO_ERROR)
 		return data[0];
@@ -222,9 +252,12 @@ static inline long VSGetMode(THREAD_ID ptid, WORD mode[VESA_MAX_MODE], DWORD *Mo
 #define FONT_ERR_ARGS		-1536	/*参数错误*/
 
 /*取得字体映射*/
-static inline long FNTGetFont(THREAD_ID ptid, const BYTE **font, DWORD *CharWidth, DWORD *CharHeight)
+static inline long FNTGetFont(const BYTE **font, DWORD *CharWidth, DWORD *CharHeight)
 {
+	THREAD_ID ptid;
 	DWORD data[MSG_DATA_LEN];
+	ptid.ProcID = SRV_FONT_PORT;
+	ptid.ThedID = INVALID;
 	data[MSG_API_ID] = MSG_ATTR_FONT | FONT_API_GETFONT;
 	if ((data[0] = KSendMsg(&ptid, data, SRV_OUT_TIME)) != NO_ERROR)
 		return data[0];
@@ -254,17 +287,23 @@ static inline long FNTGetFont(THREAD_ID ptid, const BYTE **font, DWORD *CharWidt
 #define CUI_ERR_ARGS	-1792	/*参数错误*/
 
 /*注册接收按键消息的线程*/
-static inline long CUISetRecv(THREAD_ID ptid)
+static inline long CUISetRecv()
 {
+	THREAD_ID ptid;
 	DWORD data[MSG_DATA_LEN];
+	ptid.ProcID = SRV_CUI_PORT;
+	ptid.ThedID = INVALID;
 	data[MSG_API_ID] = MSG_ATTR_CUI | CUI_API_SETRECV;
 	return KSendMsg(&ptid, data, 0);
 }
 
 /*取得字符界面颜色*/
-static inline long CUIGetCol(THREAD_ID ptid, DWORD *CharColor, DWORD *BgColor)
+static inline long CUIGetCol(DWORD *CharColor, DWORD *BgColor)
 {
+	THREAD_ID ptid;
 	DWORD data[MSG_DATA_LEN];
+	ptid.ProcID = SRV_CUI_PORT;
+	ptid.ThedID = INVALID;
 	data[MSG_API_ID] = MSG_ATTR_CUI | CUI_API_GETCOL;
 	if ((data[0] = KSendMsg(&ptid, data, SRV_OUT_TIME)) != NO_ERROR)
 		return data[0];
@@ -274,9 +313,12 @@ static inline long CUIGetCol(THREAD_ID ptid, DWORD *CharColor, DWORD *BgColor)
 }
 
 /*设置字符界面颜色*/
-static inline long CUISetCol(THREAD_ID ptid, DWORD CharColor, DWORD BgColor)
+static inline long CUISetCol(DWORD CharColor, DWORD BgColor)
 {
+	THREAD_ID ptid;
 	DWORD data[MSG_DATA_LEN];
+	ptid.ProcID = SRV_CUI_PORT;
+	ptid.ThedID = INVALID;
 	data[MSG_API_ID] = MSG_ATTR_CUI | CUI_API_SETCOL;
 	data[1] = CharColor;
 	data[2] = BgColor;
@@ -284,9 +326,12 @@ static inline long CUISetCol(THREAD_ID ptid, DWORD CharColor, DWORD BgColor)
 }
 
 /*取得光标位置*/
-static inline long CUIGetCur(THREAD_ID ptid, DWORD *CursX, DWORD *CursY)
+static inline long CUIGetCur(DWORD *CursX, DWORD *CursY)
 {
+	THREAD_ID ptid;
 	DWORD data[MSG_DATA_LEN];
+	ptid.ProcID = SRV_CUI_PORT;
+	ptid.ThedID = INVALID;
 	data[MSG_API_ID] = MSG_ATTR_CUI | CUI_API_GETCUR;
 	if ((data[0] = KSendMsg(&ptid, data, SRV_OUT_TIME)) != NO_ERROR)
 		return data[0];
@@ -296,9 +341,12 @@ static inline long CUIGetCur(THREAD_ID ptid, DWORD *CursX, DWORD *CursY)
 }
 
 /*设置光标位置*/
-static inline long CUISetCur(THREAD_ID ptid, DWORD CursX, DWORD CursY)
+static inline long CUISetCur(DWORD CursX, DWORD CursY)
 {
+	THREAD_ID ptid;
 	DWORD data[MSG_DATA_LEN];
+	ptid.ProcID = SRV_CUI_PORT;
+	ptid.ThedID = INVALID;
 	data[MSG_API_ID] = MSG_ATTR_CUI | CUI_API_SETCUR;
 	data[1] = CursX;
 	data[2] = CursY;
@@ -306,26 +354,35 @@ static inline long CUISetCur(THREAD_ID ptid, DWORD CursX, DWORD CursY)
 }
 
 /*清屏*/
-static inline long CUIClrScr(THREAD_ID ptid)
+static inline long CUIClrScr()
 {
+	THREAD_ID ptid;
 	DWORD data[MSG_DATA_LEN];
+	ptid.ProcID = SRV_CUI_PORT;
+	ptid.ThedID = INVALID;
 	data[MSG_API_ID] = MSG_ATTR_CUI | CUI_API_CLRSCR;
 	return KSendMsg(&ptid, data, 0);
 }
 
 /*输出字符*/
-static inline long CUIPutC(THREAD_ID ptid, char c)
+static inline long CUIPutC(char c)
 {
+	THREAD_ID ptid;
 	DWORD data[MSG_DATA_LEN];
+	ptid.ProcID = SRV_CUI_PORT;
+	ptid.ThedID = INVALID;
 	data[MSG_API_ID] = MSG_ATTR_CUI | CUI_API_PUTC;
 	data[1] = c;
 	return KSendMsg(&ptid, data, 0);
 }
 
 /*输出字符串*/
-static inline long CUIPutS(THREAD_ID ptid, const char *str)
+static inline long CUIPutS(const char *str)
 {
+	THREAD_ID ptid;
 	DWORD data[MSG_DATA_LEN];
+	ptid.ProcID = SRV_CUI_PORT;
+	ptid.ThedID = INVALID;
 	data[MSG_API_ID] = CUI_API_PUTS;
 	if ((data[0] = KWriteProcAddr((void*)str, strlen(str) + 1, &ptid, data, SRV_OUT_TIME)) != NO_ERROR)
 		return data[0];
@@ -341,18 +398,24 @@ static inline long CUIPutS(THREAD_ID ptid, const char *str)
 #define SPK_API_NOSOUND	1	/*停止发声功能号*/
 
 /*发声*/
-static inline long SPKSound(THREAD_ID ptid, DWORD freq)
+static inline long SPKSound(DWORD freq)
 {
+	THREAD_ID ptid;
 	DWORD data[MSG_DATA_LEN];
+	ptid.ProcID = SRV_SPK_PORT;
+	ptid.ThedID = INVALID;
 	data[MSG_API_ID] = MSG_ATTR_SPK | SPK_API_SOUND;
 	data[1] = freq;
 	return KSendMsg(&ptid, data, 0);
 }
 
 /*停止发声*/
-static inline long SPKNosound(THREAD_ID ptid)
+static inline long SPKNosound()
 {
+	THREAD_ID ptid;
 	DWORD data[MSG_DATA_LEN];
+	ptid.ProcID = SRV_SPK_PORT;
+	ptid.ThedID = INVALID;
 	data[MSG_API_ID] = MSG_ATTR_SPK | SPK_API_NOSOUND;
 	return KSendMsg(&ptid, data, 0);
 }
@@ -384,9 +447,12 @@ static inline long SPKNosound(THREAD_ID ptid)
 #define UART_ERR_BUSY	-2307	/*端口驱动正忙*/
 
 /*打开串口*/
-static inline long UARTOpenCom(THREAD_ID ptid, DWORD com, DWORD baud, DWORD args)
+static inline long UARTOpenCom(DWORD com, DWORD baud, DWORD args)
 {
+	THREAD_ID ptid;
 	DWORD data[MSG_DATA_LEN];
+	ptid.ProcID = SRV_UART_PORT;
+	ptid.ThedID = INVALID;
 	data[MSG_API_ID] = MSG_ATTR_UART | UART_API_OPENCOM;
 	data[1] = com;
 	data[2] = baud;
@@ -397,9 +463,12 @@ static inline long UARTOpenCom(THREAD_ID ptid, DWORD com, DWORD baud, DWORD args
 }
 
 /*关闭串口*/
-static inline long UARTCloseCom(THREAD_ID ptid, DWORD com)
+static inline long UARTCloseCom(DWORD com)
 {
+	THREAD_ID ptid;
 	DWORD data[MSG_DATA_LEN];
+	ptid.ProcID = SRV_UART_PORT;
+	ptid.ThedID = INVALID;
 	data[MSG_API_ID] = MSG_ATTR_UART | UART_API_CLOSECOM;
 	data[1] = com;
 	if ((data[0] = KSendMsg(&ptid, data, SRV_OUT_TIME)) != NO_ERROR)
@@ -408,9 +477,12 @@ static inline long UARTCloseCom(THREAD_ID ptid, DWORD com)
 }
 
 /*写串口*/
-static inline long UARTWriteCom(THREAD_ID ptid, DWORD com, void *buf, DWORD siz, DWORD time)
+static inline long UARTWriteCom(DWORD com, void *buf, DWORD siz, DWORD time)
 {
+	THREAD_ID ptid;
 	DWORD data[MSG_DATA_LEN];
+	ptid.ProcID = SRV_UART_PORT;
+	ptid.ThedID = INVALID;
 	data[MSG_API_ID] = UART_API_WRITECOM;
 	data[3] = com;
 	data[4] = time;
@@ -420,9 +492,12 @@ static inline long UARTWriteCom(THREAD_ID ptid, DWORD com, void *buf, DWORD siz,
 }
 
 /*读串口*/
-static inline long UARTReadCom(THREAD_ID ptid, DWORD com, void *buf, DWORD siz, DWORD time)
+static inline long UARTReadCom(DWORD com, void *buf, DWORD siz, DWORD time)
 {
+	THREAD_ID ptid;
 	DWORD data[MSG_DATA_LEN];
+	ptid.ProcID = SRV_UART_PORT;
+	ptid.ThedID = INVALID;
 	data[MSG_API_ID] = UART_API_READCOM;
 	data[3] = com;
 	data[4] = time;
@@ -441,9 +516,12 @@ static inline long UARTReadCom(THREAD_ID ptid, DWORD com, void *buf, DWORD siz, 
 #define IME_API_PUTKEY		2	/*向输入法发送按键功能号*/
 
 /*打开输入法工具条*/
-static inline long IMEOpenBar(THREAD_ID ptid, long x, long y)
+static inline long IMEOpenBar(long x, long y)
 {
+	THREAD_ID ptid;
 	DWORD data[MSG_DATA_LEN];
+	ptid.ProcID = SRV_IME_PORT;
+	ptid.ThedID = INVALID;
 	data[MSG_API_ID] = MSG_ATTR_IME | IME_API_OPENBAR;
 	data[1] = x;
 	data[2] = y;
@@ -451,17 +529,23 @@ static inline long IMEOpenBar(THREAD_ID ptid, long x, long y)
 }
 
 /*关闭输入法工具条*/
-static inline long IMECloseBar(THREAD_ID ptid)
+static inline long IMECloseBar()
 {
+	THREAD_ID ptid;
 	DWORD data[MSG_DATA_LEN];
+	ptid.ProcID = SRV_IME_PORT;
+	ptid.ThedID = INVALID;
 	data[MSG_API_ID] = MSG_ATTR_IME | IME_API_CLOSEBAR;
 	return KSendMsg(&ptid, data, 0);
 }
 
 /*向输入法发送按键*/
-static inline long IMEPutKey(THREAD_ID ptid, DWORD key)
+static inline long IMEPutKey(DWORD key)
 {
+	THREAD_ID ptid;
 	DWORD data[MSG_DATA_LEN];
+	ptid.ProcID = SRV_IME_PORT;
+	ptid.ThedID = INVALID;
 	data[MSG_API_ID] = MSG_ATTR_IME | IME_API_PUTKEY;
 	data[1] = key;
 	return KSendMsg(&ptid, data, 0);

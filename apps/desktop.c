@@ -74,7 +74,7 @@ long MainMsgProc(THREAD_ID ptid, DWORD data[MSG_DATA_LEN])
 			DWORD *bmp, BmpWidth, BmpHeight;
 			if (dsk->obj.gid)	/*非主桌面,主动退出*/
 			{
-				GUIdestroy(GCGuiPtid, dsk->obj.gid);
+				GUIdestroy(dsk->obj.gid);
 				break;
 			}
 			GCLoadBmp("desktop.bmp", NULL, 0, &BmpWidth, &BmpHeight);
@@ -91,9 +91,9 @@ long MainMsgProc(THREAD_ID ptid, DWORD data[MSG_DATA_LEN])
 			args.y = 16;
 			args.style = 0;
 			args.MsgProc = NULL;
-			GCBtnCreate(NULL, &args, dsk->obj.gid, &dsk->obj, "命令提示符", CmdProc);
+			GCBtnCreate(NULL, &args, dsk->obj.gid, &dsk->obj, "命令提示符", NULL, CmdProc);
 			args.y = 40;
-			GCBtnCreate(NULL, &args, dsk->obj.gid, &dsk->obj, "资源管理器", GmgrProc);
+			GCBtnCreate(NULL, &args, dsk->obj.gid, &dsk->obj, "资源管理器", NULL, GmgrProc);
 		}
 		break;
 	}

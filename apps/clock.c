@@ -17,17 +17,13 @@
 int main(int argc, char *argv[])
 {
 	TM nowtime;
-	THREAD_ID TimePtid;
-	long res;
 
-	if ((res = KGetKptThed(SRV_TIME_PORT, &TimePtid)) != NO_ERROR)
-		return res;
 	if (GDIinit() != NO_ERROR)
 		return NO_ERROR;
 	for(;;)
 	{
 		float i, tmphor;
-		TMCurTime(TimePtid, &nowtime);
+		TMCurTime(&nowtime);
 		//±≥æ∞
 		GDIFillRect(GDIwidth - CLOCK_WID, 0, CLOCK_WID, CLOCK_WID, 0);
 		//±Ì≈Ã

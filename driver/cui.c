@@ -18,7 +18,6 @@
 #define GUI_MOD_HEIGHT	25
 #define RECVPTID_LEN	0x300	/*接收消息线程ID栈长度*/
 
-THREAD_ID KbdPtid;	/*键盘驱动*/
 DWORD DspMode;	/*字符显示模式*/
 DWORD width, height;	/*显示字符数量*/
 DWORD CharWidth, CharHeight;	/*字符大小*/
@@ -75,7 +74,7 @@ long MainMsgProc(THREAD_ID ptid, DWORD data[MSG_DATA_LEN])
 		break;
 	case GM_LBUTTONDOWN:	/*鼠标按下*/
 		if (!(wnd->obj.style & WND_STATE_FOCUS))
-			GUISetFocus(GCGuiPtid, wnd->obj.gid);
+			GUISetFocus(wnd->obj.gid);
 		break;
 	case GM_KEY:	/*发送按键*/
 		SendKeyMsg(data);
@@ -99,7 +98,8 @@ void CreateGuiWnd()
 	args.style = WND_STYLE_CAPTION | WND_STYLE_BORDER | WND_STYLE_CLOSEBTN;
 	args.MsgProc = MainMsgProc;
 	GCWndCreate(&wnd, &args, 0, NULL, "控制台");
-	ptid = GCGuiPtid;
+	ptid.ProcID = SRV_GUI_PORT;
+	ptid.ThedID = INVALID;
 	if (KRecvProcMsg(&ptid, data, INVALID) != NO_ERROR)	/*等待创建完成消息*/
 		return;
 	GCDispatchMsg(ptid, data);	/*创建完成后续处理*/
@@ -127,7 +127,7 @@ void ClearScr()
 			GCWndGetClientLoca(wnd, &CliX, &CliY);
 			GCFillRect(&wnd->client, 0, 0, wnd->client.width, wnd->client.height, BgColor);
 			GCFillRect(&wnd->client, 0, CharHeight - CURS_WIDTH, CharWidth, CURS_WIDTH, CharColor);	/*画光标*/
-			GUIpaint(GCGuiPtid, wnd->obj.gid, CliX, CliY, wnd->client.width, wnd->client.height);
+			GUIpaint(wnd->obj.gid, CliX, CliY, wnd->client.width, wnd->client.height);
 		}
 		break;
 	}
@@ -159,7 +159,7 @@ void PutStr(const char *str)
 						CreateGuiWnd();
 					GCWndGetClientLoca(wnd, &CliX, &CliY);
 					GCFillRect(&wnd->client, CharWidth * CursX, CharHeight * CursY, CharWidth, CharHeight, BgColor);	/*清除背景*/
-					GUIpaint(GCGuiPtid, wnd->obj.gid, CliX + CharWidth * CursX, CliY + CharHeight * CursY, CharWidth, CharHeight);
+					GUIpaint(wnd->obj.gid, CliX + CharWidth * CursX, CliY + CharHeight * CursY, CharWidth, CharHeight);
 				}
 				break;
 			}
@@ -205,7 +205,7 @@ void PutStr(const char *str)
 						GCWndGetClientLoca(wnd, &CliX, &CliY);
 						GCFillRect(&wnd->client, BufX, BufY, CharWidth * (bufp - LineBuf), CharHeight, BgColor);
 						GCDrawStr(&wnd->client, BufX, BufY, LineBuf, CharColor);
-						GUIpaint(GCGuiPtid, wnd->obj.gid, CliX + BufX, CliY + BufY, CharWidth * (bufp - LineBuf), CharHeight);
+						GUIpaint(wnd->obj.gid, CliX + BufX, CliY + BufY, CharWidth * (bufp - LineBuf), CharHeight);
 					}
 					break;
 				}
@@ -235,7 +235,7 @@ void PutStr(const char *str)
 					GCWndGetClientLoca(wnd, &CliX, &CliY);
 					memcpy32(wnd->obj.uda.vbuf + wnd->obj.uda.width * 20, wnd->obj.uda.vbuf + wnd->obj.uda.width * (20 + CharHeight), wnd->obj.uda.width * CharHeight * (height - 1));	/*向上滚屏*/
 					GCFillRect(&wnd->client, 0, CharHeight * (height - 1), wnd->client.width, CharHeight, BgColor);
-					GUIpaint(GCGuiPtid, wnd->obj.gid, CliX, CliY, wnd->client.width, wnd->client.height);
+					GUIpaint(wnd->obj.gid, CliX, CliY, wnd->client.width, wnd->client.height);
 				}
 				break;
 			}
@@ -269,7 +269,7 @@ void PutStr(const char *str)
 				GCWndGetClientLoca(wnd, &CliX, &CliY);
 				GCFillRect(&wnd->client, BufX, BufY, CharWidth * (bufp - LineBuf), CharHeight, BgColor);
 				GCDrawStr(&wnd->client, BufX, BufY, LineBuf, CharColor);
-				GUIpaint(GCGuiPtid, wnd->obj.gid, CliX + BufX, CliY + BufY, CharWidth * (bufp - LineBuf), CharHeight);
+				GUIpaint(wnd->obj.gid, CliX + BufX, CliY + BufY, CharWidth * (bufp - LineBuf), CharHeight);
 			}
 			break;
 		}
@@ -289,7 +289,7 @@ void PutStr(const char *str)
 				CreateGuiWnd();
 			GCWndGetClientLoca(wnd, &CliX, &CliY);
 			GCFillRect(&wnd->client, CharWidth * CursX, CharHeight * CursY + CharHeight - CURS_WIDTH, CharWidth, CURS_WIDTH, CharColor);	/*画光标*/
-			GUIpaint(GCGuiPtid, wnd->obj.gid, CliX + CharWidth * CursX, CliY + CharHeight * CursY + CharHeight - CURS_WIDTH, CharWidth, CURS_WIDTH);
+			GUIpaint(wnd->obj.gid, CliX + CharWidth * CursX, CliY + CharHeight * CursY + CharHeight - CURS_WIDTH, CharWidth, CURS_WIDTH);
 		}
 		break;
 	}
@@ -312,7 +312,7 @@ void BackSp()
 				CreateGuiWnd();
 			GCWndGetClientLoca(wnd, &CliX, &CliY);
 			GCFillRect(&wnd->client, CharWidth * CursX, CharHeight * CursY + CharHeight - CURS_WIDTH, CharWidth, CURS_WIDTH, BgColor);	/*清除光标*/
-			GUIpaint(GCGuiPtid, wnd->obj.gid, CliX + CharWidth * CursX, CliY + CharHeight * CursY + CharHeight - CURS_WIDTH, CharWidth, CURS_WIDTH);
+			GUIpaint(wnd->obj.gid, CliX + CharWidth * CursX, CliY + CharHeight * CursY + CharHeight - CURS_WIDTH, CharWidth, CURS_WIDTH);
 		}
 		break;
 	}
@@ -341,7 +341,7 @@ void BackSp()
 			GCWndGetClientLoca(wnd, &CliX, &CliY);
 			GCFillRect(&wnd->client, CharWidth * CursX, CharHeight * CursY, CharWidth, CharHeight, BgColor);	/*清除背景*/
 			GCFillRect(&wnd->client, CharWidth * CursX, CharHeight * CursY + CharHeight - CURS_WIDTH, CharWidth, CURS_WIDTH, CharColor);	/*画光标*/
-			GUIpaint(GCGuiPtid, wnd->obj.gid, CliX + CharWidth * CursX, CliY + CharHeight * CursY, CharWidth, CharHeight);
+			GUIpaint(wnd->obj.gid, CliX + CharWidth * CursX, CliY + CharHeight * CursY, CharWidth, CharHeight);
 		}
 		break;
 	}
@@ -369,9 +369,7 @@ int main()
 	BgColor = 0xFFCCCCCC;
 	goto initok;
 initgdi:
-	if ((res = KGetKptThed(SRV_KBDMUS_PORT, &KbdPtid)) != NO_ERROR)	/*取得键盘服务*/
-		return res;
-	if ((res = KMSetRecv(KbdPtid)) != NO_ERROR)
+	if ((res = KMSetRecv()) != NO_ERROR)
 		return res;
 	res = GDIinit();	/*次之使用GDI*/
 	if (res != NO_ERROR)
@@ -461,13 +459,13 @@ initok:
 							CreateGuiWnd();
 						GCWndGetClientLoca(wnd, &CliX, &CliY);
 						GCFillRect(&wnd->client, CharWidth * CursX, CharHeight * CursY + CharHeight - CURS_WIDTH, CharWidth, CURS_WIDTH, BgColor);	/*清除光标*/
-						GUIpaint(GCGuiPtid, wnd->obj.gid, CliX + CharWidth * CursX, CliY + CharHeight * CursY + CharHeight - CURS_WIDTH, CharWidth, CURS_WIDTH);
+						GUIpaint(wnd->obj.gid, CliX + CharWidth * CursX, CliY + CharHeight * CursY + CharHeight - CURS_WIDTH, CharWidth, CURS_WIDTH);
 						if (data[1] < width)
 							CursX = data[1];
 						if (data[2] < height)
 							CursY = data[2];
 						GCFillRect(&wnd->client, CharWidth * CursX, CharHeight * CursY + CharHeight - CURS_WIDTH, CharWidth, CURS_WIDTH, CharColor);	/*画光标*/
-						GUIpaint(GCGuiPtid, wnd->obj.gid, CliX + CharWidth * CursX, CliY + CharHeight * CursY + CharHeight - CURS_WIDTH, CharWidth, CURS_WIDTH);
+						GUIpaint(wnd->obj.gid, CliX + CharWidth * CursX, CliY + CharHeight * CursY + CharHeight - CURS_WIDTH, CharWidth, CURS_WIDTH);
 					}
 					break;
 				}

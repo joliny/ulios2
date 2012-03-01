@@ -98,7 +98,6 @@ long SetFocusGobj(GOBJ_DESC *gobj);
 
 extern void *GDIvm;
 extern DWORD GDIwidth, GDIheight, GDIPixBits, GDImode;
-extern THREAD_ID GDIVesaPtid;
 
 /*ÌùÍ¼*/
 void GDIPutImage(long x, long y, DWORD *img, long w, long h);

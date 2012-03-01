@@ -10,22 +10,17 @@ void *GDIvm;
 const BYTE *GDIfont;
 DWORD GDIwidth, GDIheight, GDIPixBits, GDImode;
 DWORD GDICharWidth, GDICharHeight;
-THREAD_ID GDIVesaPtid, GDIFontPtid;
 
 /*≥ı ºªØGDIø‚*/
 long GDIinit()
 {
 	long res;
 
-	if ((res = KGetKptThed(SRV_VESA_PORT, &GDIVesaPtid)) != NO_ERROR)
-		return res;
-	if (GDIvm == NULL && (res = VSGetVmem(GDIVesaPtid, &GDIvm, &GDIwidth, &GDIheight, &GDIPixBits, &GDImode)) != NO_ERROR)
+	if (GDIvm == NULL && (res = VSGetVmem(&GDIvm, &GDIwidth, &GDIheight, &GDIPixBits, &GDImode)) != NO_ERROR)
 		return res;
 	if (!GDImode)
 		return GDI_ERR_TEXTMODE;
-	if ((res = KGetKptThed(SRV_FONT_PORT, &GDIFontPtid)) != NO_ERROR)
-		return res;
-	if (GDIfont == NULL && (res = FNTGetFont(GDIFontPtid, &GDIfont, &GDICharWidth, &GDICharHeight)) != NO_ERROR)
+	if (GDIfont == NULL && (res = FNTGetFont(&GDIfont, &GDICharWidth, &GDICharHeight)) != NO_ERROR)
 		return res;
 	return NO_ERROR;
 }
