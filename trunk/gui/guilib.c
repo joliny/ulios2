@@ -9,7 +9,6 @@
 
 void *GDIvm;
 DWORD GDIwidth, GDIheight, GDIPixBits, GDImode;
-THREAD_ID GDIVesaPtid;
 
 typedef struct _RGB24
 {
@@ -336,17 +335,14 @@ void GuiPutImage(long x, long y, DWORD *img, long memw, long w, long h)
 long LoadBmp(char *path, DWORD *buf, DWORD len, DWORD *width, DWORD *height)
 {
 	BYTE BmpHead[32];
-	THREAD_ID FsPtid;
 	DWORD bmpw, bmph;
-	long file, res;
+	long file;
 
-	if ((res = KGetKptThed(SRV_FS_PORT, &FsPtid)) != NO_ERROR)	/*取得文件系统服务线程*/
-		return res;
-	if ((file = FSopen(FsPtid, path, FS_OPEN_READ)) < 0)	/*读取BMP文件*/
+	if ((file = FSopen(path, FS_OPEN_READ)) < 0)	/*读取BMP文件*/
 		return file;
-	if (FSread(FsPtid, file, &BmpHead[2], 30) < 30 || *((WORD*)&BmpHead[2]) != 0x4D42 || *((WORD*)&BmpHead[30]) != 24)	/*保证32位对齐访问*/
+	if (FSread(file, &BmpHead[2], 30) < 30 || *((WORD*)&BmpHead[2]) != 0x4D42 || *((WORD*)&BmpHead[30]) != 24)	/*保证32位对齐访问*/
 	{
-		FSclose(FsPtid, file);
+		FSclose(file);
 		return -1;
 	}
 	bmpw = *((DWORD*)&BmpHead[20]);
@@ -357,18 +353,18 @@ long LoadBmp(char *path, DWORD *buf, DWORD len, DWORD *width, DWORD *height)
 		*height = bmph;
 	if (bmpw * bmph > len)
 	{
-		FSclose(FsPtid, file);
+		FSclose(file);
 		return -1;
 	}
-	FSseek(FsPtid, file, 54, FS_SEEK_SET);
+	FSseek(file, 54, FS_SEEK_SET);
 	len = (bmpw * 3 + 3) & 0xFFFFFFFC;
 	for (buf += bmpw * (bmph - 1); bmph > 0; bmph--, buf -= bmpw)
 	{
 		BYTE *src, *dst;
 
-		if (FSread(FsPtid, file, buf, len) < len)
+		if (FSread(file, buf, len) < len)
 		{
-			FSclose(FsPtid, file);
+			FSclose(file);
 			return -1;
 		}
 		src = (BYTE*)buf + bmpw * 3;
@@ -381,6 +377,6 @@ long LoadBmp(char *path, DWORD *buf, DWORD len, DWORD *width, DWORD *height)
 			*(--dst) = *(--src);
 		}
 	}
-	FSclose(FsPtid, file);
+	FSclose(file);
 	return NO_ERROR;
 }

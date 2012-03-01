@@ -8,7 +8,7 @@
 #include "../lib/malloc.h"
 #include "../lib/gclient.h"
 
-THREAD_ID FsPtid;
+CTRL_SEDT *DirSedt;	/*地址栏*/
 CTRL_LST *PartList;	/*分区列表*/
 CTRL_LST *FileList;	/*文件列表*/
 CTRL_BTN *ParBtn;	/*父目录按钮*/
@@ -19,6 +19,12 @@ CTRL_BTN *DelBtn;	/*删除按钮*/
 CTRL_BTN *DirBtn;	/*创建目录按钮*/
 CTRL_BTN *FileBtn;	/*创建文件按钮*/
 CTRL_BTN *RenamBtn;	/*重命名按钮*/
+DWORD op;	/*操作*/
+char PathBuf[MAX_PATH];	/*复制或剪切路径缓冲*/
+
+#define OP_NONE	0
+#define OP_CUT	1
+#define OP_COPY	2
 
 /*双字转化为数字*/
 char *Itoa(char *buf, DWORD n, DWORD r)
@@ -97,32 +103,52 @@ void Sprintf(char *buf, const char *fmtstr, ...)
 #define WND_WIDTH	400	/*窗口最小宽度,高度*/
 #define WND_HEIGHT	300
 #define SIDE		2	/*控件边距*/
+#define EDT_HEIGHT	16	/*地址栏高度*/
 #define PART_WIDTH	64	/*分区列表宽度*/
 #define BTN_WIDTH	56	/*按钮宽度,高度*/
 #define BTN_HEIGHT	20
 
+/*填充文件列表*/
+void FillFileList()
+{
+	FILE_INFO fi;
+	long dh;
+	LIST_ITEM *item;
+	char buf[MAX_PATH];
+
+	if ((dh = FSOpenDir("")) < 0)
+		return;
+	FSGetCwd(buf, MAX_PATH);
+	GCSedtSetText(DirSedt, buf);
+	GCLstDelAllItem(FileList);
+	item = NULL;
+	while (FSReadDir(dh, &fi) == NO_ERROR)
+	{
+		char buf[MAX_PATH];
+		Sprintf(buf, "%s %s", (fi.attr & FILE_ATTR_DIREC) ? "[]" : "==", fi.name);
+		GCLstInsertItem(FileList, item, buf, &item);
+	}
+	FSclose(dh);
+}
+
+/*地址栏回车处理*/
+void DirSedtEnterProc(CTRL_SEDT *edt)
+{
+	if (FSChDir(edt->text) == NO_ERROR)
+		FillFileList();
+}
+
+/*分区列表选取处理*/
 void PartListSelProc(CTRL_LST *lst)
 {
 	if (lst->SelItem)	/*选中盘符*/
 	{
-		FILE_INFO fi;
-		long dh;
-		LIST_ITEM *item;
-		FSChDir(FsPtid, lst->SelItem->text);
-		if ((dh = FSOpenDir(FsPtid, "")) < 0)
-			return;
-		GCLstDelAllItem(FileList);
-		item = NULL;
-		while (FSReadDir(FsPtid, dh, &fi) == NO_ERROR)
-		{
-			char buf[MAX_PATH];
-			Sprintf(buf, "%s %s", (fi.attr & FILE_ATTR_DIREC) ? "[]" : "==", fi.name);
-			GCLstInsertItem(FileList, item, buf, &item);
-		}
-		FSclose(FsPtid, dh);
+		if (FSChDir(lst->SelItem->text) == NO_ERROR)
+			FillFileList();
 	}
 }
 
+/*分区列表消息处理*/
 long PartListMsgProc(THREAD_ID ptid, DWORD data[MSG_DATA_LEN])
 {
 	CTRL_LST *lst = (CTRL_LST*)data[GUIMSG_GOBJ_ID];
@@ -135,7 +161,7 @@ long PartListMsgProc(THREAD_ID ptid, DWORD data[MSG_DATA_LEN])
 
 			pid = 0;
 			item = NULL;
-			while (FSEnumPart(FsPtid, &pid) == NO_ERROR)
+			while (FSEnumPart(&pid) == NO_ERROR)
 			{
 				char buf[4];
 				Sprintf(buf, "/%u", pid);
@@ -148,36 +174,198 @@ long PartListMsgProc(THREAD_ID ptid, DWORD data[MSG_DATA_LEN])
 	return GCLstDefMsgProc(ptid, data);
 }
 
+/*文件列表选取处理*/
 void FileListSelProc(CTRL_LST *lst)
 {
-	if (lst->SelItem)	/*选中目录或文件*/
+	if (lst->SelItem)	/*选中文件*/
 	{
-		if (lst->SelItem->text[0] == '[')	/*打开目录*/
-		{
-			FILE_INFO fi;
-			long dh;
-			LIST_ITEM *item;
-			FSChDir(FsPtid, lst->SelItem->text + 3);
-			if ((dh = FSOpenDir(FsPtid, "")) < 0)
-				return;
-			GCLstDelAllItem(FileList);
-			item = NULL;
-			while (FSReadDir(FsPtid, dh, &fi) == NO_ERROR)
-			{
-				char buf[MAX_PATH];
-				Sprintf(buf, "%s %s", (fi.attr & FILE_ATTR_DIREC) ? "[]" : "==", fi.name);
-				GCLstInsertItem(FileList, item, buf, &item);
-			}
-			FSclose(FsPtid, dh);
-		}
-		else	/*执行程序*/
-		{
-			THREAD_ID ptid;
-			KCreateProcess(0, lst->SelItem->text + 3, NULL, &ptid);
-		}
+		GCBtnSetDisable(CutBtn, FALSE);
+		GCBtnSetDisable(CopyBtn, FALSE);
+		GCBtnSetDisable(DelBtn, FALSE);
+		GCBtnSetDisable(RenamBtn, FALSE);
+	}
+	else
+	{
+		GCBtnSetDisable(CutBtn, TRUE);
+		GCBtnSetDisable(CopyBtn, TRUE);
+		GCBtnSetDisable(DelBtn, TRUE);
+		GCBtnSetDisable(RenamBtn, TRUE);
 	}
 }
 
+/*文件列表消息处理*/
+long FileListMsgProc(THREAD_ID ptid, DWORD data[MSG_DATA_LEN])
+{
+	CTRL_LST *lst = (CTRL_LST*)data[GUIMSG_GOBJ_ID];
+	switch (data[MSG_API_ID] & MSG_API_MASK)
+	{
+	case GM_CREATE:
+		FillFileList();
+		break;
+	case GM_LBUTTONDBCLK:
+		if (lst->SelItem)	/*选中目录或文件*/
+		{
+			if (lst->SelItem->text[0] == '[')	/*打开目录*/
+			{
+				if (FSChDir(lst->SelItem->text + 3) == NO_ERROR)
+					FillFileList();
+			}
+			else	/*执行程序*/
+			{
+				THREAD_ID ptid;
+				KCreateProcess(0, lst->SelItem->text + 3, NULL, &ptid);
+			}
+		}
+		break;
+	}
+	return GCLstDefMsgProc(ptid, data);
+}
+
+/*上级目录按钮处理*/
+void ParBtnPressProc(CTRL_BTN *btn)
+{
+	if (FSChDir("..") == NO_ERROR)
+		FillFileList();
+}
+
+/*剪切按钮处理*/
+void CutBtnPressProc(CTRL_BTN *btn)
+{
+	if (FileList->SelItem)	/*选中文件*/
+	{
+		char buf[MAX_PATH];
+		FSGetCwd(buf, MAX_PATH);
+		Sprintf(PathBuf, "%s/%s", buf, FileList->SelItem->text + 3);
+		op = OP_CUT;
+		GCBtnSetDisable(PasteBtn, FALSE);
+	}
+}
+
+/*复制按钮处理*/
+void CopyBtnPressProc(CTRL_BTN *btn)
+{
+	if (FileList->SelItem)	/*选中文件*/
+	{
+		char buf[MAX_PATH];
+		FSGetCwd(buf, MAX_PATH);
+		Sprintf(PathBuf, "%s/%s", buf, FileList->SelItem->text + 3);
+		op = OP_COPY;
+		GCBtnSetDisable(PasteBtn, FALSE);
+	}
+}
+
+/*递归删除目录*/
+void DelTree(char *path)
+{
+	if (FSChDir(path) == NO_ERROR)
+	{
+		FILE_INFO fi;
+		long dh;
+		if ((dh = FSOpenDir("")) < 0)
+		{
+			FSChDir("..");
+			return;
+		}
+		while (FSReadDir(dh, &fi) == NO_ERROR)
+			DelTree(fi.name);
+		FSclose(dh);
+		FSChDir("..");
+	}
+	FSremove(path);
+}
+
+/*递归复制目录到当前目录*/
+void CopyTree(char *path)
+{
+	char *end, *name;
+	FILE_INFO fi;
+	long inh;
+
+	end = path;	/*分离路径和名称*/
+	while (*end)
+		end++;
+	name = end;
+	while (name > path && *name != '/')
+		name--;
+	if (*name == '/')
+		name++;
+	if ((inh = FSOpenDir(path)) >= 0)	/*尝试打开目录*/
+	{
+		if (FSMkDir(name) == NO_ERROR)	/*创建新目录*/
+		{
+			FSChDir(name);
+			while (FSReadDir(inh, &fi) == NO_ERROR)
+				if (!(fi.name[0] == '.' && (fi.name[1] == '\0' || (fi.name[1] == '.' && fi.name[2] == '\0'))))	/*单点和双点目录不复制*/
+				{
+					*end = '/';
+					strcpy(end + 1, fi.name);
+					CopyTree(path);
+					*end = '\0';
+				}
+			FSChDir("..");
+		}
+		FSclose(inh);
+	}
+	else if ((inh = FSopen(path, FS_OPEN_READ)) >= 0)	/*尝试打开文件*/
+	{
+		char buf[4096];
+		long outh, siz;
+
+		if ((outh = FScreat(name)) >= 0)	/*创建新文件*/
+		{
+			while ((siz = FSread(inh, buf, sizeof(buf))) > 0)	/*复制数据*/
+				FSwrite(outh, buf, siz);
+			FSclose(outh);
+		}
+		FSclose(inh);
+	}
+}
+
+/*粘贴按钮处理*/
+void PasteBtnPressProc(CTRL_BTN *btn)
+{
+	if (op != OP_NONE)	/*已剪切或复制文件*/
+	{
+		CopyTree(PathBuf);
+		if (op == OP_CUT)
+		{
+			char buf[MAX_PATH];
+			FSGetCwd(buf, MAX_PATH);
+			DelTree(PathBuf);
+			FSChDir(buf);
+		}
+		op = OP_NONE;
+		GCBtnSetDisable(PasteBtn, TRUE);
+		FillFileList();
+	}
+}
+
+/*删除按钮处理*/
+void DelBtnPressProc(CTRL_BTN *btn)
+{
+	if (FileList->SelItem)	/*选中文件*/
+	{
+		DelTree(FileList->SelItem->text + 3);
+		FillFileList();
+	}
+}
+
+/*创建目录按钮处理*/
+void DirBtnPressProc(CTRL_BTN *btn)
+{
+}
+
+/*创建文件按钮处理*/
+void FileBtnPressProc(CTRL_BTN *btn)
+{
+}
+
+/*重命名按钮处理*/
+void RenamBtnPressProc(CTRL_BTN *btn)
+{
+}
+
+/*主窗口消息处理*/
 long MainMsgProc(THREAD_ID ptid, DWORD data[MSG_DATA_LEN])
 {
 	CTRL_WND *wnd = (CTRL_WND*)data[GUIMSG_GOBJ_ID];
@@ -186,38 +374,47 @@ long MainMsgProc(THREAD_ID ptid, DWORD data[MSG_DATA_LEN])
 	case GM_CREATE:
 		{
 			CTRL_ARGS args;
-			long CliX, CliY;
 
-			GCWndGetClientLoca(wnd, &CliX, &CliY);
+			GCWndGetClientLoca(wnd, &args.x, &args.y);
+			args.width = wnd->client.width - SIDE * 2;
+			args.height = EDT_HEIGHT;
+			args.x += SIDE;
+			args.y += SIDE;
+			args.style = 0;
+			args.MsgProc = NULL;
+			GCSedtCreate(&DirSedt, &args, wnd->obj.gid, &wnd->obj, NULL, DirSedtEnterProc);
 			args.width = PART_WIDTH;
-			args.height = wnd->client.height - SIDE * 2;
-			args.x = CliX + SIDE;
-			args.y = CliY + SIDE;
+			args.height = wnd->client.height - EDT_HEIGHT - SIDE * 3;
+			args.y += EDT_HEIGHT + SIDE;
 			args.style = 0;
 			args.MsgProc = PartListMsgProc;
 			GCLstCreate(&PartList, &args, wnd->obj.gid, &wnd->obj, PartListSelProc);
 			args.width = wnd->client.width - PART_WIDTH - BTN_WIDTH - SIDE * 4;
-			args.x = CliX + PART_WIDTH + SIDE * 2;
-			args.MsgProc = NULL;
+			args.x += PART_WIDTH + SIDE;
+			args.MsgProc = FileListMsgProc;
 			GCLstCreate(&FileList, &args, wnd->obj.gid, &wnd->obj, FileListSelProc);
+			args.x += args.width + SIDE;
 			args.width = BTN_WIDTH;
 			args.height = BTN_HEIGHT;
-			args.x = CliX + wnd->client.width - BTN_WIDTH - SIDE;
-			GCBtnCreate(&ParBtn, &args, wnd->obj.gid, &wnd->obj, "上级目录", NULL);
+			args.MsgProc = NULL;
+			GCBtnCreate(&ParBtn, &args, wnd->obj.gid, &wnd->obj, "上级目录", NULL, ParBtnPressProc);
 			args.y += BTN_HEIGHT + SIDE;
-			GCBtnCreate(&CutBtn, &args, wnd->obj.gid, &wnd->obj, "剪切", NULL);
+			args.style = BTN_STYLE_DISABLED;
+			GCBtnCreate(&CutBtn, &args, wnd->obj.gid, &wnd->obj, "剪切", NULL, CutBtnPressProc);
 			args.y += BTN_HEIGHT + SIDE;
-			GCBtnCreate(&CopyBtn, &args, wnd->obj.gid, &wnd->obj, "复制", NULL);
+			GCBtnCreate(&CopyBtn, &args, wnd->obj.gid, &wnd->obj, "复制", NULL, CopyBtnPressProc);
 			args.y += BTN_HEIGHT + SIDE;
-			GCBtnCreate(&PasteBtn, &args, wnd->obj.gid, &wnd->obj, "粘贴", NULL);
+			GCBtnCreate(&PasteBtn, &args, wnd->obj.gid, &wnd->obj, "粘贴", NULL, PasteBtnPressProc);
 			args.y += BTN_HEIGHT + SIDE;
-			GCBtnCreate(&DelBtn, &args, wnd->obj.gid, &wnd->obj, "删除", NULL);
+			GCBtnCreate(&DelBtn, &args, wnd->obj.gid, &wnd->obj, "删除", NULL, DelBtnPressProc);
 			args.y += BTN_HEIGHT + SIDE;
-			GCBtnCreate(&DirBtn, &args, wnd->obj.gid, &wnd->obj, "创建目录", NULL);
+			args.style = 0;
+			GCBtnCreate(&DirBtn, &args, wnd->obj.gid, &wnd->obj, "创建目录", NULL, DirBtnPressProc);
 			args.y += BTN_HEIGHT + SIDE;
-			GCBtnCreate(&FileBtn, &args, wnd->obj.gid, &wnd->obj, "创建文件", NULL);
+			GCBtnCreate(&FileBtn, &args, wnd->obj.gid, &wnd->obj, "创建文件", NULL, FileBtnPressProc);
 			args.y += BTN_HEIGHT + SIDE;
-			GCBtnCreate(&RenamBtn, &args, wnd->obj.gid, &wnd->obj, "重命名", NULL);
+			args.style = BTN_STYLE_DISABLED;
+			GCBtnCreate(&RenamBtn, &args, wnd->obj.gid, &wnd->obj, "重命名", NULL, RenamBtnPressProc);
 		}
 		break;
 	case GM_SIZE:
@@ -226,10 +423,14 @@ long MainMsgProc(THREAD_ID ptid, DWORD data[MSG_DATA_LEN])
 			DWORD width, height;
 
 			GCWndGetClientLoca(wnd, &x, &y);
-			width = PART_WIDTH;
-			height = wnd->client.height - SIDE * 2;
+			width = wnd->client.width - SIDE * 2;
+			height = EDT_HEIGHT;
 			x += SIDE;
 			y += SIDE;
+			GCGobjSetSize(&DirSedt->obj, x, y, width, height);
+			width = PART_WIDTH;
+			height = wnd->client.height - EDT_HEIGHT - SIDE * 3;
+			y += EDT_HEIGHT + SIDE;
 			GCLstSetSize(PartList, x, y, width, height);
 			width = wnd->client.width - PART_WIDTH - BTN_WIDTH - SIDE * 4;
 			x += PART_WIDTH + SIDE;
@@ -262,8 +463,6 @@ int main()
 	CTRL_ARGS args;
 	long res;
 
-	if ((res = KGetKptThed(SRV_FS_PORT, &FsPtid)) != NO_ERROR)
-		return res;
 	if ((res = InitMallocTab(0x1000000)) != NO_ERROR)	/*设置16MB堆内存*/
 		return res;
 	if ((res = GCinit()) != NO_ERROR)

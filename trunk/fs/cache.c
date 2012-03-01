@@ -42,7 +42,7 @@ long RwCache(DWORD drv, BOOL isWrite, DWORD sec, DWORD cou, void *buf)
 			{
 				for (PreBmd = CurBmd + 1; PreBmd - CurBmd < MAXPROC_COU && PreBmd < &bmt[BMT_LEN] && (PreBmd->BlkID & CACHE_ATTR_DIRTY) && (PreBmd->BlkID >> BLKID_SHIFT) == (CurBmd->BlkID >> BLKID_SHIFT) && PreBmd->DrvID == CurBmd->DrvID; PreBmd++)
 					PreBmd->BlkID &= ~CACHE_ATTR_DIRTY;
-				if ((res = HDWriteSector(AthdPtid, CurBmd->DrvID, (CurBmd->BlkID & BLKID_MASK) | (sec & BLKATTR_MASK), PreBmd - CurBmd, cachep)) != NO_ERROR)	/*±£¥Ê‘‡øÈ*/
+				if ((res = HDWriteSector(CurBmd->DrvID, (CurBmd->BlkID & BLKID_MASK) | (sec & BLKATTR_MASK), PreBmd - CurBmd, cachep)) != NO_ERROR)	/*±£¥Ê‘‡øÈ*/
 				{
 					ulock(&cahl);
 					return res;
@@ -60,7 +60,7 @@ long RwCache(DWORD drv, BOOL isWrite, DWORD sec, DWORD cou, void *buf)
 					PreBmd->DrvID = drv;
 					PreBmd->BlkID = sec & BLKID_MASK;
 				}
-				if ((res = HDReadSector(AthdPtid, drv, (sec & BLKID_MASK) | (sec & BLKATTR_MASK), PreBmd - CurBmd, cachep)) != NO_ERROR)	/*‘§∂¡»°*/
+				if ((res = HDReadSector(drv, (sec & BLKID_MASK) | (sec & BLKATTR_MASK), PreBmd - CurBmd, cachep)) != NO_ERROR)	/*‘§∂¡»°*/
 				{
 					ulock(&cahl);
 					return res;
@@ -88,7 +88,7 @@ long SaveCache()
 		{
 			for (PreBmd = CurBmd + 1; PreBmd - CurBmd < MAXPROC_COU && PreBmd < &bmt[BMT_LEN] && (PreBmd->BlkID & CACHE_ATTR_DIRTY) && (PreBmd->BlkID >> BLKID_SHIFT) == (CurBmd->BlkID >> BLKID_SHIFT) && PreBmd->DrvID == CurBmd->DrvID; PreBmd++)
 				PreBmd->BlkID &= ~CACHE_ATTR_DIRTY;
-			if ((res = HDWriteSector(AthdPtid, CurBmd->DrvID, (CurBmd->BlkID & BLKID_MASK) | (CurBmd - bmt), PreBmd - CurBmd, cache + ((CurBmd - bmt) << BLK_SHIFT))) != NO_ERROR)	/*±£¥Ê‘‡øÈ*/
+			if ((res = HDWriteSector(CurBmd->DrvID, (CurBmd->BlkID & BLKID_MASK) | (CurBmd - bmt), PreBmd - CurBmd, cache + ((CurBmd - bmt) << BLK_SHIFT))) != NO_ERROR)	/*±£¥Ê‘‡øÈ*/
 			{
 				ulock(&cahl);
 				return res;

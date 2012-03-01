@@ -8,8 +8,6 @@
 #include "../lib/gdi.h"
 #include "../fs/fsapi.h"
 
-THREAD_ID FsPtid, CuiPtid;
-
 #define FDAT_SIZ		0x00700000	/*动态内存大小*/
 
 void *fm, *CurFm;
@@ -457,9 +455,9 @@ BOOL readQTable(long fh)
 	BYTE buf[1024], *bufp;
 	int lenth;
 	DWORD i, qtID;
-	FSread(FsPtid, fh, buf, 2);
+	FSread(fh, buf, 2);
 	lenth = (int)(ICHG(buf[0], buf[1]) - 2);
-	FSread(FsPtid, fh, buf, lenth);
+	FSread(fh, buf, lenth);
 	bufp = buf;
 	while (lenth > 0)
 	{
@@ -483,9 +481,9 @@ BOOL readSOF0(long fh)
 	BYTE buf[1024], *bufp;
 	int lenth;
 	DWORD i;
-	FSread(FsPtid, fh, buf, 2);
+	FSread(fh, buf, 2);
 	lenth = (int)(ICHG(buf[0], buf[1]) - 2);
-	FSread(FsPtid, fh, buf, lenth);
+	FSread(fh, buf, lenth);
 	bufp = buf;
 	if (buf[0] != 8)
 		return FALSE;
@@ -531,9 +529,9 @@ BOOL readHTable(long fh)
 	DWORD i, j;
 	DWORD htID, type;
 	HUFFMAN_NODE *h;
-	FSread(FsPtid, fh, buf, 2);
+	FSread(fh, buf, 2);
 	lenth = (int)(ICHG(buf[0], buf[1]) - 2);
-	FSread(FsPtid, fh, buf, lenth);
+	FSread(fh, buf, lenth);
 	bufp = buf;
 	while (lenth > 0)
 	{
@@ -621,24 +619,24 @@ BOOL readSOS(long fh)
 	BYTE cv;
 	DECODE_PARAM param;
 	BOOL retVal;
-	FSseek(FsPtid, fh, 2, FS_SEEK_CUR);
-	FSread(FsPtid, fh, &c, 1);
+	FSseek(fh, 2, FS_SEEK_CUR);
+	FSread(fh, &c, 1);
 	if (c < 1 || c > 4)
 		return FALSE;
 	comNum = c;
 	for (i = 0; i < comNum; i++)
 	{
-		FSread(FsPtid, fh, &c, 1);
+		FSread(fh, &c, 1);
 		if (c > 5)
 			return FALSE;
 		comID[i] = c;
-		FSread(FsPtid, fh, &c, 1);
+		FSread(fh, &c, 1);
 		htDcID[i] = c >> 4;
 		htAcID[i] = c & 0x0F;
 		if (htDcID[i] > 4 || htAcID[i] > 4)
 			return FALSE;
 	}
-	FSseek(FsPtid, fh, 3, FS_SEEK_CUR);
+	FSseek(fh, 3, FS_SEEK_CUR);
 	blockIdx[0] = 0, blockIdx[1] = 0, blockIdx[2] = 0, blockIdx[3] = 0;
 	DCbk[0] = 0, DCbk[1] = 0, DCbk[2] = 0, DCbk[3] = 0;
 	param.stream = cc;
@@ -662,7 +660,7 @@ startScan:
 						for (k = 0; k < remainInBuf; k++)
 							cc[k] = cc[bufIndex + k];
 						bufIndex = 0;
-						remainInBuf += FSread(FsPtid, fh, cc + remainInBuf, 100);
+						remainInBuf += FSread(fh, cc + remainInBuf, 100);
 //						if (k != 100)
 //							readOK = TRUE;
 					}
@@ -802,7 +800,7 @@ sync:
 		{
 			if (c2 < 0xD0 || c2 > 0xD7)
 			{
-				FSseek(FsPtid, fh, -remainInBuf, FS_SEEK_CUR);
+				FSseek(fh, -remainInBuf, FS_SEEK_CUR);
 				return TRUE;
 			}
 			else
@@ -819,7 +817,7 @@ sync:
 				for (k = 0; k < remainInBuf; k++)
 					cc[k] = cc[bufIndex + k];
 				bufIndex = 0;
-				remainInBuf += FSread(FsPtid, fh, cc + remainInBuf, 100);
+				remainInBuf += FSread(fh, cc + remainInBuf, 100);
 //				if (k != 100)
 //					readOK = TRUE;
 			}
@@ -881,26 +879,26 @@ BOOL JpegOpen(const char *fileName)
 	long fh;
 	BYTE seg[2];
 
-	if ((fh = FSopen(FsPtid, fileName, FS_OPEN_READ)) < 0)
+	if ((fh = FSopen(fileName, FS_OPEN_READ)) < 0)
 	{
-		CUIPutS(CuiPtid, "打开文件出错！\n");
+		CUIPutS("打开文件出错！\n");
 		return FALSE;
 	}
-	FSread(FsPtid, fh, seg, 2);
+	FSread(fh, seg, 2);
 	if (seg[0] != 0xFF || seg[1] != 0xD8)
 	{
-		FSclose(FsPtid, fh);
-		CUIPutS(CuiPtid, "JPEG文件格式错！\n");
+		FSclose(fh);
+		CUIPutS("JPEG文件格式错！\n");
 		return FALSE;
 	}
 	for (;;)
 	{
-		if (FSread(FsPtid, fh, seg, 2) < 2)
+		if (FSread(fh, seg, 2) < 2)
 			break;
 		if (seg[0] != 0xFF)
 			break;
 		while (seg[1] == 0xFF)
-			FSread(FsPtid, fh, &seg[1], 1);
+			FSread(fh, &seg[1], 1);
 		switch (seg[1])
 		{
 		case 0x01:
@@ -927,8 +925,8 @@ BOOL JpegOpen(const char *fileName)
 		case 0xCD:
 		case 0xCE:
 		case 0xCF:
-			FSclose(FsPtid, fh);
-			CUIPutS(CuiPtid, "不支持的JPEG文件！\n");
+			FSclose(fh);
+			CUIPutS("不支持的JPEG文件！\n");
 			return FALSE;
 		case 0xDB:	/*量化表*/
 			if (readQTable(fh) == FALSE)
@@ -947,17 +945,17 @@ BOOL JpegOpen(const char *fileName)
 				goto error;
 			break;
 		case 0xD9:	/*图像结束*/
-			FSclose(FsPtid, fh);
+			FSclose(fh);
 			YCbCrToRGB();
 			return TRUE;
 		default:
-			FSread(FsPtid, fh, seg, 2);
-			FSseek(FsPtid, fh, ICHG(seg[0], seg[1]) - 2, FS_SEEK_CUR);
+			FSread(fh, seg, 2);
+			FSseek(fh, ICHG(seg[0], seg[1]) - 2, FS_SEEK_CUR);
 		}
 	}
 error:
-	FSclose(FsPtid, fh);
-	CUIPutS(CuiPtid, "JPEG文件格式错！\n");
+	FSclose(fh);
+	CUIPutS("JPEG文件格式错！\n");
 	return FALSE;
 }
 
@@ -983,24 +981,21 @@ int main(int argc, char *argv[])
 {
 	BYTE *p1, *p2, *p3;
 	DWORD i, j, *buf, *bufp;
-	if (KGetKptThed(SRV_CUI_PORT, &CuiPtid) != NO_ERROR)
-		return NO_ERROR;
+
 	if (argc <= 1)
 	{
-		CUIPutS(CuiPtid,
+		CUIPutS(
 			"参数:JPG文件路径\n"
 			"本程序集成JPEG解码器，可以显示JPEG格式的图像。\n"
 			);
 		return NO_ERROR;
 	}
-	if (KGetKptThed(SRV_FS_PORT, &FsPtid) != NO_ERROR)
-		return NO_ERROR;
 	/*初始化动态内存分配*/
 	if (KMapUserAddr(&fm, FDAT_SIZ) != NO_ERROR)
 		return NO_ERROR;
 	if (GDIinit() != NO_ERROR)
 	{
-		CUIPutS(CuiPtid, "GDI初始化出错！\n");
+		CUIPutS("GDI初始化出错！\n");
 		return NO_ERROR;
 	}
 	CurFm = fm;

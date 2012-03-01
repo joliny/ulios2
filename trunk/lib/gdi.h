@@ -17,7 +17,6 @@ extern void *GDIvm;
 extern const BYTE *GDIfont;
 extern DWORD GDIwidth, GDIheight, GDIPixBits, GDImode;
 extern DWORD GDICharWidth, GDICharHeight;
-extern THREAD_ID GDIVesaPtid, GDIFontPtid;
 
 /*≥ı ºªØGDIø‚*/
 long GDIinit();

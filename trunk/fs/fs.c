@@ -38,8 +38,6 @@ FSUI fsuit[FSUIT_LEN] = {
 	{"fat32", Fat32MntPart, Fat32UmntPart, Fat32SetPart, Fat32CmpFile, Fat32SchFile, Fat32NewFile, Fat32DelFile, Fat32SetFile, Fat32SetSize, Fat32RwFile, Fat32ReadDir, Fat32FreeData}
 };
 
-THREAD_ID AthdPtid;	/*磁盘服务ID*/
-THREAD_ID TimePtid;	/*时间服务ID*/
 PART_DESC part[PART_LEN];	/*分区信息表*/
 FILE_DESC* filt[FILT_LEN];	/*打开文件指针表*/
 FILE_DESC** FstFd;			/*第一个空文件描述符指针*/
@@ -56,10 +54,6 @@ long InitFS()
 	long res;
 
 	if ((res = KRegKnlPort(SRV_FS_PORT)) != NO_ERROR)	/*注册服务端口*/
-		return res;
-	if ((res = KGetKptThed(SRV_ATHD_PORT, &AthdPtid)) != NO_ERROR)	/*取得磁盘驱动服务线程*/
-		return res;
-	if ((res = KGetKptThed(SRV_TIME_PORT, &TimePtid)) != NO_ERROR)	/*取得时钟驱动服务线程*/
 		return res;
 	if ((res = KMapUserAddr(&cache, BLK_SIZ * BMT_LEN + FDAT_SIZ)) != NO_ERROR)	/*申请高速缓冲和自由内存空间*/
 		return res;
@@ -498,7 +492,7 @@ static long CreateFild(PROCRES_DESC *pres, const char *path, DWORD attr, FILE_DE
 	TmpFile->flag = FILE_FLAG_WRITE;
 	TmpFile->cou = 1;
 	TmpFile->par = CurFile;
-	if (TMCurSecond(TimePtid, &TmpFile->file.CreateTime) != NO_ERROR)	/*设置为当前时间*/
+	if (TMCurSecond(&TmpFile->file.CreateTime) != NO_ERROR)	/*设置为当前时间*/
 		TmpFile->file.CreateTime = INVALID;
 	TmpFile->file.AccessTime = TmpFile->file.ModifyTime = TmpFile->file.CreateTime;
 	TmpFile->file.attr = attr;
@@ -815,7 +809,7 @@ long close(PROCRES_DESC *pres, DWORD fhi)
 	fh->fd = NULL;
 	fi.name[0] = 0;
 	fi.ModifyTime = fi.CreateTime = INVALID;
-	if (TMCurSecond(TimePtid, &fi.AccessTime) != NO_ERROR)	/*设置为当前时间*/
+	if (TMCurSecond(&fi.AccessTime) != NO_ERROR)	/*设置为当前时间*/
 		fi.AccessTime = INVALID;
 	fi.attr = INVALID;
 	if (CurFile->flag & FILE_FLAG_WRITE)	/*打开写的文件要更新修改时间*/

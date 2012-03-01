@@ -185,7 +185,7 @@ long MainMsgProc(THREAD_ID ptid, DWORD data[MSG_DATA_LEN])
 	switch (data[MSG_API_ID] & MSG_API_MASK)
 	{
 	case GM_LBUTTONDOWN:
-		GUIdrag(GCGuiPtid, edt->obj.gid, GM_DRAGMOD_MOVE);	/*按下时拖动*/
+		GUIdrag(edt->obj.gid, GM_DRAGMOD_MOVE);	/*按下时拖动*/
 		break;
 	}
 	return GCSedtDefMsgProc(ptid, data);
@@ -234,8 +234,8 @@ int main()
 			case IME_API_OPENBAR:	/*打开输入法工具条*/
 				if (edt)
 				{
-					GUImove(GCGuiPtid, edt->obj.gid, data[1], data[2]);
-					GUISetTop(GCGuiPtid, edt->obj.gid);
+					GUImove(edt->obj.gid, data[1], data[2]);
+					GUISetTop(edt->obj.gid);
 				}
 				else
 				{
@@ -249,7 +249,7 @@ int main()
 				break;
 			case IME_API_CLOSEBAR:	/*关闭输入法工具条*/
 				if (edt)
-					GUIdestroy(GCGuiPtid, edt->obj.gid);
+					GUIdestroy(edt->obj.gid);
 				break;
 			case IME_API_PUTKEY:	/*按键输入*/
 				switch (data[1] & 0xFF)
@@ -285,14 +285,14 @@ int main()
 						data[0] = MSG_ATTR_GUI | GM_IMEPUTKEY;
 						data[1] = hzid / 94 + 161 + ((hzid % 94 + 161) << 8);
 						KSendMsg(&ptid, data, 0);
-						GUIdestroy(GCGuiPtid, edt->obj.gid);
+						GUIdestroy(edt->obj.gid);
 					}
 					break;
 				case '\b':	/*退格,删一字符*/
 					if (edt)
 					{
 						if (--InID == 0)
-							GUIdestroy(GCGuiPtid, edt->obj.gid);
+							GUIdestroy(edt->obj.gid);
 						else
 						{
 							beg = 0;
@@ -324,13 +324,13 @@ int main()
 							data[0] = MSG_ATTR_GUI | GM_IMEPUTKEY;
 							data[1] = hzid / 94 + 161 + ((hzid % 94 + 161) << 8);
 							KSendMsg(&ptid, data, 0);
-							GUIdestroy(GCGuiPtid, edt->obj.gid);
+							GUIdestroy(edt->obj.gid);
 						}
 					}
 					break;
 				case 27:	/*ESC关闭工具条*/
 					if (edt)
-						GUIdestroy(GCGuiPtid, edt->obj.gid);
+						GUIdestroy(edt->obj.gid);
 					break;
 				default:	/*一般字符,加入*/
 					if (InID < IN_BUF_LEN - 1)	/*缓冲未满,继续输入*/
@@ -341,7 +341,8 @@ int main()
 							GCSedtCreate(&edt, &args, 0, NULL, NULL, NULL);
 							{
 								DWORD tmp[MSG_DATA_LEN];
-								ptid = GCGuiPtid;
+								ptid.ProcID = SRV_GUI_PORT;
+								ptid.ThedID = INVALID;
 								if (KRecvProcMsg(&ptid, tmp, INVALID) != NO_ERROR)	/*等待创建完成消息*/
 									break;
 								GCDispatchMsg(ptid, tmp);	/*创建完成后续处理*/

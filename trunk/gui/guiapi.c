@@ -212,9 +212,7 @@ long InitGUI()
 
 	if ((res = KRegKnlPort(SRV_GUI_PORT)) != NO_ERROR)	/*注册服务端口*/
 		return res;
-	if ((res = KGetKptThed(SRV_VESA_PORT, &GDIVesaPtid)) != NO_ERROR)	/*取得显卡服务线程*/
-		return res;
-	if ((res = VSGetVmem(GDIVesaPtid, &GDIvm, &GDIwidth, &GDIheight, &GDIPixBits, &GDImode)) != NO_ERROR)	/*初始化GDI*/
+	if ((res = VSGetVmem(&GDIvm, &GDIwidth, &GDIheight, &GDIPixBits, &GDImode)) != NO_ERROR)	/*初始化GDI*/
 		return res;
 	if (!GDImode)
 		return GUI_ERR_WRONG_VESAMODE;

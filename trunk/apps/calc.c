@@ -593,7 +593,7 @@ void SetGraMode(BOOL isGraMode)
 		GCSetArea(&(but[i]->obj.uda), BTN_WIDTH, BTN_HEIGHT, &wnd->obj.uda, but[i]->obj.x, but[i]->obj.y);
 		GCBtnDefDrawProc(but[i]);
 	}
-	GUIpaint(GCGuiPtid, wnd->obj.gid, 4, 24, WND_WIDTH - 4 * 2, WND_HEIGHT - 20 - 4 * 2);	/*绘制完后提交*/
+	GUIpaint(wnd->obj.gid, 4, 24, WND_WIDTH - 4 * 2, WND_HEIGHT - 20 - 4 * 2);	/*绘制完后提交*/
 }
 
 /*长整形转化为数字*/
@@ -669,7 +669,7 @@ void Draw2D()
 		if (p2d[i - 1] != -1 && p2d[i] != -1)	//异常点不画
 			GCDrawLine(&GraArea, i - 1, p2d[i - 1], i, p2d[i], 0);
 	}
-	GUIpaint(GCGuiPtid, wnd->obj.gid, WND_WIDTH, 20 + SIDE_Y, GRA_WIDTH, GRA_HEIGHT);	/*绘制完后提交*/
+	GUIpaint(wnd->obj.gid, WND_WIDTH, 20 + SIDE_Y, GRA_WIDTH, GRA_HEIGHT);	/*绘制完后提交*/
 }
 
 void Calc3D()
@@ -726,7 +726,7 @@ void Draw3D()
 				GCDrawLine(&GraArea, x3d[j][i - 1], y3d[j][i - 1], x3d[j][i], y3d[j][i], 0);
 		}
 	}
-	GUIpaint(GCGuiPtid, wnd->obj.gid, WND_WIDTH, 20 + SIDE_Y, GRA_WIDTH, GRA_HEIGHT);	/*绘制完后提交*/
+	GUIpaint(wnd->obj.gid, WND_WIDTH, 20 + SIDE_Y, GRA_WIDTH, GRA_HEIGHT);	/*绘制完后提交*/
 }
 
 /*编辑框回车处理*/
@@ -847,13 +847,13 @@ long MainMsgProc(THREAD_ID ptid, DWORD data[MSG_DATA_LEN])
 			for (i = 0; i < 6; i++)
 			{
 				args.x = CliX + SIDE_X + i * (BTN_WIDTH + 4);
-				GCBtnCreate(&but[i], &args, wnd->obj.gid, &wnd->obj, btnam[i], BtnPressProc[i]);
+				GCBtnCreate(&but[i], &args, wnd->obj.gid, &wnd->obj, btnam[i], NULL, BtnPressProc[i]);
 			}
 			for (; i < 42; i++)
 			{
 				args.x = CliX + SIDE_X + (i % 6) * (BTN_WIDTH + 4);
 				args.y = CliY + EDT_HEIGHT + 8 + (i / 6) * (BTN_HEIGHT + 4);
-				GCBtnCreate(&but[i], &args, wnd->obj.gid, &wnd->obj, btnam[i], OthPressProc);
+				GCBtnCreate(&but[i], &args, wnd->obj.gid, &wnd->obj, btnam[i], NULL, OthPressProc);
 			}
 		}
 		break;

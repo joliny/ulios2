@@ -398,6 +398,8 @@ void ApiSendMsg(DWORD *argv)
 		argv[EAX_ID] = KERR_MSG_NOT_ENOUGH;
 		return;
 	}
+	if (((THREAD_ID*)&argv[EBX_ID])->ThedID == 0xFFFF && ((THREAD_ID*)&argv[EBX_ID])->ProcID < KPT_LEN)	/*处理内核端口参数*/
+		argv[EBX_ID] = *((DWORD*)&kpt[((THREAD_ID*)&argv[EBX_ID])->ProcID]);
 	msg->ptid = *((THREAD_ID*)&argv[EBX_ID]);
 	memcpy32(msg->data, data, MSG_DATA_LEN);
 	argv[EAX_ID] = SendMsg(msg);
@@ -447,6 +449,8 @@ void ApiRecvProcMsg(DWORD *argv)
 		argv[EAX_ID] = KERR_INVALID_MEMARGS_ADDR;
 		return;
 	}
+	if (((THREAD_ID*)&argv[EBX_ID])->ThedID == 0xFFFF && ((THREAD_ID*)&argv[EBX_ID])->ProcID < KPT_LEN)	/*处理内核端口参数*/
+		argv[EBX_ID] = *((DWORD*)&kpt[((THREAD_ID*)&argv[EBX_ID])->ProcID]);
 	if ((argv[EAX_ID] = RecvProcMsg(&msg, *((THREAD_ID*)&argv[EBX_ID]), argv[ECX_ID])) == NO_ERROR)
 	{
 		argv[EBX_ID] = *((DWORD*)&msg->ptid);
@@ -488,6 +492,8 @@ void ApiWriteProcAddr(DWORD *argv)
 	}
 	memcpy32(data, addr, MSG_DATA_LEN);	/*复制数据到内核空间*/
 	CurPmd->CurTmd->attr &= (~THED_ATTR_APPS);	/*防止访问用户内存时发生页异常,重新进入系统调用态*/
+	if (((THREAD_ID*)&argv[EBX_ID])->ThedID == 0xFFFF && ((THREAD_ID*)&argv[EBX_ID])->ProcID < KPT_LEN)	/*处理内核端口参数*/
+		argv[EBX_ID] = *((DWORD*)&kpt[((THREAD_ID*)&argv[EBX_ID])->ProcID]);
 	if ((argv[EAX_ID] = MapProcAddr((void*)argv[EDI_ID], argv[ECX_ID], (THREAD_ID*)&argv[EBX_ID], FALSE, TRUE, data, argv[EDX_ID])) == NO_ERROR)
 		memcpy32(addr, data, MSG_DATA_LEN);	/*复制数据到用户空间*/
 }
@@ -506,6 +512,8 @@ void ApiReadProcAddr(DWORD *argv)
 	}
 	memcpy32(data, addr, MSG_DATA_LEN);	/*复制数据到内核空间*/
 	CurPmd->CurTmd->attr &= (~THED_ATTR_APPS);	/*防止访问用户内存时发生页异常,重新进入系统调用态*/
+	if (((THREAD_ID*)&argv[EBX_ID])->ThedID == 0xFFFF && ((THREAD_ID*)&argv[EBX_ID])->ProcID < KPT_LEN)	/*处理内核端口参数*/
+		argv[EBX_ID] = *((DWORD*)&kpt[((THREAD_ID*)&argv[EBX_ID])->ProcID]);
 	if ((argv[EAX_ID] = MapProcAddr((void*)argv[EDI_ID], argv[ECX_ID], (THREAD_ID*)&argv[EBX_ID], TRUE, TRUE, data, argv[EDX_ID])) == NO_ERROR)
 		memcpy32(addr, data, MSG_DATA_LEN);	/*复制数据到用户空间*/
 }

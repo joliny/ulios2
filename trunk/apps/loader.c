@@ -43,17 +43,15 @@ int main()
 	void *addr;
 	long res;
 
-	if ((res = KGetKptThed(SRV_FS_PORT, &ptid)) != NO_ERROR)	/*取得文件系统线程ID*/
-		return res;
 	if ((res = KMapPhyAddr(&addr, 0x90280, 0x7C)) != NO_ERROR)	/*取得系统目录*/
 		return res;
-	if ((res = FSChDir(ptid, (const char*)addr)) != NO_ERROR)	/*切换到系统目录*/
+	if ((res = FSChDir((const char*)addr)) != NO_ERROR)	/*切换到系统目录*/
 		return res;
 	KFreeAddr(addr);
-	if ((res = FSopen(ptid, "bootlist", FS_OPEN_READ)) < 0)	/*读取配置文件*/
+	if ((res = FSopen("bootlist", FS_OPEN_READ)) < 0)	/*读取配置文件*/
 		return res;
-	siz = FSread(ptid, res, LoadList, LOADLIST_SIZ - 1);
-	FSclose(ptid, res);
+	siz = FSread(res, LoadList, LOADLIST_SIZ - 1);
+	FSclose(res);
 	path = LoadList;
 	LoadList[siz] = '\0';
 	for (;;)
