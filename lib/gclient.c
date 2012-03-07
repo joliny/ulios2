@@ -1970,8 +1970,7 @@ static void LstVsclProc(CTRL_SCRL *scl)
 			lst->CurItem = lst->CurItem->pre;
 		while (--(lst->CurPos) > scl->pos);
 	}
-	GCLstDefDrawProc(lst);
-	GUIpaint(lst->obj.gid, 0, 0, lst->obj.uda.width, lst->obj.uda.height);
+	GCGobjDraw(&lst->obj);
 }
 
 static void LstHsclProc(CTRL_SCRL *scl)
@@ -1982,8 +1981,7 @@ static void LstHsclProc(CTRL_SCRL *scl)
 	if (lst->TextX == scl->pos)
 		return;
 	lst->TextX = scl->pos;
-	GCLstDefDrawProc(lst);
-	GUIpaint(lst->obj.gid, 0, 0, lst->obj.uda.width, lst->obj.uda.height);
+	GCGobjDraw(&lst->obj);
 }
 
 static void LstMoveItem(CTRL_LST *lst, long move)
@@ -2033,8 +2031,7 @@ long GCLstDefMsgProc(THREAD_ID ptid, DWORD data[MSG_DATA_LEN])
 					break;
 				}
 			lst->SelItem = item;
-			GCLstDefDrawProc(lst);
-			GUIpaint(lst->obj.gid, 1, 1, lst->cont.width, lst->cont.height);
+			GCGobjDraw(&lst->obj);
 			if (lst->SelProc)
 				lst->SelProc(lst);
 		}
@@ -2266,8 +2263,7 @@ long GCLstInsertItem(CTRL_LST *lst, LIST_ITEM *pre, const char *text, LIST_ITEM 
 		{
 			if (nxt == NewItem)
 			{
-				GCLstDefDrawProc(lst);
-				GUIpaint(lst->obj.gid, 1, 1, lst->cont.width, lst->cont.height);
+				GCGobjDraw(&lst->obj);
 				break;
 			}
 			nxt = nxt->nxt;
@@ -2312,7 +2308,6 @@ long GCLstDelAllItem(CTRL_LST *lst)
 	LstFreeItems(lst->item);
 	lst->TextX = lst->MaxWidth = lst->ItemCou = 0;
 	lst->SelItem = lst->CurItem = lst->item = NULL;
-	GCLstDefDrawProc(lst);
-	GUIpaint(lst->obj.gid, 1, 1, lst->cont.width, lst->cont.height);
+	GCGobjDraw(&lst->obj);
 	return NO_ERROR;
 }
