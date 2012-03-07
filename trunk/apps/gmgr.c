@@ -8,6 +8,7 @@
 #include "../lib/malloc.h"
 #include "../lib/gclient.h"
 
+CTRL_WND *MainWnd;	/*主窗口*/
 CTRL_SEDT *DirSedt;	/*地址栏*/
 CTRL_LST *PartList;	/*分区列表*/
 CTRL_LST *FileList;	/*文件列表*/
@@ -18,13 +19,17 @@ CTRL_BTN *PasteBtn;	/*粘贴按钮*/
 CTRL_BTN *DelBtn;	/*删除按钮*/
 CTRL_BTN *DirBtn;	/*创建目录按钮*/
 CTRL_BTN *FileBtn;	/*创建文件按钮*/
-CTRL_BTN *RenamBtn;	/*重命名按钮*/
+CTRL_BTN *RenBtn;	/*重命名按钮*/
+CTRL_SEDT *NameEdt;	/*名称编辑框*/
 DWORD op;	/*操作*/
 char PathBuf[MAX_PATH];	/*复制或剪切路径缓冲*/
 
-#define OP_NONE	0
-#define OP_CUT	1
-#define OP_COPY	2
+#define OP_NONE	0	/*无*/
+#define OP_CUT	1	/*剪切*/
+#define OP_COPY	2	/*复制*/
+#define OP_DIR	3	/*创建目录*/
+#define OP_FILE	4	/*创建文件*/
+#define OP_REN	5	/*重命名*/
 
 /*双字转化为数字*/
 char *Itoa(char *buf, DWORD n, DWORD r)
@@ -182,14 +187,14 @@ void FileListSelProc(CTRL_LST *lst)
 		GCBtnSetDisable(CutBtn, FALSE);
 		GCBtnSetDisable(CopyBtn, FALSE);
 		GCBtnSetDisable(DelBtn, FALSE);
-		GCBtnSetDisable(RenamBtn, FALSE);
+		GCBtnSetDisable(RenBtn, FALSE);
 	}
 	else
 	{
 		GCBtnSetDisable(CutBtn, TRUE);
 		GCBtnSetDisable(CopyBtn, TRUE);
 		GCBtnSetDisable(DelBtn, TRUE);
-		GCBtnSetDisable(RenamBtn, TRUE);
+		GCBtnSetDisable(RenBtn, TRUE);
 	}
 }
 
@@ -267,7 +272,8 @@ void DelTree(char *path)
 			return;
 		}
 		while (FSReadDir(dh, &fi) == NO_ERROR)
-			DelTree(fi.name);
+			if (!(fi.name[0] == '.' && (fi.name[1] == '\0' || (fi.name[1] == '.' && fi.name[2] == '\0'))))	/*单点和双点目录不处理*/
+				DelTree(fi.name);
 		FSclose(dh);
 		FSChDir("..");
 	}
@@ -295,7 +301,7 @@ void CopyTree(char *path)
 		{
 			FSChDir(name);
 			while (FSReadDir(inh, &fi) == NO_ERROR)
-				if (!(fi.name[0] == '.' && (fi.name[1] == '\0' || (fi.name[1] == '.' && fi.name[2] == '\0'))))	/*单点和双点目录不复制*/
+				if (!(fi.name[0] == '.' && (fi.name[1] == '\0' || (fi.name[1] == '.' && fi.name[2] == '\0'))))	/*单点和双点目录不处理*/
 				{
 					*end = '/';
 					strcpy(end + 1, fi.name);
@@ -324,7 +330,7 @@ void CopyTree(char *path)
 /*粘贴按钮处理*/
 void PasteBtnPressProc(CTRL_BTN *btn)
 {
-	if (op != OP_NONE)	/*已剪切或复制文件*/
+	if (op == OP_CUT || op == OP_COPY)	/*已剪切或复制文件*/
 	{
 		CopyTree(PathBuf);
 		if (op == OP_CUT)
@@ -350,19 +356,100 @@ void DelBtnPressProc(CTRL_BTN *btn)
 	}
 }
 
+/*名称输入框回车处理*/
+void NameEdtEnterProc(CTRL_SEDT *edt)
+{
+	switch (op)
+	{
+	case OP_DIR:
+		FSMkDir(edt->text);
+		break;
+	case OP_FILE:
+		FScreat(edt->text);
+		break;
+	case OP_REN:
+		FSrename(FileList->SelItem->text + 3, edt->text);
+		break;
+	}
+	GCFillRect(&edt->obj.uda, 0, 0, edt->obj.uda.width, edt->obj.uda.height, 0xCCCCCC);
+	GUIdestroy(edt->obj.gid);
+	NameEdt = NULL;
+	GCBtnSetDisable(DirBtn, FALSE);
+	GCBtnSetDisable(FileBtn, FALSE);
+	GCBtnSetDisable(RenBtn, FALSE);
+	GCBtnSetDisable(ParBtn, FALSE);
+}
+
+/*名称输入框消息处理*/
+long NameEdtMsgProc(THREAD_ID ptid, DWORD data[MSG_DATA_LEN])
+{
+	CTRL_SEDT *edt = (CTRL_SEDT*)data[GUIMSG_GOBJ_ID];
+	switch (data[MSG_API_ID] & MSG_API_MASK)
+	{
+	case GM_CREATE:
+		GUISetFocus(edt->obj.gid);
+		break;
+	case GM_KEY:
+		if ((data[1] & 0xFF) == 27)	/*按下ESC*/
+		{
+			GCFillRect(&edt->obj.uda, 0, 0, edt->obj.uda.width, edt->obj.uda.height, 0xCCCCCC);
+			GUIdestroy(edt->obj.gid);
+			NameEdt = NULL;
+			GCBtnSetDisable(DirBtn, FALSE);
+			GCBtnSetDisable(FileBtn, FALSE);
+			GCBtnSetDisable(RenBtn, FALSE);
+			GCBtnSetDisable(ParBtn, FALSE);
+			return NO_ERROR;
+		}
+		break;
+	}
+	return GCSedtDefMsgProc(ptid, data);
+}
+
+/*创建名称输入框*/
+void CreateNameEdt(const char *text)
+{
+	CTRL_ARGS args;
+
+	if (NameEdt == NULL)
+	{
+		args.width = BTN_WIDTH;
+		args.height = EDT_HEIGHT;
+		args.x = ParBtn->obj.x;
+		args.y = ParBtn->obj.y + BTN_HEIGHT * 8 + SIDE * 8;
+		args.style = 0;
+		args.MsgProc = NameEdtMsgProc;
+		GCSedtCreate(&NameEdt, &args, MainWnd->obj.gid, &MainWnd->obj, text, NameEdtEnterProc);
+	}
+	GCBtnSetDisable(PasteBtn, TRUE);
+	GCBtnSetDisable(DirBtn, TRUE);
+	GCBtnSetDisable(FileBtn, TRUE);
+	GCBtnSetDisable(RenBtn, TRUE);
+}
+
 /*创建目录按钮处理*/
 void DirBtnPressProc(CTRL_BTN *btn)
 {
+	CreateNameEdt(NULL);
+	op = OP_DIR;
 }
 
 /*创建文件按钮处理*/
 void FileBtnPressProc(CTRL_BTN *btn)
 {
+	CreateNameEdt(NULL);
+	op = OP_FILE;
 }
 
 /*重命名按钮处理*/
 void RenamBtnPressProc(CTRL_BTN *btn)
 {
+	if (FileList->SelItem)	/*选中文件*/
+	{
+		CreateNameEdt(FileList->SelItem->text + 3);
+		GCBtnSetDisable(ParBtn, TRUE);
+		op = OP_REN;
+	}
 }
 
 /*主窗口消息处理*/
@@ -414,7 +501,7 @@ long MainMsgProc(THREAD_ID ptid, DWORD data[MSG_DATA_LEN])
 			GCBtnCreate(&FileBtn, &args, wnd->obj.gid, &wnd->obj, "创建文件", NULL, FileBtnPressProc);
 			args.y += BTN_HEIGHT + SIDE;
 			args.style = BTN_STYLE_DISABLED;
-			GCBtnCreate(&RenamBtn, &args, wnd->obj.gid, &wnd->obj, "重命名", NULL, RenamBtnPressProc);
+			GCBtnCreate(&RenBtn, &args, wnd->obj.gid, &wnd->obj, "重命名", NULL, RenamBtnPressProc);
 		}
 		break;
 	case GM_SIZE:
@@ -450,7 +537,7 @@ long MainMsgProc(THREAD_ID ptid, DWORD data[MSG_DATA_LEN])
 			y += BTN_HEIGHT + SIDE;
 			GCGobjMove(&FileBtn->obj, x, y);
 			y += BTN_HEIGHT + SIDE;
-			GCGobjMove(&RenamBtn->obj, x, y);
+			GCGobjMove(&RenBtn->obj, x, y);
 		}
 		break;
 	}
@@ -459,7 +546,6 @@ long MainMsgProc(THREAD_ID ptid, DWORD data[MSG_DATA_LEN])
 
 int main()
 {
-	CTRL_WND *wnd;
 	CTRL_ARGS args;
 	long res;
 
@@ -473,9 +559,9 @@ int main()
 	args.y = (GCheight - args.height) / 2;
 	args.style = WND_STYLE_CAPTION | WND_STYLE_BORDER | WND_STYLE_CLOSEBTN | WND_STYLE_MAXBTN | WND_STYLE_MINBTN | WND_STYLE_SIZEBTN;
 	args.MsgProc = MainMsgProc;
-	GCWndCreate(&wnd, &args, 0, NULL, "资源管理器");
-	wnd->MinWidth = WND_WIDTH;
-	wnd->MinHeight = WND_HEIGHT;
+	GCWndCreate(&MainWnd, &args, 0, NULL, "资源管理器");
+	MainWnd->MinWidth = WND_WIDTH;
+	MainWnd->MinHeight = WND_HEIGHT;
 
 	for (;;)
 	{
@@ -486,7 +572,7 @@ int main()
 			break;
 		if (GCDispatchMsg(ptid, data) == NO_ERROR)	/*处理GUI消息*/
 		{
-			if ((data[MSG_API_ID] & MSG_API_MASK) == GM_DESTROY && data[GUIMSG_GOBJ_ID] == (DWORD)wnd)	/*销毁主窗体,退出程序*/
+			if ((data[MSG_API_ID] & MSG_API_MASK) == GM_DESTROY && data[GUIMSG_GOBJ_ID] == (DWORD)MainWnd)	/*销毁主窗体,退出程序*/
 				break;
 		}
 	}
